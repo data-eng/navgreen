@@ -76,6 +76,45 @@ for col in pressure:
     df[col][(df[col]<0)|(df[col]>35)] = np.nan
 
 
+def make_point( measurement, row, value_columns, tag_columns ):
+    p = influxdb_client.Point( measurement )
+    p.time( df.loc[row,"DATETIME"].value, write_precision="ns" )
+    # Tag with the state of the valves, as context
+    for col in tag_columns:
+        if df.loc[row,col] is not np.nan:
+            p.tag( col, df.loc[row,col] )
+    # Add the sensor data fields
+    for col in value_columns:
+        if df.loc[row,col] is not np.nan:
+            p.field( col, df.loc[row,col] )
+    return p
+
+
+def write_data( df, url, tok, org ):
+    client = influxdb_client.InfluxDBClient( url=url, token=tok, org=org ) 
+    api = client.write_api( write_options=SYNCHRONOUS )
+    #for ind in df.index:
+    #for ind in range(748180,750180): # 2023-09-26
+    for ind in range(712888,714888): # 2023-09-01, THREE_WAY_EVAP_OPERATION change
+        p = make_point( "temperature", ind, temp_sensors, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        p = make_point( "pressure", ind, pressure, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        p = make_point( "flow", ind, flow, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        p = make_point( "power", ind, power, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        p = make_point( "solar", ind, solar, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        p = make_point( "other", ind, other, control )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        # Also add controls as values, for viz
+        p = make_point( "control", ind, control, [] )
+        api.write( bucket="stasinos-playground", org="torg", record=p )
+        if ind % 100 == 0:
+            print( "Row {} written".format(ind) )
+
+
 if 1==0:
     for col in other_temp:
         for offset in [1,5,10]:
@@ -87,40 +126,9 @@ if 1==0:
             print( delta.describe() )
     df.to_csv("aa.csv")
 
-def make_point( measurement, row, columns ):
-    p = influxdb_client.Point( measurement )
-    p.time( df.loc[row,"DATETIME"].value, write_precision="ns" )
-    # Tag with the state of the valves, as context
-    for col in control:
-        if df.loc[row,col] is not np.nan:
-            p.tag( col, df.loc[row,col] )
-    # Add the sensor data fields
-    for col in columns:
-        if df.loc[row,col] is not np.nan:
-            p.field( col, df.loc[row,col] )
-    return p
 
 if 1==1:
-
-    client = influxdb_client.InfluxDBClient(
-        url="http://myurl.com:8086",
-        token="secret",
-        org="torg" )
-    api = client.write_api( write_options=SYNCHRONOUS )
-    for ind in df.index:
-        p = make_point( "temperature", ind, temp_sensors )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "pressure", ind, pressure )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "flow", ind, flow )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "flow", ind, flow )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "power", ind, power )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "solar", ind, solar )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        p = make_point( "other", ind, other )
-        api.write( bucket="stasinos-playground", org="torg", record=p )
-        if ind % 1000 == 0:
-            print( "{} rows loaded".format(ind) )
+    url = "http://myurl.com:8086",
+    tok = "secret",
+    org = "torg"
+    write_data( df, url, tok, org )
