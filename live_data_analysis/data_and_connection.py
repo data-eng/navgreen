@@ -8,6 +8,8 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime
 import time
 
+import os
+
 
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
@@ -29,6 +31,9 @@ def write_data(row, url, token, organization):
     api = influx_client.write_api(write_options=SYNCHRONOUS)
 
     # Apply reasonable limits
+    for col in solar:
+        if row[col] > 2.0:
+            row[col] = 0.0
     for col in temp_sensors:
         if row[col] < -20.0 or row[col] > 100.0:
             row[col] = np.nan
@@ -37,20 +42,20 @@ def write_data(row, url, token, organization):
             row[col] = np.nan
 
     p = make_point("pressure", row, pressure, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     p = make_point("temperature", row, temp_sensors, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     p = make_point("flow", row, flow, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     p = make_point("power", row, power, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     p = make_point("solar", row, solar, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     p = make_point("other", row, other, control)
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     # Also add controls as values, for viz
     p = make_point("control", row, control, [])
-    api.write(bucket="navgreen", org="torg", record=p)
+    api.write(bucket="mult_source_heatpump", org=organization, record=p)
     print("all ok")
 
 
@@ -74,8 +79,7 @@ df.rename(columns={
     "3-WAY_EVAP_OPERATION": "THREE_WAY_EVAP_OPERATION",
     "3-WAY_COND_OPERATION": "THREE_WAY_COND_OPERATION",
     "3-WAY_SOLAR_OPERATION": "THREE_WAY_SOLAR_OPERATION",
-    "4_WAY_VALVE": "FOUR_WAY_VALVE",
-    "Date&time": "DATETIME"}, inplace=True)
+    "4_WAY_VALVE": "FOUR_WAY_VALVE"}, inplace=True)
 
 print("Finished loading CSV, shape: {}".format(df.shape))
 
@@ -125,13 +129,14 @@ temp_sensors.extend(water_temp)
 temp_sensors.extend(other_temp)
 temp_sensors.extend(ref_temp)
 
+
 # CREDENTIALS: CAREFUL
-url = ""
-tok = ""
-org = ""
+url = os.environ.get('Url_influx_db')
+tok = os.environ.get('Write_token')
+org = os.environ.get('Organization_influx')
 
 # PLC IP address and port
-plc_ip = ""
+plc_ip = os.environ.get('Plc_ip')
 plc_port = 502
 read_interval = 30  # Seconds
 reconnect_interval = 10  # Seconds
@@ -150,8 +155,7 @@ Else: If there is no exception then this block will be executed
 Finally: Finally block always gets executed either exception is generated or not
 """
 
-dataframe_date = datetime.utcnow()
-dataframe_date = dataframe_date.strftime('%Y-%m-%d')
+dataframe_date = datetime.now().strftime("%Y-%m-%d")
 
 while True:
 
@@ -179,52 +183,40 @@ while True:
                     # READ PLC REGISTERS
 
                     # Read_condenser_out temperature
-                    value = result.registers[0]
-                    T_cond_out = value / 10
+                    T_cond_out = result.registers[0] / 10
                     # print(f"T_condenser_out: {T_cond_out}")
                     # Read_condenser_in value
-                    value = result.registers[1]
-                    T_cond_in = value / 10
+                    T_cond_in = result.registers[1] / 10
                     # print(f"T_condenser_in: {T_cond_in}")
                     # Read_condenser_flow_value
-                    value = result.registers[2]
-                    flow_condenser = value / 10000  # convert to m^3/h
+                    flow_condenser = result.registers[2] / 10000  # convert to m^3/h
                     # print(f"flow_condenser: {flow_condenser}")
                     # Read_evaporator_out temperature
-                    value = result.registers[3]
-                    T_evap_out = value / 10
+                    T_evap_out = result.registers[3] / 10
                     # print(f"T_evap_out: {T_evap_out}")
                     # Read_evaporator_in value
-                    value = result.registers[4]
-                    T_evap_in = value / 10
+                    T_evap_in = result.registers[4] / 10
                     # print(f"T_evap_in: {T_evap_in}")
                     # Read_evaporator_flow_value
-                    value = result.registers[5]
-                    flow_evap = value / 10000  # convert to m^3/h
+                    flow_evap = result.registers[5] / 10000  # convert to m^3/h
                     # print(f"flow_evaporator: {flow_evap}")
                     # Read_Ambient air temperature
-                    value = result.registers[6]
-                    T_air_source = value / 10
+                    T_air_source = result.registers[6] / 10
                     # print(f"T_air_source: {T_air_source}")
                     # Read_BTES_TEMPERATURE
-                    value = result.registers[7]
-                    T_BTES_source = value / 10
+                    T_BTES_source = result.registers[7] / 10
                     # print(f"T_btes_source: {T_BTES_source}")
                     # Read_solar_buffer_TEMPERATURE
-                    value = result.registers[8]
-                    T_solar_buffer_source = value / 10
+                    T_solar_buffer_source = result.registers[8] / 10
                     # print(f"T_solar_buffer_source: {T_solar_buffer_source}")
                     # Read_space_heating_temperature
-                    value = result.registers[9]
-                    T_space_heating_buffer = value / 10
+                    T_space_heating_buffer = result.registers[9] / 10
                     # print(f"T_space_heating_buffer: {T_space_heating_buffer}")
                     # Read_solar_buffer_TEMPERATURE
-                    value = result.registers[10]
-                    T_DHW_buffer = value / 10
+                    T_DHW_buffer = result.registers[10] / 10
                     # print(f"T_DHW_buffer: {T_DHW_buffer}")
                     # Read_indoor_TEMPERATURE
-                    value = result.registers[11]
-                    T_indoor_temp = value / 10
+                    T_indoor_temp = result.registers[11] / 10
                     # print(f"T_indoor_temperature: {T_indoor_temp}")
                     # Read_DHW_outlet_temperature
                     T_dhw_out = result.registers[12] / 10
@@ -274,7 +266,6 @@ while True:
                     Condenser_three_way = result_coils.bits[3]
                     print(f"Condenser_three_way: {Condenser_three_way}")
 
-                    ##############################################################################
                     # READ HOLDING REGISTERS AGAIN
                     # Read_temperature_from_space_buffer_to_demand
                     T_from_sh_to_demand = results_registers2.registers[0] / 10
@@ -359,7 +350,7 @@ while True:
                     print(f"BTES_WATER_AIR_OPERATION: {BTES_WATER_AIR_OPERATION}")
 
                     # HEATING_COOLING_MODE
-                    HEATING_COOLING_MODE = (result_coils2.bits[5])
+                    HEATING_COOLING_MODE = result_coils2.bits[5]
                     # IF ON MODE IS HEATING , IF OFF MODE IS COOLING
                     print(f"HEATING_COOLING_MODE: {HEATING_COOLING_MODE}")
 
@@ -369,11 +360,15 @@ while True:
                     print(f"BMES_LOCAL_CONTROL: {BMES_LOCAL_CONTROL}")
 
                     current_datetime = datetime.utcnow()
-                    current_date = current_datetime.strftime('%Y-%m-%d')
                     current_datetime = current_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-                    if current_date != dataframe_date:
-                        dataframe_date = current_date
+                    current_date_local = datetime.now().strftime("%Y-%m-%d")
+
+                    print(dataframe_date)
+                    print(current_date_local)
+
+                    if current_date_local != dataframe_date:
+                        dataframe_date = current_date_local
                         df.drop(df.index, inplace=True)
 
                     new_row = {"DATETIME": current_datetime,  # "DATETIME": pd.to_datetime(current_datetime),
@@ -460,7 +455,7 @@ while True:
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
-        # time.sleep(reconnect_interval)
+        time.sleep(reconnect_interval)
         continue
 
     finally:
