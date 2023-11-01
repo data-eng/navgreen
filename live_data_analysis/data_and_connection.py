@@ -32,7 +32,7 @@ def write_data(row, url, token, organization, bucket):
 
     # Apply reasonable limits
     for col in solar:
-        if row[col] > 2.0:
+        if row[col] > 2.0: # Error that happens at night-time
             row[col] = 0.0
     for col in temp_sensors:
         if row[col] < -20.0 or row[col] > 100.0:
@@ -59,13 +59,11 @@ def write_data(row, url, token, organization, bucket):
     print("Write ok")
 
 
-water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER",
-                  "PVT_OUT_FROM_SOLAR_BUFFER", "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT",
-                  "BTES_TANK_IN", "BTES_TANK_OUT", "SOLAR_HEAT_REJECTION_IN",
-                  "SOLAR_HEAT_REJECTION_OUT", "WATER_IN_EVAP", "WATER_OUT_EVAP",
-                  "WATER_IN_COND", "WATER_OUT_COND", "SH1_IN", "SH1_RETURN",
-                  "AIR_HP_TO_BTES_TANK", "DHW_INLET", "DHW_OUTLET", "DHW_BOTTOM",
-                  "SH_INLET", "SH_RETURN", "PVT_IN", "PVT_OUT"]
+water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
+              "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "SOLAR_HEAT_REJECTION_IN",
+              "SOLAR_HEAT_REJECTION_OUT", "WATER_IN_EVAP", "WATER_OUT_EVAP", "WATER_IN_COND", "WATER_OUT_COND",
+              "SH1_IN", "SH1_RETURN", "AIR_HP_TO_BTES_TANK", "DHW_INLET", "DHW_OUTLET", "DHW_BOTTOM", "SH_INLET",
+              "SH_RETURN", "PVT_IN", "PVT_OUT"]
 
 other_temp = ["OUTDOOR_TEMP", "BTES_TANK", "SOLAR_BUFFER_TANK", "SH_BUFFER", "DHW_BUFFER", "INDOOR_TEMP"]
 
@@ -139,26 +137,13 @@ if __name__ == "__main__":
     org = os.environ.get('Organization_influx')
     bucket = os.environ.get('Bucket')
 
-    # PLC IP address and port
+    # PLC IP address, port and connection intervals
     plc_ip = os.environ.get('Plc_ip')
     plc_port = 502
     read_interval = 30  # Seconds
     reconnect_interval = 10  # Seconds
 
-    """
-    This python code uses try - exception - finally statements in order to establish the communication with the PLC.
-
-    The try except statement can handle exceptions. Exceptions may happen when you run a program.
-    Exceptions are errors that happen during execution of the program. Python won’t tell you about errors like syntax errors 
-    (grammar faults), instead it will abruptly stop.
-
-    Try: This block will test the excepted error to occur. If it runs everything is ok. If it has an error, then the except 
-    block will execute.
-    Except:  Here you can handle the error
-    Else: If there is no exception then this block will be executed
-    Finally: Finally block always gets executed either exception is generated or not
-    """
-
+    # Get current date
     dataframe_date = datetime.now().strftime("%Y-%m-%d")
 
     while True:
@@ -184,30 +169,25 @@ if __name__ == "__main__":
                     if result.isError():
                         print("Error reading register.")
                     else:
-                        # READ PLC REGISTERS
 
-                        # Read_condenser_out temperature
+                        # Read from PLC and convert to specific unit
+
+                        # READ PLC REGISTERS
                         T_cond_out = result.registers[0] / 10
                         # print(f"T_condenser_out: {T_cond_out}")
-                        # Read_condenser_in value
                         T_cond_in = result.registers[1] / 10
                         # print(f"T_condenser_in: {T_cond_in}")
-                        # Read_condenser_flow_value
                         flow_condenser = result.registers[2] / 10000  # convert to m^3/h
                         # print(f"flow_condenser: {flow_condenser}")
-                        # Read_evaporator_out temperature
                         T_evap_out = result.registers[3] / 10
                         # print(f"T_evap_out: {T_evap_out}")
-                        # Read_evaporator_in value
                         T_evap_in = result.registers[4] / 10
                         # print(f"T_evap_in: {T_evap_in}")
-                        # Read_evaporator_flow_value
                         flow_evap = result.registers[5] / 10000  # convert to m^3/h
                         # print(f"flow_evaporator: {flow_evap}")
                         # Read_Ambient air temperature
                         T_air_source = result.registers[6] / 10
                         # print(f"T_air_source: {T_air_source}")
-                        # Read_BTES_TEMPERATURE
                         T_BTES_source = result.registers[7] / 10
                         # print(f"T_btes_source: {T_BTES_source}")
                         # Read_solar_buffer_TEMPERATURE
@@ -249,26 +229,22 @@ if __name__ == "__main__":
                         # print(f"POWER_HP: {Total_electric_power}")
 
                         # READ COILS FROM PLC
-
                         # Read_air_source_command
                         Air_source_valve = result_coils.bits[0]
                         # IF OFF WATER SOURCE, IF ON AIR SOURCE
-                        print(f"Air_source_command: {Air_source_valve}")
-
+                        # print(f"Air_source_command: {Air_source_valve}")
                         # Read_BTES_SOURCE_valve_setting
                         # if OFF solar buffer, if ON BTES tank
                         BTES_source_valve = result_coils.bits[1]
-                        print(f"BTES_source_command: {BTES_source_valve}")
-
+                        # print(f"BTES_source_command: {BTES_source_valve}")
                         # Read_PVT_flow_valve_setting
                         # IF ON THEN DHW TANK, if OFF solar buffer tank
                         PVT_setting_valve = result_coils.bits[2]
-                        print(f"PVT_setting_valve: {PVT_setting_valve}")
-
+                        # print(f"PVT_setting_valve: {PVT_setting_valve}")
                         # Condenser_heat_output_direction
                         # IF ON HEAT TO SPACE BUFFER, IF OFF HEAT TO DHW TANK
                         Condenser_three_way = result_coils.bits[3]
-                        print(f"Condenser_three_way: {Condenser_three_way}")
+                        # print(f"Condenser_three_way: {Condenser_three_way}")
 
                         # READ HOLDING REGISTERS AGAIN
                         # Read_temperature_from_space_buffer_to_demand
@@ -320,11 +296,9 @@ if __name__ == "__main__":
                         # Read_temperature_BTES_out_to_HP_in
                         T_BTES_out_to_hp_in = results_registers2.registers[15] / 10
                         # print(f"T_BTES_out_to_hp_in: {T_BTES_out_to_hp_in}")
-
                         # DHW_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
                         T_setpoint_DHW_modbus = results_registers2.registers[16] / 10
                         # print(f"T_setpoint_DHW_modbus: {T_setpoint_DHW_modbus}")
-
                         # SPACE_HEATING_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
                         T_setpoint_SPACE_HEATING_modbus = results_registers2.registers[17] / 10
                         # print(f"T_setpoint_SPACE_HEATING_modbus: {T_setpoint_SPACE_HEATING_modbus}")
@@ -336,45 +310,39 @@ if __name__ == "__main__":
                         # print(f"Residential_office: {Residential_office}")
 
                         # COILS FOR BMES to know the valve position
-                        # Heating_dhw_three_way_valve
                         BTES_HEATING_DHW_THREE_WAY = result_coils2.bits[1]
                         # IF BTES_HEATING_DHW_THREE_WAY = 0N THEN SPACE BUFFER, IF ITS OFF THEN DHW
-                        print(f"BTES_HEATING_DHW_THREE_WAY: {BTES_HEATING_DHW_THREE_WAY}")
-                        # GROUND_SOLAR_THREE_WAY_VALVE
+                        # print(f"BTES_HEATING_DHW_THREE_WAY: {BTES_HEATING_DHW_THREE_WAY}")
                         BTES_GROUND_SOLAR_VALVE = result_coils2.bits[2]
                         # IF ON MODE IS GROUND , IF OFF MODE IS SOLAR_BUFFER
-                        print(f"BTES_GROUND_SOLAR_VALVE: {BTES_GROUND_SOLAR_VALVE}")
-                        # SOLAR_THREE_WAY_VALVE
+                        # print(f"BTES_GROUND_SOLAR_VALVE: {BTES_GROUND_SOLAR_VALVE}")
                         BTES_SOLAR_THREE_WAY_VALVE = result_coils2.bits[3]
                         # IF ON MODE IS DHW TANK , IF OFF MODE IS SOLAR_BUFFER
-                        print(f"BTES_SOLAR_THREE_WAY_VALVE: {BTES_SOLAR_THREE_WAY_VALVE}")
-                        # WATER_AIR_COOLED_BTES_COMMAND
+                        # print(f"BTES_SOLAR_THREE_WAY_VALVE: {BTES_SOLAR_THREE_WAY_VALVE}")
                         BTES_WATER_AIR_OPERATION = result_coils2.bits[4]
                         # IF ON MODE IS AIR SOURCE , IF OFF MODE IS WATER_SOURCE
-                        print(f"BTES_WATER_AIR_OPERATION: {BTES_WATER_AIR_OPERATION}")
+                        # print(f"BTES_WATER_AIR_OPERATION: {BTES_WATER_AIR_OPERATION}")
 
                         # HEATING_COOLING_MODE
                         HEATING_COOLING_MODE = result_coils2.bits[5]
                         # IF ON MODE IS HEATING , IF OFF MODE IS COOLING
                         print(f"HEATING_COOLING_MODE: {HEATING_COOLING_MODE}")
-
                         # BMES_LOCAL_CONTROL
                         BMES_LOCAL_CONTROL = result_coils2.bits[6]
                         # IF ON MODE IS LOCAL , IF OFF MODE IS MODBUS
                         print(f"BMES_LOCAL_CONTROL: {BMES_LOCAL_CONTROL}")
 
+                        # Get some dates
                         current_datetime = datetime.utcnow()
                         current_datetime = current_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
 
                         current_date_local = datetime.now().strftime("%Y-%m-%d")
 
-                        print(dataframe_date)
-                        print(current_date_local)
-
                         if current_date_local != dataframe_date:
                             dataframe_date = current_date_local
                             df.drop(df.index, inplace=True)
 
+                        # The data till now (CONVERTED) are taken into account from the TESTCASE in test_live_data.py
                         new_row = {"DATETIME": current_datetime,  # "DATETIME": pd.to_datetime(current_datetime),
                                    "PVT_IN_TO_DHW": T_pvt_in_to_dhw,
                                    "PVT_OUT_FROM_DHW": T_dhw_out_to_pvt,
@@ -427,8 +395,7 @@ if __name__ == "__main__":
                                    "POWER_PVT": Power_PV,
                                    "PYRANOMETER": Solar_irr_tilted,
                                    "Compressor_HZ": np.nan,
-                                   "EEV_LOAD1": np.nan,
-                                   "EEV_LOAD2": np.nan,
+                                   "EEV_LOAD1": np.nan, "EEV_LOAD2": np.nan,
                                    "THREE_WAY_EVAP_OPERATION": BTES_GROUND_SOLAR_VALVE,
                                    "THREE_WAY_COND_OPERATION": BTES_HEATING_DHW_THREE_WAY,
                                    "THREE_WAY_SOLAR_OPERATION": BTES_SOLAR_THREE_WAY_VALVE,
@@ -449,7 +416,6 @@ if __name__ == "__main__":
                         df.loc[len(df)] = new_row_with_time
                         df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
                                   mode='w', index=False)
-                        ##############################################################################
 
                     # Wait for the specified interval
                     time.sleep(read_interval)
