@@ -32,7 +32,7 @@ def write_data(row, url, token, organization, bucket):
 
     # Apply reasonable limits
     for col in solar:
-        if row[col] > 2.0: # Error that happens at night-time
+        if row[col] > 2.0:  # Error that happens at nighttime
             row[col] = 0.0
     for col in temp_sensors:
         if row[col] < -20.0 or row[col] > 100.0:
@@ -56,7 +56,7 @@ def write_data(row, url, token, organization, bucket):
     # Also add controls as values, for viz
     p = make_point("control", row, control, [])
     api.write(bucket=bucket, org=organization, record=p)
-    print("Write ok")
+    # print("Write ok")
 
 
 water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
