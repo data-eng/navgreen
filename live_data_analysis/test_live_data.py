@@ -1,84 +1,16 @@
-import influxdb_client
 import pandas as pd
 import numpy as np
 import os
 
-from data_and_connection import write_data
-from data_and_connection import temp_sensors, pressure, solar
-
-import warnings
-from influxdb_client.client.warnings import MissingPivotFunction
-warnings.simplefilter("ignore", MissingPivotFunction)
+from navgreen_base import write_data, delete_data, read_data
+from . import temp_sensors, pressure, solar
+from . import TESTDATAPATH
 
 
-def delete_data(url, token, organization, bucket):
-    """
-    Deletes all data from a specified bucket.
-    :param url: Url of the InfluxDB
-    :param token: Authorization token
-    :param organization: Organization where the bucket belongs
-    :param bucket: The bucket to delete data from
-    :return: None
-    """
-    influx_client = influxdb_client.InfluxDBClient(url=url, token=token, org=organization)
-    api = influx_client.delete_api()
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="temperature"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="pressure"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="flow"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="solar"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="other"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="power"')
-    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
-               predicate='_measurement="control"')
-
-
-def read_data(url, token, organization, bucket):
-    """
-    Reads data from a specified bucket and stores it in a DataFrame
-    :param url: Url of the InfluxDB
-    :param token: Authorization token
-    :param organization: Organization where the bucket belongs
-    :param bucket: The bucket to delete data from
-    :return: The DataFrame
-    """
-    influx_client = influxdb_client.InfluxDBClient(url=url, token=token, org=organization)
-    api = influx_client.query_api()
-    query = f'from(bucket: "{bucket}") |> range(start: 0)'
-    print("Started reading...")
-
-    data = api.query_data_frame(org=organization, query=query)
-
-    dfs = []
-    for datum in data:
-        # Pivot the DataFrame to separate fields into different columns
-        df = datum.pivot(index='_time', columns='_field', values='_value')
-        # Reset the index to make the '_time' column a regular column
-        df.reset_index(inplace=True)
-        df.columns.name = None
-
-        dfs += [df]
-
-    df1 = dfs[0]
-    df2 = dfs[1]
-    df = pd.concat([df1, df2], axis=1, join='outer', sort=False)
-    df = df.rename(columns={'_time': 'DATETIME'})
-    df = df.loc[:, ~df.columns.duplicated(keep='first')]
-
-    print("Ended reading.")
-
-    return df
-
-
-if __name__ == "__main__":
+def tester():
 
     # Load 'sample input'
-    sample_input = pd.read_csv("./test/sample_input.csv")
+    sample_input = pd.read_csv(TESTDATAPATH+"sample_input.csv")
 
     # Import credentials
     url = os.environ.get('Url_influx_db')
@@ -102,7 +34,7 @@ if __name__ == "__main__":
     
     # Get the 'sample output' by querying the test bucket
     sample_output = read_data(url, auth_token, org, bucket)
-    sample_output.to_csv('./test/sample_output.csv')
+    sample_output.to_csv( TESTDATAPATH+"sample_output.csv" )
 
     # Check that the two dataframes have the same number of rows
     assert sample_output.shape[0] == sample_input.shape[0]
