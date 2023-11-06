@@ -65,8 +65,6 @@ def read_data(url, token, organization, bucket):
     influx_client = influxdb_client.InfluxDBClient(url=url, token=token, org=organization)
     api = influx_client.query_api()
     query = f'from(bucket: "{bucket}") |> range(start: 0)'
-    print("Started reading...")
-
     data = api.query_data_frame(org=organization, query=query)
 
     dfs = []
@@ -84,8 +82,6 @@ def read_data(url, token, organization, bucket):
     df = pd.concat([df1, df2], axis=1, join='outer', sort=False)
     df = df.rename(columns={'_time': 'DATETIME'})
     df = df.loc[:, ~df.columns.duplicated(keep='first')]
-
-    print("Ended reading.")
 
     return df
 

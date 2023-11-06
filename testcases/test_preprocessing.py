@@ -14,55 +14,61 @@ class TestPreproc( unittest.TestCase ):
     @classmethod
     def setUpClass( cls ):
         # Import credentials
-        cls._url = os.environ.get('Url_influx_db')
-        cls._org = os.environ.get('Organization_influx')
-        cls._auth_token = os.environ.get('Auth_token')
+        url = os.environ.get('Url_influx_db')
+        auth_token = os.environ.get('Auth_token')
+        org = os.environ.get('Organization_influx')
         # Ignore env variable, always use this bucket for tests
-        cls._bucket = "test_bucket"
+        bucket = "test_bucket"
+
         # Load sample
-        cls._test_data_path = "./testcases/sample_data/"
-        cls._sample_input = pd.read_csv( cls._test_data_path+"sample_input.csv" )
-    # end def setUpClass()
+        test_data_path = "./testcases/sample_data/"
+        cls._sample_input = pd.read_csv( test_data_path+"sample_input.csv" )
 
-#    @classmethod
-#    def tearDownClass(cls):
-#        cls._connection.destroy()
-
-
-    def test_filters( self ):
         # Wipe clean the test bucket
-        print("Started deleting...")
-        delete_data( TestPreproc._url, TestPreproc._auth_token, TestPreproc._org, TestPreproc._bucket )
-        print("Ended deleting.")
+        print( "Emptying test_bucket... ", end="" )
+        delete_data( url, auth_token, org, bucket )
+        print("DONE.")
 
         # Read each data sample and write it to the test bucket
         # Function 'navgreen_base.write_data' does the preprocessing etc
-        print("Started writing...")
-        for _, row in TestPreproc._sample_input.iterrows():
-            write_data( row, TestPreproc._url, TestPreproc._auth_token, TestPreproc._org, TestPreproc._bucket )
-        print("Ended writing.")
+        print( "Writing test samples to test_bucket... ", end="" )
+        for _, row in cls._sample_input.iterrows():
+            write_data( row, url, auth_token, org, bucket )
+        print("DONE.")
 
         # Get the 'sample output' by querying the test bucket
-        sample_output = read_data( TestPreproc._url, TestPreproc._auth_token, TestPreproc._org, TestPreproc._bucket )
-        sample_output.to_csv( TestPreproc._test_data_path+"sample_output.csv" )
-
-        # Check that the two dataframes have the same number of rows
-        self.assertEqual( sample_output.shape[0], TestPreproc._sample_input.shape[0] )
+        print( "Reading test samples back from test_bucket... ", end="" )
+        cls._sample_output = read_data( url, auth_token, org, bucket )
+        print("DONE.")
+        cls._sample_output.to_csv( test_data_path+"sample_output.csv" )
 
         # Get the columns of the sample input that have all their values equal to np.nan
-        all_nan_columns_input = TestPreproc._sample_input.columns[TestPreproc._sample_input.isna().all()]
+        all_nan_columns_input = cls._sample_input.columns[cls._sample_input.isna().all()]
 
         # Delete the NaN columns from the DataFrame as well as the 'index', the 'Date_time_local'
         # because they do not exist in the sample_output
         cols_to_del = list(all_nan_columns_input) + ['index', 'Date_time_local']
-        sample_input = TestPreproc._sample_input.drop(columns=cols_to_del)
+        cls._sample_input.drop( columns=cols_to_del, inplace=True )
 
-        columns_unique_to_input = set(sample_input.columns) - set(sample_output.columns)
+    # end def setUpClass()
+
+
+    def test_rows( self ):
+        # Check that the two dataframes have the same number of rows
+        self.assertEqual( TestPreproc._sample_output.shape[0], TestPreproc._sample_input.shape[0] )
+    # end def test_rows()
+
+    def test_extra_columns( self ):
+        sample_input = TestPreproc._sample_input
+        sample_output = TestPreproc._sample_output
         columns_unique_to_output = set(sample_output.columns) - set(sample_input.columns)
-
-        # sample output should not have different values
         self.assertEqual( columns_unique_to_output, set() )
+    # end def test_extra_columns()
 
+    def test_missing_columns( self ):
+        sample_input = TestPreproc._sample_input
+        sample_output = TestPreproc._sample_output
+        columns_unique_to_input = set(sample_input.columns) - set(sample_output.columns)
         # If sample input still has different columns:
         # Check if their values are outliers & were eliminated by the pre-processing
         if columns_unique_to_input != set():
@@ -86,11 +92,11 @@ class TestPreproc( unittest.TestCase ):
 
         # Check that the two dataframes have the same number of columns
         self.assertEqual( sample_output.shape[1], sample_input.shape[1] )
+    # end def test_missing_columns()
 
-        sample_output = sample_output.reset_index()
-        sample_input = sample_input.reset_index()
-
-        # Make sure the columns are ordered in the same way
+    def test_columns_order( self ):
+        sample_output = TestPreproc._sample_output.reset_index()
+        sample_input = TestPreproc._sample_input.reset_index()
         sample_input = sample_input[sample_output.columns]
 
         # Also, convert date of sample input to the influx format
@@ -109,7 +115,6 @@ class TestPreproc( unittest.TestCase ):
 
         # Compare the two DataFrames
         self.assertTrue( sample_input.compare(sample_output).empty )
-
-    # end def test_filters()
+    # end def test_columns_order()
 
 # end class TestPreproc()
