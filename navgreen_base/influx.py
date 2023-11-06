@@ -4,6 +4,10 @@ import pandas as pd
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 
+import warnings
+from influxdb_client.client.warnings import MissingPivotFunction
+warnings.simplefilter("ignore", MissingPivotFunction)
+
 
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
