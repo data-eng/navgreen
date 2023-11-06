@@ -3,6 +3,8 @@ import pandas as pd
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
+import warnings
+from influxdb_client.client.warnings import MissingPivotFunction
 
 
 def make_point(measurement, row, value_columns, tag_columns):
@@ -62,6 +64,11 @@ def read_data(url, token, organization, bucket):
     :param bucket: The bucket to delete data from
     :return: The DataFrame
     """
+
+    # Supress warning about not having used pivot function
+    # to optimize processing by pandas
+    warnings.simplefilter("ignore", MissingPivotFunction)
+
     influx_client = influxdb_client.InfluxDBClient(url=url, token=token, org=organization)
     api = influx_client.query_api()
     query = f'from(bucket: "{bucket}") |> range(start: 0)'
