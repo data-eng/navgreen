@@ -95,6 +95,7 @@ class TestPreproc( unittest.TestCase ):
                 sample_input = sample_input.drop(columns=[column])
 
         # Check that the two dataframes have the same number of columns
+        # This is needed as the previous tests do not involve checking for duplicate columns that may occur
         self.assertEqual( sample_output.shape[1], sample_input.shape[1] )
     # end def test_missing_columns()
 
