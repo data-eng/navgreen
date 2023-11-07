@@ -21,8 +21,8 @@ class TestPreproc( unittest.TestCase ):
         bucket = "test_bucket"
 
         # Load sample
-        test_data_path = "./testcases/sample_data/"
-        cls._sample_input = pd.read_csv( test_data_path+"sample_input.csv" )
+        cls.test_data_path = "./testcases/sample_data/"
+        cls._sample_input = pd.read_csv( cls.test_data_path+"sample_input.csv" )
 
         # Wipe clean the test bucket
         print( "Emptying test_bucket... ", end="" )
@@ -40,7 +40,6 @@ class TestPreproc( unittest.TestCase ):
         print( "Reading test samples back from test_bucket... ", end="" )
         cls._sample_output = read_data( url, auth_token, org, bucket )
         print("DONE.")
-        cls._sample_output.to_csv( test_data_path+"sample_output.csv" )
 
         # Get the columns of the sample input that have all their values equal to np.nan
         all_nan_columns_input = cls._sample_input.columns[cls._sample_input.isna().all()]
@@ -52,6 +51,11 @@ class TestPreproc( unittest.TestCase ):
 
     # end def setUpClass()
 
+    def test_sample_output( self ):
+        # Check that nothing changes in the sample_output
+        sample_output_stored = pd.read_csv( TestPreproc.test_data_path+"sample_output.csv", index_col=0 )
+        self.assertTrue(sample_output_stored.compare(TestPreproc._sample_output).empty)
+    # end def test_sample_output()
 
     def test_rows( self ):
         # Check that the two dataframes have the same number of rows
