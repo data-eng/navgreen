@@ -3,60 +3,11 @@ from pymodbus.client import ModbusTcpClient
 import pandas as pd
 import numpy as np
 
-import influxdb_client
-from influxdb_client.client.write_api import SYNCHRONOUS
+from navgreen_base import make_point, write_data
 from datetime import datetime
 import time
 
 import os
-
-
-def make_point(measurement, row, value_columns, tag_columns):
-    p = influxdb_client.Point(measurement)
-    p.time(row["DATETIME"])
-
-    # Tag with the state of the valves, as context
-    for col in tag_columns:
-        if row[col] is not np.nan:
-            p.tag(col, row[col])
-    # Add the sensor data fields
-    for col in value_columns:
-        if row[col] is not np.nan:
-            p.field(col, row[col])
-    return p
-
-
-def write_data(row, url, token, organization, bucket):
-    influx_client = influxdb_client.InfluxDBClient(url=url, token=token, org=organization)
-    api = influx_client.write_api(write_options=SYNCHRONOUS)
-
-    # Apply reasonable limits
-    for col in solar:
-        if row[col] > 2.0:  # Error that happens at nighttime
-            row[col] = 0.0
-    for col in temp_sensors:
-        if row[col] < -20.0 or row[col] > 100.0:
-            row[col] = np.nan
-    for col in pressure:
-        if row[col] < 0.0 or row[col] > 35.0:
-            row[col] = np.nan
-
-    p = make_point("pressure", row, pressure, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("temperature", row, temp_sensors, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("flow", row, flow, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("power", row, power, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("solar", row, solar, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("other", row, other, control)
-    api.write(bucket=bucket, org=organization, record=p)
-    # Also add controls as values, for viz
-    p = make_point("control", row, control, [])
-    api.write(bucket=bucket, org=organization, record=p)
-    # print("Write ok")
 
 
 water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
