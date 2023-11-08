@@ -10,8 +10,10 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.13"
-pandas = "^2.1.2"
-influxdb-client = "^1.38.0"
+pandas = "^2.1"
+numpy = "^1.26"
+scipy = "^1.11"
+influxdb-client = "^1.38"
 pymodbus = "^3.5.4"
 
 [build-system]

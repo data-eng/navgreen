@@ -1,1 +1,2 @@
-from hist_data_analysis.sampling_rate import runme,estimate_sampling_rate
+from hist_data_analysis.analytics import analyse,similarity
+from hist_data_analysis.sampling_rate import runme,undersampling_error
