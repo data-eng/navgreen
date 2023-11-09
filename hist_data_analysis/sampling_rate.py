@@ -37,19 +37,26 @@ def load_csv():
 
 
 def undersampling_error( t, v ):
+    retv = pd.DataFrame(
+        columns=["Undersampling Ratio", ])
+
     for i in range(1,8):
         step = 2**i
         # Recreate the original sampling rate (all points in t) by
         # linearly interpolating between the points in t[::step]
         v2 = np.interp( t, t[::step], v[::step] )
-        print( "  When keeping 1 out of {}".format(step) )
-        print( similarity(t,v,v2 ) )
+        #print( "  When keeping 1 out of {}".format(step) )
+        sim = similarity( t, v, v2 )
+        sim["plot_means"].savefig( "plt-{}.png".format(step) )
+        sim["plot_slopes"].savefig( "slopes-{}.png".format(step) )
 #end def undersampling_error
 
 
 def runme():
     df = load_csv()
-    for col in columns:
-        err = undersampling_error( df["DATETIME"], df[col] )
+    dfQ4=df[(df['DATETIME'] > '2022-10-01') & (df['DATETIME'] < '2023-01-01')]
+    for col in ["PVT_IN_TO_DHW"]: #columns:
+        #print( "{} {}".format(col, df[col].isna().sum()) )
+        err = undersampling_error( dfQ4["DATETIME"], dfQ4[col] )
         print( err )
     return df
