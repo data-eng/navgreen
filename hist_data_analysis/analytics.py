@@ -21,11 +21,11 @@ def analyse( t, v ):
     intercepts = []
     for i in range(0,len(t),slice_len):
         if i+slice_len < len(t):
-            t_slice = t[i::i+slice_len]
-            v_slice = v[i::i+slice_len]
+            t_slice = t[i:i+slice_len]
+            v_slice = v[i:i+slice_len]
         else:
-            t_slice = t[i::]
-            v_slice = v[i::]
+            t_slice = t[i:]
+            v_slice = v[i:]
         t_slice = t_slice[np.isfinite(v_slice)]
         v_slice = v_slice[np.isfinite(v_slice)]
         if len(v_slice) > 0:
