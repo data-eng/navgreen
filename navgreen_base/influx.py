@@ -41,6 +41,12 @@ def establish_influxdb_connection():
     return influxdb_client.InfluxDBClient(url=url, token=auth_token, org=organization)
 
 def write_data(row, influx_client):
+    """
+    Wrires one row to a specified bucket. The bucket that will
+    be used should be set using `set_bucket` before the first
+    invocation of this method. It does not need to be set again
+    for subsequent invocations.
+    """
 
     api = influx_client.write_api(write_options=SYNCHRONOUS)
 
@@ -74,7 +80,10 @@ def write_data(row, influx_client):
 
 def read_data(influx_client):
     """
-    Reads data from a specified bucket and stores it in a DataFrame
+    Reads data from a specified bucket and stores it in a DataFrame.
+    The bucket that will be used should be set using `set_bucket`
+    before the first invocation of this method. It does not need
+    to be set again for subsequent invocations.
     :return: The DataFrame
     """
     # Supress warning about not having used pivot function
@@ -106,6 +115,9 @@ def read_data(influx_client):
 def delete_data(influx_client):
     """
     Deletes all data from a specified bucket.
+    The bucket that will be used should be set using `set_bucket`
+    before the first invocation of this method. It does not need
+    to be set again for subsequent invocations.
     :return: None
     """
     api = influx_client.delete_api()
