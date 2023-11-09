@@ -1,10 +1,9 @@
 import unittest
-import os
 
 import numpy as np
 import pandas as pd
 
-from navgreen_base import write_data, delete_data, read_data
+from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection
 from live_data_analysis import temp_sensors, pressure, solar
 
 
@@ -13,32 +12,30 @@ class TestPreproc( unittest.TestCase ):
 
     @classmethod
     def setUpClass( cls ):
-        # Import credentials
-        url = os.environ.get('Url_influx_db')
-        auth_token = os.environ.get('Auth_token')
-        org = os.environ.get('Organization_influx')
-        # Ignore env variable, always use this bucket for tests
-        bucket = "test_bucket"
+
+        # InfluxDB requirements
+        influx_client = establish_influxdb_connection()
+        bucket = set_bucket("test_bucket")
 
         # Load sample
         cls.test_data_path = "./testcases/sample_data/"
         cls._sample_input = pd.read_csv( cls.test_data_path+"sample_input.csv" )
 
         # Wipe clean the test bucket
-        print( "Emptying test_bucket... ", end="" )
-        delete_data( url, auth_token, org, bucket )
+        print( f"Emptying {bucket}... ", end="" )
+        delete_data( influx_client )
         print("DONE.")
 
         # Read each data sample and write it to the test bucket
         # Function 'navgreen_base.write_data' does the preprocessing etc
-        print( "Writing test samples to test_bucket... ", end="" )
+        print( f"Writing test samples to {bucket}... ", end="" )
         for _, row in cls._sample_input.iterrows():
-            write_data( row, url, auth_token, org, bucket )
+            write_data( row, influx_client )
         print("DONE.")
 
         # Get the 'sample output' by querying the test bucket
-        print( "Reading test samples back from test_bucket... ", end="" )
-        cls._sample_output = read_data( url, auth_token, org, bucket )
+        print( f"Reading test samples back from {bucket}... ", end="" )
+        cls._sample_output = read_data( influx_client )
         print("DONE.")
 
         # Get the columns of the sample input that have all their values equal to np.nan

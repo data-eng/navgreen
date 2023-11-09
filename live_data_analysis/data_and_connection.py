@@ -3,7 +3,7 @@ from pymodbus.client import ModbusTcpClient
 import pandas as pd
 import numpy as np
 
-from navgreen_base import make_point, write_data
+from navgreen_base import establish_influxdb_connection, set_bucket, write_data
 from datetime import datetime
 import time
 
@@ -82,11 +82,10 @@ if __name__ == "__main__":
     assert ((len(df.columns) - 1) == len(water_temp) + len(other_temp) + len(pressure) + len(flow) + len(power)
             + len(solar) + len(other) + len(control) + len(ref_temp) + 1)
 
-    # CREDENTIALS: CAREFUL
-    url = os.environ.get('Url_influx_db')
-    tok = os.environ.get('Write_token')
-    org = os.environ.get('Organization_influx')
-    bucket = os.environ.get('Bucket')
+    # Establish connection with InfluxDb
+    influx_client = establish_influxdb_connection()
+    # Set the preferred bucket
+    _ = set_bucket(os.environ.get('Bucket'))
 
     # PLC IP address, port and connection intervals
     plc_ip = os.environ.get('Plc_ip')
@@ -357,7 +356,7 @@ if __name__ == "__main__":
                                    }
 
                         # Write row to DataBase
-                        write_data(new_row, url, tok, org, "mult_source_heatpump")
+                        write_data(new_row, influx_client)
 
                         # Write row to DataFrame (future .csv)
                         # Create a new row with the current local date and time
