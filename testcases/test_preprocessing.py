@@ -3,12 +3,10 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection
-from live_data_analysis import temp_sensors, pressure, solar
+from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection, temp_sensors, pressure, solar, process_data
 
 
 class TestPreproc( unittest.TestCase ):
-
 
     @classmethod
     def setUpClass( cls ):
@@ -20,6 +18,8 @@ class TestPreproc( unittest.TestCase ):
         # Load sample
         cls.test_data_path = "./testcases/sample_data/"
         cls._sample_input = pd.read_csv( cls.test_data_path+"sample_input.csv" )
+        # Apply transformation
+        cls._sample_input = process_data(cls._sample_input, hist_data=False)
 
         # Wipe clean the test bucket
         print( f"Emptying {bucket}... ", end="" )
@@ -43,14 +43,18 @@ class TestPreproc( unittest.TestCase ):
 
         # Delete the NaN columns from the DataFrame as well as the 'index', the 'Date_time_local'
         # because they do not exist in the sample_output
-        cols_to_del = list(all_nan_columns_input) + ['index', 'Date_time_local']
-        cls._sample_input.drop( columns=cols_to_del, inplace=True )
+        cols_to_del = list(all_nan_columns_input)
+        if "index" in cls._sample_input.columns:
+            cols_to_del += ['index']
 
+        cls._sample_input.drop( columns=cols_to_del, inplace=True )
     # end def setUpClass()
 
     def test_sample_output( self ):
         # Check that nothing changes in the sample_output
         sample_output_stored = pd.read_csv( TestPreproc.test_data_path+"sample_output.csv", index_col=0 )
+        sample_output_stored['DATETIME'] = pd.to_datetime(sample_output_stored['DATETIME'], utc=True)
+
         self.assertTrue(sample_output_stored.compare(TestPreproc._sample_output).empty)
     # end def test_sample_output()
 
@@ -103,6 +107,8 @@ class TestPreproc( unittest.TestCase ):
 
         # Also, convert date of sample input to the influx format
         sample_input['DATETIME'] = pd.to_datetime(sample_input['DATETIME']).dt.strftime('%Y-%m-%d %H:%M:%S+00:00')
+
+        #print(solar)
 
         for col in sample_input.columns:
             # Treat the 'solar' outliers

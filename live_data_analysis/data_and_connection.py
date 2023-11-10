@@ -3,85 +3,18 @@ from pymodbus.client import ModbusTcpClient
 import pandas as pd
 import numpy as np
 
-from navgreen_base import establish_influxdb_connection, set_bucket, write_data
+from navgreen_base import establish_influxdb_connection, set_bucket, write_data, columns, process_data
 from datetime import datetime
 import time
 
 import os
 
 
-water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
-              "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "SOLAR_HEAT_REJECTION_IN",
-              "SOLAR_HEAT_REJECTION_OUT", "WATER_IN_EVAP", "WATER_OUT_EVAP", "WATER_IN_COND", "WATER_OUT_COND",
-              "SH1_IN", "SH1_RETURN", "AIR_HP_TO_BTES_TANK", "DHW_INLET", "DHW_OUTLET", "DHW_BOTTOM", "SH_INLET",
-              "SH_RETURN", "PVT_IN", "PVT_OUT"]
-
-other_temp = ["OUTDOOR_TEMP", "BTES_TANK", "SOLAR_BUFFER_TANK", "SH_BUFFER", "DHW_BUFFER", "INDOOR_TEMP"]
-
-ref_temp = ["RECEIVER_LIQUID_IN", "RECEIVER_LIQUID_OUT", "ECO_LIQUID_OUT", "SUCTION_TEMP",
-            "DISCHARGE_TEMP", "ECO_VAPOR_TEMP", "EXPANSION_TEMP", "ECO_EXPANSION_TEMP"]
-
-pressure = ["SUCTION_PRESSURE", "DISCHARGE_PRESSURE", "ECO_PRESSURE"]
-
-flow = ["FLOW_EVAPORATOR", "FLOW_CONDENSER", "FLOW_DHW", "FLOW_SOLAR_HEAT_REJECTION",
-        "FLOW_PVT", "FLOW_FAN_COILS_INDOOR"]
-
-power = ["POWER_HP", "POWER_PVT"]
-
-solar = ["PYRANOMETER"]
-
-other = ["Compressor_HZ", "EEV_LOAD1", "EEV_LOAD2"]
-
-control = ["THREE_WAY_EVAP_OPERATION", "THREE_WAY_COND_OPERATION", "THREE_WAY_SOLAR_OPERATION",
-           "FOUR_WAY_VALVE", "AIR_COOLED_COMMAND", "Residential_office_mode", "MODBUS_LOCAL"]
-
-temp_sensors = []
-temp_sensors.extend(water_temp)
-temp_sensors.extend(other_temp)
-temp_sensors.extend(ref_temp)
-
-
 if __name__ == "__main__":
 
     # Create Pandas DataFrame with the corresponding columns
-    df = pd.DataFrame(
-        columns=['Date_time_local', 'DATETIME', 'PVT_IN_TO_DHW', 'PVT_OUT_FROM_DHW', 'PVT_IN_TO_SOLAR_BUFFER',
-                 'PVT_OUT_FROM_SOLAR_BUFFER', 'SOLAR_BUFFER_IN', 'SOLAR_BUFFER_OUT', 'BTES_TANK_IN',
-                 'BTES_TANK_OUT', 'SOLAR_HEAT_REJECTION_IN', 'SOLAR_HEAT_REJECTION_OUT',
-                 '3-WAY_EVAP_OPERATION', '3-WAY_COND_OPERATION', '3-WAY_SOLAR_OPERATION', 'SPARE_NTC_SENSOR',
-                 'Date', 'Time', 'RECEIVER_LIQUID_IN', 'RECEIVER_LIQUID_OUT', 'ECO_LIQUID_OUT',
-                 'SUCTION_TEMP', 'DISCHARGE_TEMP', 'ECO_VAPOR_TEMP', 'EXPANSION_TEMP', 'ECO_EXPANSION_TEMP',
-                 'SUCTION_PRESSURE', 'DISCHARGE_PRESSURE', 'ECO_PRESSURE', 'AIR_COOLED_COMMAND',
-                 '4_WAY_VALVE', 'WATER_IN_EVAP', 'WATER_OUT_EVAP', 'WATER_IN_COND', 'WATER_OUT_COND',
-                 'OUTDOOR_TEMP', 'BTES_TANK', 'SOLAR_BUFFER_TANK', 'SH_BUFFER', 'DHW_BUFFER', 'INDOOR_TEMP',
-                 'DHW_INLET', 'DHW_OUTLET', 'SH1_IN', 'SH1_RETURN', 'DHW_BOTTOM', 'AIR_HP_TO_BTES_TANK',
-                 'SH_INLET', 'SH_RETURN', 'PVT_IN', 'PVT_OUT', 'POWER_HP', 'POWER_GLOBAL_SOL', 'POWER_PVT',
-                 'FLOW_EVAPORATOR', 'FLOW_CONDENSER', 'FLOW_DHW', 'FLOW_SOLAR_HEAT_REJECTION', 'FLOW_PVT',
-                 'FLOW_FAN_COILS_INDOOR', 'PYRANOMETER', 'Compressor_HZ', 'Residential_office_mode',
-                 'MODBUS_LOCAL', 'EEV_LOAD1', 'EEV_LOAD2'])
-
-    df.rename(columns={
-        "3-WAY_EVAP_OPERATION": "THREE_WAY_EVAP_OPERATION",
-        "3-WAY_COND_OPERATION": "THREE_WAY_COND_OPERATION",
-        "3-WAY_SOLAR_OPERATION": "THREE_WAY_SOLAR_OPERATION",
-        "4_WAY_VALVE": "FOUR_WAY_VALVE"}, inplace=True)
-
-    print("Finished loading CSV, shape: {}".format(df.shape))
-
-    # Marked as "not important"
-    df.drop("SPARE_NTC_SENSOR", axis=1, inplace=True)
-    df.drop("POWER_GLOBAL_SOL", axis=1, inplace=True)
-
-    # Redundant
-    df.drop("Date", axis=1, inplace=True)
-    df.drop("Time", axis=1, inplace=True)
-
-    print("Finished preprocessing, shape: {}".format(df.shape))
-
-    # just checking that nothing is forgotten. +1 for datetime
-    assert ((len(df.columns) - 1) == len(water_temp) + len(other_temp) + len(pressure) + len(flow) + len(power)
-            + len(solar) + len(other) + len(control) + len(ref_temp) + 1)
-
+    df = pd.DataFrame(columns=columns)
+    df = process_data(df, hist_data=True) # 'hist_data=True', so that the columns are processed properly
     # Establish connection with InfluxDb
     influx_client = establish_influxdb_connection()
     # Set the preferred bucket
@@ -355,8 +288,10 @@ if __name__ == "__main__":
                                    "MODBUS_LOCAL": BMES_LOCAL_CONTROL
                                    }
 
+                        # Process columns and outliers of measurements
+                        write_row = process_data(new_row, hist_data=False)
                         # Write row to DataBase
-                        write_data(new_row, influx_client)
+                        write_data(write_row, influx_client)
 
                         # Write row to DataFrame (future .csv)
                         # Create a new row with the current local date and time
