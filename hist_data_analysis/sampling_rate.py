@@ -40,14 +40,11 @@ def undersampling_error( t, v ):
     retv = pd.DataFrame(
         columns=["Undersampling Ratio", ])
 
-    for i in range(1,8):
+    for i in range(3,8):
         step = 2**i
-        # Recreate the original sampling rate (all points in t) by
-        # linearly interpolating between the points in t[::step]
-        v2 = np.interp( t, t[::step], v[::step] )
         #print( "  When keeping 1 out of {}".format(step) )
-        sim = similarity( t, v, v2 )
-        sim["plot_means"].savefig( "plt-{}.png".format(step) )
+        sim = similarity( t, v, t[::step], v[::step] )
+        sim["plot_means"].savefig( "means-{}.png".format(step) )
         sim["plot_slopes"].savefig( "slopes-{}.png".format(step) )
 #end def undersampling_error
 

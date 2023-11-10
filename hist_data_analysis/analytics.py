@@ -14,7 +14,7 @@ def analyse( t, v ):
     """
 
     # Should be params with defaults
-    slice_len = 1000
+    slice_len = 1024
     distr_bins = 7
 
     means = []
@@ -67,41 +67,67 @@ def analyse( t, v ):
 #end def analyse
 
 
-def similarity( t, v1, v2 ):
+def make_errorbars( data ):
+    fig,ax = plt.subplots()
+    x0 = 0.0
+    for d in data:
+        x = np.arange( x0, len(d["means"]) )
+        ax.errorbar(x, d["means"], d["stds"], linestyle='None', marker='.')
+        # Move the starting point slightly to the right, some that the
+        # next graph does not fall exactly over this obne
+        x0 += 0.3
+    #end for
+    return fig
+#end def make_errorbars
+
+
+
+def make_lines( data ):
+    fig,ax = plt.subplots()
+    x0 = 0.0
+    for d in data:
+        x = np.arange( x0, len(d) )
+        ax.plot( x, d )
+        # Move the starting point slightly to the right, some that the
+        # next graph does not fall exactly over this obne
+        x0 += 0.3
+    return fig
+    #end for
+
+
+
+def similarity( t1, v1, t2, v2 ):
     """
     Calculates various metrics that measure how different two
-    time-aligned timeseries appear when different analytics is
-    applied to them.
-    :param t: Array-like, timestamps
+    timeseries appear when different analytics is applied to them.
+    :param t1: Array-like, timestamps
     :param v1: Array-like, values
+    :param t2: Array-like, timestamps
     :param v2: Array-like, values
     :return: dict with different metrics:
        mean absolute error and RMS error when directly comparing values
     """
+    # Interpolate from t2,v2 onto the times in t1
+    v2_aligned = np.interp( t1, t2, v2 )
+
     retv = {
         "mae": np.mean(np.abs(v2-v1)),
         "rmse":np.sqrt(np.mean((v2-v1)**2))
     }
-    anal1 = analyse( t, v1 )
-    anal2 = analyse( t, v2 )
+    anal1 = analyse( t1, v1 )
+    anal2 = analyse( t2, v2 )
+    anal2a= analyse( t1, v2_aligned )
 
-    retv["rmse_means"] = np.sqrt(np.mean( (anal2["values"]["means"]-anal1["values"]["means"])**2 ))
-    retv["rmse_stds"]  = np.sqrt(np.mean( (anal2["values"]["stds"]-anal1["values"]["stds"])**2 ))
-    fig,ax = plt.subplots()
-    x1 = np.arange( 0.0, len(anal1["values"]["means"]) )
-    x2 = np.arange( 0.3, len(anal2["values"]["means"]) )
-    ax.errorbar(x1, anal1["values"]["means"], anal1["values"]["stds"], linestyle='None', marker='x')
-    ax.errorbar(x2, anal2["values"]["means"], anal2["values"]["stds"], linestyle='None', marker='^')
-    retv["plot_means"]  = fig
+    retv["rmse_means"] = np.sqrt(np.mean( (anal2a["values"]["means"]-anal1["values"]["means"])**2 ))
+    retv["rmse_stds"]  = np.sqrt(np.mean( (anal2a["values"]["stds"]-anal1["values"]["stds"])**2 ))
+    retv["plot_means"] = make_errorbars( [anal1["values"],anal2a["values"]] )
 
-    retv["rmse_slopes"] = np.sqrt(np.mean( (anal2["trend"]["slopes"]-anal1["trend"]["slopes"])**2 ))
-    retv["rmse_intercepts"] = np.sqrt(np.mean( (anal2["trend"]["intercepts"]-anal1["trend"]["intercepts"])**2 ))
-    fig,ax = plt.subplots()
-    x1 = np.arange( 0.0, len(anal1["trend"]["slopes"]) )
-    ax.errorbar(x1, anal1["trend"]["slopes"] )
-    ax.errorbar(x2, anal2["trend"]["slopes"] )
-    retv["plot_slopes"]  = fig
+    retv["rmse_slopes"] = np.sqrt(np.mean( (anal2a["trend"]["slopes"]-anal1["trend"]["slopes"])**2 ))
+    retv["rmse_intercepts"] = np.sqrt(np.mean( (anal2a["trend"]["intercepts"]-anal1["trend"]["intercepts"])**2 ))
+    retv["plot_slopes"] = make_lines( [anal1["trend"]["slopes"],anal2a["trend"]["slopes"]] )
 
     return retv
     
-#end def rmse
+#end def similarity
+
+
