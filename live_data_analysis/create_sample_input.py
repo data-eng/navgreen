@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import random
 
-from data_and_connection import temp_sensors, pressure, solar
+from navgreen_base import temp_sensors, pressure, solar
 
 df = pd.read_csv("../data_from_plc_2023-10-29.csv")
 
