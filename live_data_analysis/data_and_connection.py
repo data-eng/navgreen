@@ -1,5 +1,7 @@
 from pymodbus.client import ModbusTcpClient
 
+import logging
+
 import pandas as pd
 import numpy as np
 
@@ -8,6 +10,22 @@ from datetime import datetime
 import time
 
 import os
+
+# Configure logger and set its level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Configure format
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+# Set log file, its level and format
+file_handler = logging.FileHandler('./live_data_analysis/logger.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+# Set stream its level and format
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+# Add handlers to logger
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 
 if __name__ == "__main__":
@@ -24,7 +42,8 @@ if __name__ == "__main__":
     plc_ip = os.environ.get('Plc_ip')
     plc_port = 502
     read_interval = 30  # Seconds
-    reconnect_interval = 10  # Seconds
+    reconnect_interval = 30  # Seconds
+    reconnect_interval_influx = 60 # Seconds
 
     # Get current date
     dataframe_date = datetime.now().strftime("%Y-%m-%d")
@@ -37,21 +56,20 @@ if __name__ == "__main__":
             client = ModbusTcpClient(plc_ip, port=plc_port)
 
             # Try to establish a connection
-            if client.connect():
-                print("Connected to PLC successfully!")
+            try:
+                client.connect()
+                logger.info("Connected to PLC successfully")
                 # You can perform read/write operations with the PLC here if needed
                 # Example: result = client.read_holding_registers(0, 1)
 
                 while True:
-                    # Read holding register D500, D501, D502
-                    result_coils2 = client.read_coils(8192 + 509, 7, int=0)  # read coils from 509 to 515
-                    result = client.read_holding_registers(500, 20)  # Read registers from 500 to 519
-                    result_coils = client.read_coils(8192 + 500, 4)  # Read coils from 500 to 503
-                    results_registers2 = client.read_holding_registers(520, 18)  # Read registers from 520 to 527
 
-                    if result.isError():
-                        print("Error reading register.")
-                    else:
+                    try:
+                        # Read holding register D500, D501, D502
+                        result_coils2 = client.read_coils(8192 + 509, 7, int=0)  # read coils from 509 to 515
+                        result = client.read_holding_registers(500, 20)  # Read registers from 500 to 519
+                        result_coils = client.read_coils(8192 + 500, 4)  # Read coils from 500 to 503
+                        results_registers2 = client.read_holding_registers(520, 18)  # Read registers from 520 to 527
 
                         # Read from PLC and convert to specific unit
 
@@ -145,7 +163,7 @@ if __name__ == "__main__":
                         # Read_tilted_collector_solar_irradiation
                         # Units: kW / m^2
                         Solar_irr_tilted = results_registers2.registers[4] / 10000  # CONVERT TO kW / m^2
-                        print(f"Solar_irr_tilted: {Solar_irr_tilted}")
+                        # print(f"Solar_irr_tilted: {Solar_irr_tilted}")
                         # Read_temperature_PVT_inlet
                         T_pvt_in = results_registers2.registers[5] / 10
                         # print(f"T_pvt_in: {T_pvt_in}")
@@ -209,11 +227,11 @@ if __name__ == "__main__":
                         # HEATING_COOLING_MODE
                         HEATING_COOLING_MODE = result_coils2.bits[5]
                         # IF ON MODE IS HEATING , IF OFF MODE IS COOLING
-                        print(f"HEATING_COOLING_MODE: {HEATING_COOLING_MODE}")
+                        # print(f"HEATING_COOLING_MODE: {HEATING_COOLING_MODE}")
                         # BMES_LOCAL_CONTROL
                         BMES_LOCAL_CONTROL = result_coils2.bits[6]
                         # IF ON MODE IS LOCAL , IF OFF MODE IS MODBUS
-                        print(f"BMES_LOCAL_CONTROL: {BMES_LOCAL_CONTROL}")
+                        # print(f"BMES_LOCAL_CONTROL: {BMES_LOCAL_CONTROL}")
 
                         # Get some dates
                         current_datetime = datetime.utcnow()
@@ -290,29 +308,48 @@ if __name__ == "__main__":
 
                         # Process columns and outliers of measurements
                         write_row = process_data(new_row, hist_data=False)
-                        # Write row to DataBase
-                        write_data(write_row, influx_client)
 
-                        # Write row to DataFrame (future .csv)
-                        # Create a new row with the current local date and time
-                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        new_row_with_time = {'Date_time_local': now, **new_row}  # Add the date and time to the new row
+                        try:
+                            # Write row to DataBase
+                            write_data(write_row, influx_client)
 
-                        df.loc[len(df)] = new_row_with_time
-                        df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
-                                  mode='w', index=False)
+                            # Write row to DataFrame (future .csv)
+                            # Create a new row with the current local date and time
+                            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                            new_row_with_time = {'Date_time_local': now, **new_row}  # Add the date and time to the new row
 
-                    # Wait for the specified interval
-                    time.sleep(read_interval)
-            else:
-                print("Failed to connect to PLC. Check the PLC settings and connection.")
+                            df.loc[len(df)] = new_row_with_time
+                            df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
+                                      mode='w', index=False)
+
+                            # Wait for the specified interval
+                            time.sleep(read_interval)
+
+                        except Exception as e:
+                            logger.error(f"Failed to write to InfluxDB: {str(e)}")
+                            logger.info(f"Sleeping for {reconnect_interval_influx} seconds..")
+                            time.sleep(reconnect_interval_influx)
+                            continue
+
+                    except Exception as e:
+                        logger.error(f"Error reading register: {str(e)}")
+                        logger.info(f"Sleeping for {reconnect_interval} seconds..")
+                        time.sleep(reconnect_interval)
+                        continue
+
+            except Exception as e:
+                logger.error(f"Failed to connect to PLC: {str(e)}")
+                logger.info(f"Sleeping for {reconnect_interval} seconds..")
                 time.sleep(reconnect_interval)
+                continue
 
         except Exception as e:
-            print(f"An error occurred: {str(e)}")
+            logger.error(f"Unable to create: Modbus TCP/IP client: {str(e)}")
+            logger.info(f"Sleeping for {reconnect_interval} seconds..")
             time.sleep(reconnect_interval)
             continue
 
         finally:
             if client is not None and client.is_socket_open():
                 client.close()
+                logger.info("Closed socket")
