@@ -1,9 +1,21 @@
 import unittest
+import logging
 
 import numpy as np
 import pandas as pd
 
 from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection, temp_sensors, pressure, solar, process_data
+
+# Configure logger and set its level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Configure format
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+# Configure stream handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+# Add handler to logger
+logger.addHandler(stream_handler)
 
 
 class TestPreproc( unittest.TestCase ):
@@ -22,21 +34,21 @@ class TestPreproc( unittest.TestCase ):
         cls._sample_input = process_data(cls._sample_input, hist_data=False)
 
         # Wipe clean the test bucket
-        print( f"Emptying {bucket}... ", end="" )
+        logger.info( f"Emptying {bucket}... ")
         delete_data( influx_client )
-        print("DONE.")
+        logger.info("DONE.")
 
         # Read each data sample and write it to the test bucket
         # Function 'navgreen_base.write_data' does the preprocessing etc
-        print( f"Writing test samples to {bucket}... ", end="" )
+        logger.info( f"Writing test samples to {bucket}... ")
         for _, row in cls._sample_input.iterrows():
             write_data( row, influx_client )
-        print("DONE.")
+        logger.info("DONE.")
 
         # Get the 'sample output' by querying the test bucket
-        print( f"Reading test samples back from {bucket}... ", end="" )
+        logger.info( f"Reading test samples back from {bucket}... ")
         cls._sample_output = read_data( influx_client )
-        print("DONE.")
+        logger.info("DONE.")
 
         # Get the columns of the sample input that have all their values equal to np.nan
         all_nan_columns_input = cls._sample_input.columns[cls._sample_input.isna().all()]
@@ -107,8 +119,6 @@ class TestPreproc( unittest.TestCase ):
 
         # Also, convert date of sample input to the influx format
         sample_input['DATETIME'] = pd.to_datetime(sample_input['DATETIME']).dt.strftime('%Y-%m-%d %H:%M:%S+00:00')
-
-        #print(solar)
 
         for col in sample_input.columns:
             # Treat the 'solar' outliers
