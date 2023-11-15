@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
+
 from hist_data_analysis import similarity
+
+
+FIGURES_DIR = "figures"
 
 
 columns = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW",
@@ -44,8 +48,8 @@ def undersampling_error( t, v ):
         step = 2**i
         #print( "  When keeping 1 out of {}".format(step) )
         sim = similarity( t, v, t[::step], v[::step] )
-        sim["plot_means"].savefig( "means-{}.png".format(step) )
-        sim["plot_slopes"].savefig( "slopes-{}.png".format(step) )
+        sim["plot_means"].savefig( FIGURES_DIR + "/means-{}.png".format(step) )
+        sim["plot_slopes"].savefig( FIGURES_DIR + "/slopes-{}.png".format(step) )
 #end def undersampling_error
 
 
