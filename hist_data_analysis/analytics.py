@@ -5,6 +5,11 @@ import scipy.stats.mstats
 import matplotlib.pyplot as plt
 
 
+DISTR_BINS = 7
+# CAREFUL: must be a power of 2. See below why.
+SLICE_LEN = 1024
+
+
 def analyse( t, v ):
     """
     Calculates analytics over a timeseries t,v
@@ -13,31 +18,30 @@ def analyse( t, v ):
     :return: (dict) A variety of analytics
     """
 
-    # Should be params with defaults
-    slice_len = 1024
-    distr_bins = 7
-
     means = []
     stds = []
     distrs = []
     slopes = []
     intercepts = []
+    amplitudes = []
+    powers = []
 
     # For consistency, pre-compute bin edges 
-    bin_edges = np.histogram_bin_edges( v[np.isfinite(v)], distr_bins )
+    bin_edges = np.histogram_bin_edges( v[np.isfinite(v)], DISTR_BINS )
     
-    for i in range(0,len(t),slice_len):
-        # Make slices of `slice_len` items each
-        if i+slice_len < len(t):
-            t_slice = t[i:i+slice_len]
-            v_slice = v[i:i+slice_len]
+    for i in range(0,len(t),SLICE_LEN):
+        # Make slices of `SLICE_LEN` items each
+        if i+SLICE_LEN < len(t):
+            t_slice = t[i:i+SLICE_LEN]
+            v_slice = v[i:i+SLICE_LEN]
         else:
             t_slice = t[i:]
             v_slice = v[i:]
         t_slice = t_slice[np.isfinite(v_slice)]
         v_slice = v_slice[np.isfinite(v_slice)]
 
-        if len(v_slice) > 2:
+        l = len(v_slice)
+        if l > 2:
             # Distribution of values
             means.append( np.mean(v_slice) )
             stds.append( np.std(v_slice) )
@@ -48,11 +52,24 @@ def analyse( t, v ):
             theil = scipy.stats.mstats.theilslopes( v_slice, t_slice )
             slopes.append( theil.slope )
             intercepts.append( theil.intercept )
-            # Todo: spectral
-
+            if (l & (l-1) == 0):
+                # Only calculate spectral amplitudes if
+                # len is a power of 2.
+                # CAREFUL: `SLICE_LEN` above must be a power
+                # of 2 so we only lose the very last slice.
+                # TODO: FFT assumes values are uniformly distributed
+                # in time, so we should have checked for gaps and NaNs.
+                f = np.fft.fft(v_slice)
+                amplitudes.append( f )
+                powers.append( (np.abs(f)/SLICE_LEN)**2 )
         else:
+            means.append( np.nan )
+            stds.append( np.nan )
+            distrs.append( np.tile([np.nan],DISTR_BINS) )
             slopes.append( np.nan )
             intercepts.append( np.nan )
+            amplitudes.append( np.tile([np.nan],SLICE_LEN) )
+            powers.append( np.tile([np.nan],SLICE_LEN) )
 
     retv = {}
     retv["values"] = {}
@@ -62,6 +79,9 @@ def analyse( t, v ):
     retv["trend"] = {}
     retv["trend"]["slopes"] = np.array(slopes)
     retv["trend"]["intercepts"] = np.array(intercepts)
+    retv["spectral"] = {}
+    retv["spectral"]["amplitudes"] = np.array(amplitudes)
+    retv["spectral"]["powers"] = np.array(powers)
 
     return retv
 #end def analyse
@@ -91,8 +111,9 @@ def make_lines( data ):
         # Move the starting point slightly to the right, some that the
         # next graph does not fall exactly over this obne
         x0 += 0.3
-    return fig
     #end for
+    return fig
+#end def make_lines
 
 
 
@@ -125,6 +146,7 @@ def similarity( t1, v1, t2, v2 ):
     retv["rmse_slopes"] = np.sqrt(np.mean( (anal2a["trend"]["slopes"]-anal1["trend"]["slopes"])**2 ))
     retv["rmse_intercepts"] = np.sqrt(np.mean( (anal2a["trend"]["intercepts"]-anal1["trend"]["intercepts"])**2 ))
     retv["plot_slopes"] = make_lines( [anal1["trend"]["slopes"],anal2a["trend"]["slopes"]] )
+    retv["rmse_spectr_pow"] = np.sqrt(np.mean( (anal2a["spectral"]["powers"]-anal1["spectral"]["powers"])**2 ))
 
     return retv
     
