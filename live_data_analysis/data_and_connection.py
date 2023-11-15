@@ -4,12 +4,13 @@ import logging
 
 import pandas as pd
 import numpy as np
-
-from navgreen_base import establish_influxdb_connection, set_bucket, write_data, columns, process_data
+import os
+import json
 from datetime import datetime
 import time
 
-import os
+from navgreen_base import establish_influxdb_connection, set_bucket, write_data, columns, process_data
+
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -43,7 +44,6 @@ if __name__ == "__main__":
     plc_port = 502
     read_interval = 30  # Seconds
     reconnect_interval = 30  # Seconds
-    reconnect_interval_influx = 60 # Seconds
 
     # Get current date
     dataframe_date = datetime.now().strftime("%Y-%m-%d")
@@ -309,27 +309,68 @@ if __name__ == "__main__":
                         # Process columns and outliers of measurements
                         write_row = process_data(new_row, hist_data=False)
 
-                        try:
-                            # Write row to DataBase
-                            write_data(write_row, influx_client)
+                        # Write row to DataFrame (future .csv)
+                        # Create a new row with the current local date and time
+                        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        new_row_with_time = {'Date_time_local': now, **new_row}  # Add the date and time to the new row
 
-                            # Write row to DataFrame (future .csv)
-                            # Create a new row with the current local date and time
-                            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            new_row_with_time = {'Date_time_local': now, **new_row}  # Add the date and time to the new row
+                        df.loc[len(df)] = new_row_with_time
+                        df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
+                                  mode='w', index=False)
 
-                            df.loc[len(df)] = new_row_with_time
-                            df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
-                                      mode='w', index=False)
+                        log_data_file_path = f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/influx_log_data.csv'
 
-                            # Wait for the specified interval
-                            time.sleep(read_interval)
+                        # There is logged data
+                        if log_data_file_path.exists():
+                            # Load the data into a DataFrame
+                            log_df = pd.read_json(log_data_file_path)
 
-                        except Exception as e:
-                            logger.error(f"Failed to write to InfluxDB: {str(e)}")
-                            logger.info(f"Sleeping for {reconnect_interval_influx} seconds..")
-                            time.sleep(reconnect_interval_influx)
-                            continue
+                            try:
+                                # Try and write logged data to DataBase
+                                for idx in range(log_df.shape[0]):
+                                    write_data(log_df.iloc[idx], influx_client)
+                                # Write also the new line,
+                                write_data(write_row, influx_client)
+                                # Since everything is written, delete logging dataframe
+                                os.remove(log_data_file_path)
+                            except Exception as e:
+                                logger.error(f"Failed to write to InfluxDB: {str(e)}")
+                                # If write was not successful, continue the logging
+                                # Append the unwritten row to the file
+                                with open(log_data_file_path, 'r') as file:
+                                    data = json.load(file)
+                                    data.append(write_row)
+
+                                with open(log_data_file_path, 'w') as file:
+                                    json.dump(data, file)
+                                continue
+                        # No logged data
+                        else:
+                            try:
+                                # Write row to DataBase
+                                write_data(write_row, influx_client)
+
+                            except Exception as e:
+                                # There is an error in writing the data to InfluxDB so
+                                # store it in order to write it later
+
+                                # Create the file if it doesn't exist and initialize with an empty list
+                                with open(log_data_file_path, 'w') as file:
+                                    json.dump([], file)
+
+                                # Append the unwritten row to the file
+                                with open(log_data_file_path, 'r') as file:
+                                    data = json.load(file)
+                                    data.append(write_row)
+
+                                with open(log_data_file_path, 'w') as file:
+                                    json.dump(data, file)
+
+                                logger.error(f"Failed to write to InfluxDB: {str(e)}")
+                                continue
+
+                        # Wait for the specified interval
+                        time.sleep(read_interval)
 
                     except Exception as e:
                         logger.error(f"Error reading register: {str(e)}")
