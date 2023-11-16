@@ -9,9 +9,12 @@ authors = [ "Tatiana Boura <tat.boura@gmail.com>",
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.13"
-pandas = "^2.1.2"
-influxdb-client = "^1.38.0"
+python = ">=3.10,<3.13"
+pandas = "^2.1"
+numpy = "^1.26"
+scipy = "^1.11"
+matplotlib = "^3.8"
+influxdb-client = "^1.38"
 pymodbus = "^3.5.4"
 
 [build-system]
@@ -20,4 +23,5 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 tester = "scripts:test"
+sampler = "hist_data_analysis:runme"
 
