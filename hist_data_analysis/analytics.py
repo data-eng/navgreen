@@ -94,7 +94,7 @@ def make_errorbars( data ):
         x = np.arange( x0, len(d["means"]) )
         ax.errorbar(x, d["means"], d["stds"], linestyle='None', marker='.')
         # Move the starting point slightly to the right, some that the
-        # next graph does not fall exactly over this obne
+        # next graph does not fall exactly over this one
         x0 += 0.3
     #end for
     return fig
@@ -109,7 +109,7 @@ def make_lines( data ):
         x = np.arange( x0, len(d) )
         ax.plot( x, d )
         # Move the starting point slightly to the right, some that the
-        # next graph does not fall exactly over this obne
+        # next graph does not fall exactly over this one
         x0 += 0.3
     #end for
     return fig
@@ -136,7 +136,7 @@ def similarity( t1, v1, t2, v2 ):
         "rmse":np.sqrt(np.mean((v2-v1)**2))
     }
     anal1 = analyse( t1, v1 )
-    anal2 = analyse( t2, v2 )
+    # anal2 = analyse( t2, v2 )
     anal2a= analyse( t1, v2_aligned )
 
     retv["rmse_means"] = np.sqrt(np.mean( (anal2a["values"]["means"]-anal1["values"]["means"])**2 ))
