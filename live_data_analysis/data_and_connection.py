@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import os
 import json
+import csv
 from datetime import datetime
 import time
 
@@ -31,9 +32,11 @@ logger.addHandler(stream_handler)
 
 if __name__ == "__main__":
 
-    # Create Pandas DataFrame with the corresponding columns
+    # Create Pandas DataFrame with the corresponding columns - it is not going to be used later
     df = pd.DataFrame(columns=columns)
     df = process_data(df, hist_data=True) # 'hist_data=True', so that the columns are processed properly
+    stored_cols = df.columns + ["Date_time_local"]
+
     # Establish connection with InfluxDb
     influx_client = establish_influxdb_connection()
     # Set the preferred bucket
@@ -241,7 +244,6 @@ if __name__ == "__main__":
 
                         if current_date_local != dataframe_date:
                             dataframe_date = current_date_local
-                            df.drop(df.index, inplace=True)
 
                         # The data till now (CONVERTED) are taken into account from the TESTCASE in test_live_data.py
                         new_row = {"DATETIME": current_datetime,  # "DATETIME": pd.to_datetime(current_datetime),
@@ -309,15 +311,23 @@ if __name__ == "__main__":
                         # Process columns and outliers of measurements
                         write_row = process_data(new_row, hist_data=False)
 
-                        # Write row to DataFrame (future .csv)
+                        # Write row to DataFrame.csv
                         # Create a new row with the current local date and time
                         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         new_row_with_time = {'Date_time_local': now, **new_row}  # Add the date and time to the new row
 
-                        df.loc[len(df)] = new_row_with_time
-                        df.to_csv(f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv',
-                                  mode='w', index=False)
+                        csv_file = f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv'
+                        # If file does not exist aka the day has changed, and we need a new .csv, create it
+                        if not os.path.isfile(csv_file):
+                            with open(csv_file, 'w', newline='') as file:
+                                writer = csv.DictWriter(file, fieldnames=stored_cols)
+                                writer.writeheader()
+                        # Append the new row of information
+                        with open(csv_file, 'a', newline='') as file:
+                            writer = csv.DictWriter(file, fieldnames=stored_cols)
+                            writer.writerow(new_row_with_time)
 
+                        # Start the process of writing into InfluxDB
                         log_data_file_path = f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/influx_log_data.csv'
 
                         # There is logged data
