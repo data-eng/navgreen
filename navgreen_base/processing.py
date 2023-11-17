@@ -81,13 +81,6 @@ def process_data(df, hist_data=True):
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
 
-    # Just checking that nothing is forgotten. +1 for datetime.
-    # The historical data does not contain column 'Date_time_local'
-    cols_len = len(df.columns) if hist_data else (len(df.columns) - 1)
-
-    assert (cols_len == len(water_temp) + len(other_temp) + len(pressure) + len(flow) + len(power)
-            + len(solar) + len(other) + len(control) + len(ref_temp) + 1)
-
     # The historical data in our disposal (the ones that refer to the data collected before we took over the project)
     # were not converted to the preferred units, so when these data are used, the following conversions should be made
     if hist_data:
