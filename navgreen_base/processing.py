@@ -125,7 +125,7 @@ def process_data(df, hist_data=True):
             df[col] = np.nan
         '''
 
-        df["DATETIME"] = pd.to_datetime(df['DATETIME']).dt.strftime('%Y-%m-%d %H:%M:%S+00:00')
+        df["DATETIME"] = pd.to_datetime(df['DATETIME'], format="%Y-%m-%d %H:%M:%S")
 
     # Apply reasonable limits
     for col in solar:
