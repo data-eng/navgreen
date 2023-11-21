@@ -87,7 +87,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Q_SOLAR_BUFFER_HP"
+                  "Q_BTES_HP_COOL",
+                  "Q_BTES_HP_HEAT"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -240,7 +241,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_COOL:\n           if r.THREE_WAY_EVAP_OPERATION == \"False\" and r.FOUR_WAY_VALVE == \"False\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_IN-r.BTES_TANK_OUT)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_COOL\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"]) ",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_COOL:\n           if r.THREE_WAY_EVAP_OPERATION == \"True\" and r.FOUR_WAY_VALVE == \"False\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_IN-r.BTES_TANK_OUT)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_COOL\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"]) ",
           "refId": "Q_BTES_HP_COOL"
         },
         {
@@ -249,7 +250,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_HEAT:\n           if r.THREE_WAY_EVAP_OPERATION == \"False\" and r.FOUR_WAY_VALVE == \"True\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_OUT-r.BTES_TANK_IN)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_HEAT:\n           if r.THREE_WAY_EVAP_OPERATION == \"True\" and r.FOUR_WAY_VALVE == \"True\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_OUT-r.BTES_TANK_IN)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])",
           "refId": "Q_BTES_HP_HEAT"
         },
         {
@@ -1074,13 +1075,13 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 186,
+  "version": 188,
   "weekStart": ""
 }
