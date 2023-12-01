@@ -67,6 +67,7 @@ if __name__ == "__main__":
                     result = client.read_holding_registers(500, 20)  # Read registers from 500 to 519
                     result_coils = client.read_coils(8192 + 500, 4)  # Read coils from 500 to 503
                     results_registers2 = client.read_holding_registers(520, 18)  # Read registers from 520 to 527
+                    setpoint_registers = client.read_holding_registers(540, 2)  # Read holding registers 540 and 541, setpoint SH and setpoint DHW
 
                     # Read from PLC and convert to specific unit
 
@@ -195,10 +196,10 @@ if __name__ == "__main__":
                     T_BTES_out_to_hp_in = results_registers2.registers[15] / 10
                     # print(f"T_BTES_out_to_hp_in: {T_BTES_out_to_hp_in}")
                     # DHW_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
-                    T_setpoint_DHW_modbus = results_registers2.registers[16] / 10
+                    T_setpoint_DHW_modbus = setpoint_registers.registers[0] / 10
                     # print(f"T_setpoint_DHW_modbus: {T_setpoint_DHW_modbus}")
                     # SPACE_HEATING_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
-                    T_setpoint_SPACE_HEATING_modbus = results_registers2.registers[17] / 10
+                    T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[1] / 10
                     # print(f"T_setpoint_SPACE_HEATING_modbus: {T_setpoint_SPACE_HEATING_modbus}")
 
                     # READ COILS AGAIN
@@ -299,7 +300,9 @@ if __name__ == "__main__":
                                "FOUR_WAY_VALVE": HEATING_COOLING_MODE,
                                "AIR_COOLED_COMMAND": BTES_WATER_AIR_OPERATION,
                                "Residential_office_mode": Residential_office,
-                               "MODBUS_LOCAL": BMES_LOCAL_CONTROL
+                               "MODBUS_LOCAL": BMES_LOCAL_CONTROL,
+                               "T_CHECKPOINT_DHW_MODBUS" : T_setpoint_DHW_modbus,
+                                "T_CHECKPOINT_SPACE_HEATING_MODBUS": T_setpoint_SPACE_HEATING_modbus
                                }
 
                     # Create a new row with the current local date and time

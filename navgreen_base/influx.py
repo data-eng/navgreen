@@ -7,7 +7,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
-from navgreen_base.processing import flow, power, solar, temp_sensors, other, pressure, control
+from navgreen_base.processing import flow, power, solar, temp_sensors, other, pressure, control, checkpoints
 
 # Import organisation
 organization = os.environ.get('Organization_influx')
@@ -30,8 +30,14 @@ def make_point(measurement, row, value_columns, tag_columns):
             p.tag(col, row[col])
     # Add the sensor data fields
     for col in value_columns:
-        if row[col] is not np.nan:
-            p.field(col, row[col])
+        try:
+            if row[col] is not np.nan:
+                p.field(col, row[col])
+        except KeyError:
+            if col in checkpoints:
+                continue
+            else:
+                raise ValueError(f'Cannot find column {col}.')
     return p
 
 # Establish connection with InfluxDb
@@ -64,6 +70,12 @@ def write_data(row, influx_client):
     api.write(bucket=bucket, org=organization, record=p)
     p = make_point("other", row, other, control)
     api.write(bucket=bucket, org=organization, record=p)
+    try:
+        p = make_point("checkpoints", row, checkpoints, control)
+        api.write(bucket=bucket, org=organization, record=p)
+    except:
+        print("No checkpoint data.")
+
     # Also add controls as values, for viz
     p = make_point("control", row, control, [])
     api.write(bucket=bucket, org=organization, record=p)
@@ -134,3 +146,5 @@ def delete_data(influx_client):
                predicate='_measurement="power"')
     api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
                predicate='_measurement="control"')
+    api.delete(bucket=bucket, org=organization, start="1970-01-01T00:00:00Z", stop="2030-01-01T00:00:00Z",
+               predicate='_measurement="checkpoints"')
