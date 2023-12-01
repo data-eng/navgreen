@@ -130,5 +130,7 @@ def process_data(df, hist_data=True):
     for col in pressure:
         df[col] = df[col].apply(lambda x: np.nan if x <  0.0 or x > 35.0 else x)
 
+    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= 4.0 else x)
+
     return df
 #end def process_data
