@@ -1,9 +1,20 @@
 import pandas as pd
+import logging
 
 from navgreen_base import process_data
 
 from hist_data_analysis import similarity
 
+# Configure logger and set its level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Configure format
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+# Configure stream handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+# Add handler to logger
+logger.addHandler(stream_handler)
 
 FIGURES_DIR = "figures"
 
@@ -17,7 +28,7 @@ def undersampling_error( t, v ):
 
     for i in range(3,8):
         step = 2**i
-        #print( "  When keeping 1 out of {}".format(step) )
+        logger.debug( "  When keeping 1 out of {}".format(step) )
         sim = similarity( t, v, t[::step], v[::step] )
         sim["plot_means"].savefig( FIGURES_DIR + "/means-{}.png".format(step) )
         sim["plot_slopes"].savefig( FIGURES_DIR + "/slopes-{}.png".format(step) )
@@ -37,6 +48,6 @@ def runme():
     dfQ4=df[(df['DATETIME'] > '2022-10-01') & (df['DATETIME'] < '2023-01-01')]
     err = None
     for col in ["PVT_IN_TO_DHW"]:
-        #print( "{} {}".format(col, df[col].isna().sum()) )
+        logger.debug( "{} {}".format(col, df[col].isna().sum()) )
         err = undersampling_error( dfQ4["DATETIME"], dfQ4[col] )
     return err
