@@ -1,8 +1,21 @@
 import pandas as pd
 import numpy as np
 import random
+import logging
 
 from navgreen_base import temp_sensors, pressure, solar
+
+# Configure logger and set its level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Configure format
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+# Configure stream handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+# Add handler to logger
+logger.addHandler(stream_handler)
+
 
 df = pd.read_csv("../data_from_plc_2023-10-29.csv")
 
@@ -50,7 +63,7 @@ while True:
 
 df.loc[random_index_temp, temp_sensors[i]] = -21.0
 
-print(f'Twitched temp sensor {temp_sensors[i]} at index: {random_index_temp}')
+logger.info(f'Twitched temp sensor {temp_sensors[i]} at index: {random_index_temp}')
 
 # One fake outlier for a random pressure value.
 # For the time being 'pressure' hasn't got any values at all
@@ -58,18 +71,18 @@ random_index_press = random.randint(0, df.shape[0]-1)
 j = random.randint(0, len(pressure) - 1)
 df.loc[random_index_press, pressure[j]] = 36.0
 
-print(f'Twitched pressure sensor {pressure[j]} at index: {random_index_press}')
+logger.info(f'Twitched pressure sensor {pressure[j]} at index: {random_index_press}')
 
 # One fake outlier for a random solar value
 random_index_solar = random.randint(0, df.shape[0]-1)
 k = random.randint(0, len(solar) - 1)
 df.loc[random_index_solar, solar[k]] = 6.0
 
-print(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
+logger.info(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
 
-print(df.loc[random_index_temp, temp_sensors[i]])
-print(df.loc[random_index_press, pressure[j]])
-print(df.loc[random_index_solar, solar[k]])
+logger.info(df.loc[random_index_temp, temp_sensors[i]])
+logger.info(df.loc[random_index_press, pressure[j]])
+logger.info(df.loc[random_index_solar, solar[k]])
 
 # Store sample_input
 df.to_csv(f'./test/sample_input.csv', mode='w', index=False)
