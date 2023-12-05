@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import os
+import logging
+import sys
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -8,6 +10,17 @@ import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
 from navgreen_base.processing import flow, power, solar, temp_sensors, other, pressure, control, checkpoints
+
+# Configure logger and set its level
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+# Configure format
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+# Configure stream handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+# Add handler to logger
+logger.addHandler(stream_handler)
 
 # Import organisation
 organization = os.environ.get('Organization_influx')
@@ -35,7 +48,8 @@ def make_point(measurement, row, value_columns, tag_columns):
                 p.field(col, row[col])
         except KeyError:  # Checkpoints are not always stored e.g. historical data or if they have not changed
             if col not in checkpoints:
-                raise ValueError(f'Cannot find column {col}.')
+                logger.critical(f"Cannot find column {col}.")
+                sys.exit(1)
 
     return p
 
@@ -69,12 +83,8 @@ def write_data(row, influx_client):
     api.write(bucket=bucket, org=organization, record=p)
     p = make_point("other", row, other, control)
     api.write(bucket=bucket, org=organization, record=p)
-    try:
-        p = make_point("checkpoints", row, checkpoints, control)
-        api.write(bucket=bucket, org=organization, record=p)
-    except:
-        print("No checkpoint data.")
-
+    p = make_point("checkpoints", row, checkpoints, control)
+    api.write(bucket=bucket, org=organization, record=p)
     # Also add controls as values, for viz
     p = make_point("control", row, control, [])
     api.write(bucket=bucket, org=organization, record=p)
