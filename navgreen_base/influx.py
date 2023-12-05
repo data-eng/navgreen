@@ -33,11 +33,10 @@ def make_point(measurement, row, value_columns, tag_columns):
         try:
             if row[col] is not np.nan:
                 p.field(col, row[col])
-        except KeyError:
-            if col in checkpoints:
-                continue
-            else:
+        except KeyError:  # Checkpoints are not always stored e.g. historical data or if they have not changed
+            if col not in checkpoints:
                 raise ValueError(f'Cannot find column {col}.')
+
     return p
 
 # Establish connection with InfluxDb

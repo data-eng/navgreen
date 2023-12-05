@@ -46,6 +46,9 @@ if __name__ == "__main__":
 
     client = None
 
+    prior_checkpoint_DHW_modbus = np.inf
+    prior_checkpoint_SPACE_HEATING_modbus = np.inf
+
     # This try-except is to catch a ctrl-c
     try:
 
@@ -201,6 +204,13 @@ if __name__ == "__main__":
                     # SPACE_HEATING_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
                     T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[1] / 10
                     # print(f"T_setpoint_SPACE_HEATING_modbus: {T_setpoint_SPACE_HEATING_modbus}")
+
+                    if T_setpoint_DHW_modbus != prior_checkpoint_DHW_modbus or T_setpoint_SPACE_HEATING_modbus != prior_checkpoint_SPACE_HEATING_modbus:
+                        prior_checkpoint_DHW_modbus = T_setpoint_DHW_modbus
+                        prior_checkpoint_SPACE_HEATING_modbus = T_setpoint_SPACE_HEATING_modbus
+                    else:
+                        T_setpoint_DHW_modbus = np.nan
+                        T_setpoint_SPACE_HEATING_modbus = np.nan
 
                     # READ COILS AGAIN
                     # Residential_or_office_mode
