@@ -87,8 +87,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Q_BTES_HP_COOL",
-                  "Q_BTES_HP_HEAT"
+                  "Q_PVT_SOLAR_BUFFER"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -205,7 +204,7 @@
             "type": "influxdb",
             "uid": "U9EYdpMIz"
           },
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_OUT\" or r._field == \"PVT_IN\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_PVT: (3.6014+0.004*(r.PVT_IN + r.PVT_OUT)/2.0 - 0.000002*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)*((1049.0-0.475*(r.PVT_IN + r.PVT_OUT)/2.0-0.0018*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)/1000.0/3600.0*r.FLOW_PVT)*(r.PVT_OUT + r.PVT_IN)\n   }))\n   |> keep(columns: [\"_time\", \"Q_PVT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT\")\n   |> keep(columns: [\"_time\", \"Q_PVT\"])",
+          "query": "  from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_OUT\" or r._field == \"PVT_IN\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_PVT: (3.6014+0.004*(r.PVT_IN + r.PVT_OUT)/2.0 - 0.000002*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN + \n      r.PVT_OUT)/2.0-0.0018*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_OUT - r.PVT_IN)\n   }))\n   |> keep(columns: [\"_time\", \"Q_PVT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT\")\n   |> keep(columns: [\"_time\", \"Q_PVT\"])",
           "refId": "Q_PVT"
         },
         {
@@ -214,7 +213,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_SOLAR_BUFFER\" or r._field == \"PVT_OUT_FROM_SOLAR_BUFFER\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_SOLAR_BUFFER:\n           if r.THREE_WAY_SOLAR_OPERATION == \"False\" then (3.6014+0.004*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0 - 0.000002*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0-0.0018*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)/1000.0/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_SOLAR_BUFFER\" )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_SOLAR_BUFFER\" or r._field == \"PVT_OUT_FROM_SOLAR_BUFFER\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_SOLAR_BUFFER:\n           if r.THREE_WAY_SOLAR_OPERATION == \"False\" then (3.6014+0.004*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0 - 0.000002*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0-0.0018*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_SOLAR_BUFFER\" )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])",
           "refId": "Q_PVT_SOLAR_BUFFER"
         },
         {
@@ -223,7 +222,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_DHW\" or r._field == \"PVT_OUT_FROM_DHW\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_DHW:\n           if r.THREE_WAY_SOLAR_OPERATION == \"True\" then (3.6014+0.004*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 - 0.000002*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 -0.0018*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)/1000.0/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_DHW - r.PVT_OUT_FROM_DHW)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_DHW\")\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_DHW\" or r._field == \"PVT_OUT_FROM_DHW\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_DHW:\n           if r.THREE_WAY_SOLAR_OPERATION == \"True\" then (3.6014+0.004*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 - 0.000002*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 -0.0018*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_DHW - r.PVT_OUT_FROM_DHW)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_DHW\")\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n",
           "refId": "Q_PVT_DHW"
         },
         {
@@ -779,32 +778,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "FLOW_CONDENSER"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 11,
@@ -1014,7 +988,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "PVT_IN_TO_DHW"
+                  "T_CHECKPOINT_SPACE_HEATING_MODBUS"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1060,7 +1034,16 @@
             "uid": "U9EYdpMIz"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"temperature\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)\n \n",
-          "refId": "A"
+          "refId": "Τemperatures"
+        },
+        {
+          "datasource": {
+            "type": "influxdb",
+            "uid": "U9EYdpMIz"
+          },
+          "hide": false,
+          "query": "from(bucket: \"mult_source_heatpump\")\r\n|> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n|> filter(fn: (r) => r._measurement == \"checkpoints\")\r\n|> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\r\n|> aggregateWindow(every: 30s, fn: last)\r\n|> fill(column: \"_value\", usePrevious: true)\r\n|> aggregateWindow(every: v.windowPeriod, fn: last)",
+          "refId": "Checkpoints"
         }
       ],
       "title": "Temperatures",
@@ -1075,13 +1058,13 @@
     "list": []
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 188,
+  "version": 193,
   "weekStart": ""
 }
