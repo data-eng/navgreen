@@ -15,7 +15,7 @@ columns=['Date_time_local', 'DATETIME', 'PVT_IN_TO_DHW', 'PVT_OUT_FROM_DHW', 'PV
      'SH_INLET', 'SH_RETURN', 'PVT_IN', 'PVT_OUT', 'POWER_HP', 'POWER_GLOBAL_SOL', 'POWER_PVT',
      'FLOW_EVAPORATOR', 'FLOW_CONDENSER', 'FLOW_DHW', 'FLOW_SOLAR_HEAT_REJECTION', 'FLOW_PVT',
      'FLOW_FAN_COILS_INDOOR', 'PYRANOMETER', 'Compressor_HZ', 'Residential_office_mode',
-     'MODBUS_LOCAL', 'EEV_LOAD1', 'EEV_LOAD2']
+     'MODBUS_LOCAL', 'EEV_LOAD1', 'EEV_LOAD2', "T_CHECKPOINT_DHW_MODBUS", "T_CHECKPOINT_SPACE_HEATING_MODBUS"]
 
 
 water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
@@ -42,6 +42,8 @@ other = ["Compressor_HZ", "EEV_LOAD1", "EEV_LOAD2"]
 
 control = ["THREE_WAY_EVAP_OPERATION", "THREE_WAY_COND_OPERATION", "THREE_WAY_SOLAR_OPERATION",
            "FOUR_WAY_VALVE", "AIR_COOLED_COMMAND", "Residential_office_mode", "MODBUS_LOCAL"]
+
+checkpoints = ["T_CHECKPOINT_DHW_MODBUS", "T_CHECKPOINT_SPACE_HEATING_MODBUS"]
 
 temp_sensors = []
 temp_sensors.extend(water_temp)
@@ -127,6 +129,8 @@ def process_data(df, hist_data=True):
         df[col] = df[col].apply(lambda x: np.nan if x < -20.0 or x > 100.0 else x)
     for col in pressure:
         df[col] = df[col].apply(lambda x: np.nan if x <  0.0 or x > 35.0 else x)
+
+    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= 4.0 else x)
 
     return df
 #end def process_data
