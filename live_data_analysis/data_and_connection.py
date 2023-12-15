@@ -205,6 +205,10 @@ if __name__ == "__main__":
                     T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[0] / 10
                     # print(f"T_setpoint_SPACE_HEATING_modbus: {T_setpoint_SPACE_HEATING_modbus}")
 
+                    # Round the set-points so that the code is not sensitive to changes beyond the second decimal
+                    T_setpoint_DHW_modbus = round(T_setpoint_DHW_modbus, 2)
+                    T_setpoint_SPACE_HEATING_modbus = round(T_setpoint_SPACE_HEATING_modbus, 2)
+
                     if T_setpoint_DHW_modbus != prior_checkpoint_DHW_modbus or T_setpoint_SPACE_HEATING_modbus != prior_checkpoint_SPACE_HEATING_modbus:
                         prior_checkpoint_DHW_modbus = T_setpoint_DHW_modbus
                         prior_checkpoint_SPACE_HEATING_modbus = T_setpoint_SPACE_HEATING_modbus
