@@ -1,5 +1,4 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.payload import BinaryPayloadDecoder
 
 import logging
 
