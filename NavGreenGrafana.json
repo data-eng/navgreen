@@ -87,7 +87,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Q_PVT_SOLAR_BUFFER"
+                  "Q_TANK_BUILD_COOL",
+                  "Q_TANK_BUILD_HEAT"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -267,7 +268,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_HEAT: 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_INLET-r.SH_RETURN)\n   }))\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_HEAT: \n      if r.SH_INLET > r.SH_RETURN then 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_INLET-r.SH_RETURN)\n      else 0.0 }),\n   )\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])",
           "refId": "Q_TANK_BUILD_HEAT"
         },
         {
@@ -276,7 +277,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_COOL: 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_RETURN-r.SH_INLET)\n   }))\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_COOL\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])",
+          "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_COOL: \n      if r.SH_INLET <= r.SH_RETURN then 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_RETURN-r.SH_INLET)\n      else 0.0 }),\n   )\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_COOL\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])",
           "refId": "Q_TANK_BUILD_COOL"
         }
       ],
@@ -988,7 +989,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "T_CHECKPOINT_SPACE_HEATING_MODBUS"
+                  "T_CHECKPOINT_SPACE_HEATING_MODBUS",
+                  "T_CHECKPOINT_DHW_MODBUS"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1042,7 +1044,7 @@
             "uid": "U9EYdpMIz"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\r\n|> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n|> filter(fn: (r) => r._measurement == \"checkpoints\")\r\n|> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\r\n|> aggregateWindow(every: 30s, fn: last)\r\n|> fill(column: \"_value\", usePrevious: true)\r\n|> aggregateWindow(every: v.windowPeriod, fn: last)",
+          "query": "from(bucket: \"mult_source_heatpump\")\r\n|> range(start: -30d)\r\n|> filter(fn: (r) => r._measurement == \"checkpoints\")\r\n|> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\r\n|> aggregateWindow(every: 30s, fn: last)\r\n|> fill(column: \"_value\", usePrevious: true)\r\n|> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n|> aggregateWindow(every: v.windowPeriod, fn: last)",
           "refId": "Checkpoints"
         }
       ],
@@ -1050,7 +1052,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "",
+  "refresh": false,
   "schemaVersion": 35,
   "style": "dark",
   "tags": [],
@@ -1058,13 +1060,13 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 193,
+  "version": 203,
   "weekStart": ""
 }
