@@ -8,6 +8,7 @@ import os
 import csv
 from datetime import datetime
 import time
+import struct
 
 from navgreen_base import establish_influxdb_connection, set_bucket, write_data, process_data
 
@@ -27,6 +28,19 @@ stream_handler.setFormatter(formatter)
 # Add handlers to logger
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
+
+def read_reg_value(register, index, divisor):
+    """
+    This function reads the correct value from the PLC, translates it
+    to a signed integer and then converts it to the correct decimal unit
+    :param register: Register to read values from
+    :param index: Register's index
+    :param divisor: Value's divisor to convert to preferred unit
+    :return: Value converted to signed int
+    """
+    value = register.registers[index]
+    value = struct.unpack('>h', struct.pack('>H', value))[0]
+    return value / divisor
 
 if __name__ == "__main__":
 
@@ -67,143 +81,110 @@ if __name__ == "__main__":
 
                     # Read holding register D500, D501, D502
                     result_coils2 = client.read_coils(8192 + 509, 7, int=0)  # read coils from 509 to 515
-                    result = client.read_holding_registers(500, 20)  # Read registers from 500 to 519
                     result_coils = client.read_coils(8192 + 500, 4)  # Read coils from 500 to 503
+
+                    result = client.read_holding_registers(500, 20)  # Read registers from 500 to 519
                     results_registers2 = client.read_holding_registers(520, 18)  # Read registers from 520 to 527
                     setpoint_registers = client.read_holding_registers(540, 2)  # Read holding registers 540 and 541, setpoint SH and setpoint DHW
 
                     # Read from PLC and convert to specific unit
 
-                    # READ PLC REGISTERS
-                    T_cond_out = result.registers[0] / 10
-                    # print(f"T_condenser_out: {T_cond_out}")
-                    T_cond_in = result.registers[1] / 10
-                    # print(f"T_condenser_in: {T_cond_in}")
-                    flow_condenser = result.registers[2] / 10000  # convert to m^3/h
-                    # print(f"flow_condenser: {flow_condenser}")
-                    T_evap_out = result.registers[3] / 10
-                    # print(f"T_evap_out: {T_evap_out}")
-                    T_evap_in = result.registers[4] / 10
-                    # print(f"T_evap_in: {T_evap_in}")
-                    flow_evap = result.registers[5] / 10000  # convert to m^3/h
-                    # print(f"flow_evaporator: {flow_evap}")
-                    # Read_Ambient air temperature
-                    T_air_source = result.registers[6] / 10
-                    # print(f"T_air_source: {T_air_source}")
-                    T_BTES_source = result.registers[7] / 10
-                    # print(f"T_btes_source: {T_BTES_source}")
-                    # Read_solar_buffer_TEMPERATURE
-                    T_solar_buffer_source = result.registers[8] / 10
-                    # print(f"T_solar_buffer_source: {T_solar_buffer_source}")
-                    # Read_space_heating_temperature
-                    T_space_heating_buffer = result.registers[9] / 10
-                    # print(f"T_space_heating_buffer: {T_space_heating_buffer}")
-                    # Read_solar_buffer_TEMPERATURE
-                    T_DHW_buffer = result.registers[10] / 10
-                    # print(f"T_DHW_buffer: {T_DHW_buffer}")
-                    # Read_indoor_TEMPERATURE
-                    T_indoor_temp = result.registers[11] / 10
-                    # print(f"T_indoor_temperature: {T_indoor_temp}")
-                    # Read_DHW_outlet_temperature
-                    T_dhw_out = result.registers[12] / 10
-                    # print(f"T_dhw_outlet_temp: {T_dhw_out}")
-                    # Read_DHW_inlet_TEMPERATURE
-                    T_dhw_in = result.registers[13] / 10
-                    # print(f"T_dhw_inlet_temp: {T_dhw_in}")
-                    # Read_indoor_TEMPERATURE
-                    flow_dhw = result.registers[14] / 10000  # convert to m^3/h
-                    # print(f"flow_dhw: {flow_dhw}")
-                    # Read_sh_inlet_TEMPERATURE_from_heat_pump
-                    T_hp_out_sh_in = result.registers[15] / 10
-                    # print(f"T_sh_in_from_HP: {T_hp_out_sh_in}")
-                    # Read_sh_outlet_TEMPERATURE_to_heat_pump
-                    T_sh_out_hp_in = result.registers[16] / 10
-                    # print(f"T_sh_in_from_HP: {T_hp_out_sh_in}")
-                    # Read_hp_outlet_to_DHW_tank_(same_as_condenser_out)
-                    T_hp_out_to_dhw_tank = result.registers[17] / 10
-                    # print(f"T_hp_out_to_dhw_tank: {T_hp_out_to_dhw_tank}")
-                    # Read_hp_in_temperature_from_DHW_tank(same_as_condenser_in)
-                    T_hp_in_from_dhw_tank = result.registers[18] / 10
-                    # print(f"T_hp_in_from_dhw_tank: {T_hp_in_from_dhw_tank}")
-                    # Read_hp_in_temperature_from_DHW_tank(same_as_condenser_in)
-                    # Electricity in kW"
-                    Total_electric_power = result.registers[19] / 1000
-                    # print(f"POWER_HP: {Total_electric_power}")
-
                     # READ COILS FROM PLC
-                    # Read_air_source_command
                     Air_source_valve = result_coils.bits[0]
-                    # IF OFF WATER SOURCE, IF ON AIR SOURCE
-                    # print(f"Air_source_command: {Air_source_valve}")
-                    # Read_BTES_SOURCE_valve_setting
-                    # if OFF solar buffer, if ON BTES tank
                     BTES_source_valve = result_coils.bits[1]
-                    # print(f"BTES_source_command: {BTES_source_valve}")
-                    # Read_PVT_flow_valve_setting
-                    # IF ON THEN DHW TANK, if OFF solar buffer tank
                     PVT_setting_valve = result_coils.bits[2]
-                    # print(f"PVT_setting_valve: {PVT_setting_valve}")
-                    # Condenser_heat_output_direction
-                    # IF ON HEAT TO SPACE BUFFER, IF OFF HEAT TO DHW TANK
                     Condenser_three_way = result_coils.bits[3]
-                    # print(f"Condenser_three_way: {Condenser_three_way}")
+
+                    # READ COILS AGAIN
+                    Residential_office = result_coils2.bits[0]
+                    BTES_HEATING_DHW_THREE_WAY = result_coils2.bits[1]
+                    BTES_GROUND_SOLAR_VALVE = result_coils2.bits[2]
+                    BTES_SOLAR_THREE_WAY_VALVE = result_coils2.bits[3]
+                    BTES_WATER_AIR_OPERATION = result_coils2.bits[4]
+                    HEATING_COOLING_MODE = result_coils2.bits[5]
+                    BMES_LOCAL_CONTROL = result_coils2.bits[6]
+
+                    # READ PLC REGISTERS
+                    # T_cond_out = result.registers[0] / 10
+                    T_cond_out = read_reg_value(result, 0, 10)
+                    # T_cond_in = result.registers[1] / 10
+                    T_cond_in = read_reg_value(result, 1, 10)
+                    # flow_condenser = result.registers[2] / 10000
+                    flow_condenser = read_reg_value(result, 2, 10000)
+                    #T_evap_out = result.registers[3] / 10
+                    T_evap_out = read_reg_value(result, 3, 10)
+                    # T_evap_in = result.registers[4] / 10
+                    T_evap_in = read_reg_value(result, 4, 10)
+                    # flow_evap = result.registers[5] / 10000
+                    flow_evap = read_reg_value(result, 5, 10000)
+                    # T_air_source = result.registers[6] / 10
+                    T_air_source = read_reg_value(result, 6, 10)
+                    #T_BTES_source = result.registers[7] / 10
+                    T_BTES_source = read_reg_value(result, 7, 10)
+                    #T_solar_buffer_source = result.registers[8] / 10
+                    T_solar_buffer_source = read_reg_value(result, 8, 10)
+                    #T_space_heating_buffer = result.registers[9] / 10
+                    T_space_heating_buffer = read_reg_value(result, 9, 10)
+                    #T_DHW_buffer = result.registers[10] / 10
+                    T_DHW_buffer = read_reg_value(result, 10, 10)
+                    #T_indoor_temp = result.registers[11] / 10
+                    T_indoor_temp = read_reg_value(result, 11, 10)
+                    #T_dhw_out = result.registers[12] / 10
+                    T_dhw_out = read_reg_value(result, 12, 10)
+                    #T_dhw_in = result.registers[13] / 10
+                    T_dhw_in = read_reg_value(result, 13, 10)
+                    #flow_dhw = result.registers[14] / 10000
+                    flow_dhw = read_reg_value(result, 14, 10000)
+                    #T_hp_out_sh_in = result.registers[15] / 10
+                    T_hp_out_sh_in = read_reg_value(result, 15, 10)
+                    #T_sh_out_hp_in = result.registers[16] / 10
+                    T_sh_out_hp_in = read_reg_value(result, 16, 10)
+                    #T_hp_out_to_dhw_tank = result.registers[17] / 10
+                    T_hp_out_to_dhw_tank = read_reg_value(result, 17, 10)
+                    #T_hp_in_from_dhw_tank = result.registers[18] / 10
+                    T_hp_in_from_dhw_tank = read_reg_value(result, 18, 10)
+                    #Total_electric_power = result.registers[19] / 1000
+                    Total_electric_power = read_reg_value(result, 19, 1000)
 
                     # READ HOLDING REGISTERS AGAIN
-                    # Read_temperature_from_space_buffer_to_demand
-                    T_from_sh_to_demand = results_registers2.registers[0] / 10
-                    # print(f"T_from_sh_to_demand: {T_from_sh_to_demand}")
-                    # Read_temperature_from_demand_to_space_buffer
-                    T_from_demand_to_space_bufer = results_registers2.registers[1] / 10
-                    # print(f"T_from_demand_to_space_bufer: {T_from_demand_to_space_bufer}")
-                    # water_flow_rate_for_space_heating_or_cooling
-                    flow_water_demand = results_registers2.registers[2] / 10000  # convert to m^3/h
-                    # print(f"flow_water_demand: {flow_water_demand}")
-                    # Read_electrical_power_produced_by_PVT_collectors
-                    Power_PV = results_registers2.registers[3] / 10000  # CONVERT TO kW
-                    # print(f"Power_PV: {Power_PV}")
-                    # Read_tilted_collector_solar_irradiation
-                    # Units: kW / m^2
-                    Solar_irr_tilted = results_registers2.registers[4] / 10000  # CONVERT TO kW / m^2
-                    # print(f"Solar_irr_tilted: {Solar_irr_tilted}")
-                    # Read_temperature_PVT_inlet
-                    T_pvt_in = results_registers2.registers[5] / 10
-                    # print(f"T_pvt_in: {T_pvt_in}")
-                    # Read_temperature_PVT_outlet
-                    T_pvt_out = results_registers2.registers[6] / 10
-                    # print(f"T_pvt_out: {T_pvt_out}")
-                    # Read_temperature_from_PVT____inlet_to_dhw
-                    T_pvt_in_to_dhw = results_registers2.registers[7] / 10
-                    # print(f"T_pvt_in_to_dhw: {T_pvt_in_to_dhw}")
-                    # Read_temperature_PVT_outlet_from_dhw_back_to_collectors
-                    T_dhw_out_to_pvt = results_registers2.registers[8] / 10
-                    # print(f"T_dhw_out_to_pvt: {T_dhw_out_to_pvt}")
-                    # Read_temperature_from_PVT____inlet_to_solar_buffer_tank
-                    T_pvt_in_to_solar_buffer = results_registers2.registers[9] / 10
-                    # print(f"T_pvt_in_to_solar_buffer: {T_pvt_in_to_solar_buffer}")
-                    # Read_temperature_PVT_outlet_from_solar_buffer_back_to_collectors
-                    T_solar_buffer_out_to_pvt = results_registers2.registers[10] / 10
-                    # print(f"T_solar_buffer_out_to_pvt: {T_solar_buffer_out_to_pvt}")
-                    # solar_circuit_flow_rate
-                    flow_solar_circuit = results_registers2.registers[11] / 10000  # convert to m^3/h
-                    # print(f"flow_solar_circuit: {flow_solar_circuit}")
-                    # Read_temperature_hp_evap_out_to_solar_buffer_in
-                    T_hp_out_to_solar_buffer_in = results_registers2.registers[12] / 10
-                    # print(f"T_hp_out_to_solar_buffer_in: {T_hp_out_to_solar_buffer_in}")
-                    # Read_temperature_hp_evap_in_from_solar_buffer_out
-                    T_hp_in_from_solar_buffer = results_registers2.registers[13] / 10
-                    # print(f"T_hp_in_from_solar_buffer: {T_hp_in_from_solar_buffer}")
-                    # Read_temperature_hp_evap_out_to_BTES_tank_IN
-                    T_hp_out_to_btes_in = results_registers2.registers[14] / 10
-                    # print(f"T_hp_out_to_btes_in: {T_hp_out_to_btes_in}")
-                    # Read_temperature_BTES_out_to_HP_in
-                    T_BTES_out_to_hp_in = results_registers2.registers[15] / 10
-                    # print(f"T_BTES_out_to_hp_in: {T_BTES_out_to_hp_in}")
-                    # DHW_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
-                    T_setpoint_DHW_modbus = setpoint_registers.registers[1] / 10
-                    # print(f"T_setpoint_DHW_modbus: {T_setpoint_DHW_modbus}")
-                    # SPACE_HEATING_TANK_TEMPERATURE_SETPOINT_MODBUS_OPERATION
-                    T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[0] / 10
-                    # print(f"T_setpoint_SPACE_HEATING_modbus: {T_setpoint_SPACE_HEATING_modbus}")
+                    #T_from_sh_to_demand = results_registers2.registers[0] / 10
+                    T_from_sh_to_demand = read_reg_value(results_registers2, 0, 10)
+                    #T_from_demand_to_space_bufer = results_registers2.registers[1] / 10
+                    T_from_demand_to_space_bufer = read_reg_value(results_registers2, 1, 10)
+                    #flow_water_demand = results_registers2.registers[2] / 10000
+                    flow_water_demand = read_reg_value(results_registers2, 2, 10000)
+                    #Power_PV = results_registers2.registers[3] / 10000
+                    Power_PV = read_reg_value(results_registers2, 3, 10000)
+                    #Solar_irr_tilted = results_registers2.registers[4] / 10000
+                    Solar_irr_tilted = read_reg_value(results_registers2, 4, 10000)
+                    #T_pvt_in = results_registers2.registers[5] / 10
+                    T_pvt_in = read_reg_value(results_registers2, 5, 10)
+                    #T_pvt_out = results_registers2.registers[6] / 10
+                    T_pvt_out = read_reg_value(results_registers2, 6, 10)
+                    #T_pvt_in_to_dhw = results_registers2.registers[7] / 10
+                    T_pvt_in_to_dhw = read_reg_value(results_registers2, 7, 10)
+                    #T_dhw_out_to_pvt = results_registers2.registers[8] / 10
+                    T_dhw_out_to_pvt = read_reg_value(results_registers2, 8, 10)
+                    #T_pvt_in_to_solar_buffer = results_registers2.registers[9] / 10
+                    T_pvt_in_to_solar_buffer = read_reg_value(results_registers2, 9, 10)
+                    #T_solar_buffer_out_to_pvt = results_registers2.registers[10] / 10
+                    T_solar_buffer_out_to_pvt = read_reg_value(results_registers2, 10, 10)
+                    #flow_solar_circuit = results_registers2.registers[11] / 10000
+                    flow_solar_circuit = read_reg_value(results_registers2, 11, 10000)
+                    #T_hp_out_to_solar_buffer_in = results_registers2.registers[12] / 10
+                    T_hp_out_to_solar_buffer_in = read_reg_value(results_registers2, 12, 10)
+                    #T_hp_in_from_solar_buffer = results_registers2.registers[13] / 10
+                    T_hp_in_from_solar_buffer = read_reg_value(results_registers2, 13, 10)
+                    #T_hp_out_to_btes_in = results_registers2.registers[14] / 10
+                    T_hp_out_to_btes_in = read_reg_value(results_registers2, 14, 10)
+                    #T_BTES_out_to_hp_in = results_registers2.registers[15] / 10
+                    T_BTES_out_to_hp_in = read_reg_value(results_registers2,15, 10)
+
+                    # READ SET-POINTS
+                    #T_setpoint_DHW_modbus = setpoint_registers.registers[1] / 10
+                    T_setpoint_DHW_modbus = read_reg_value(setpoint_registers, 1, 10)
+                    #T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[0] / 10
+                    T_setpoint_SPACE_HEATING_modbus = read_reg_value(setpoint_registers, 0, 10)
 
                     # Round the set-points so that the code is not sensitive to changes beyond the second decimal
                     T_setpoint_DHW_modbus = round(T_setpoint_DHW_modbus, 2)
@@ -215,35 +196,6 @@ if __name__ == "__main__":
                     else:
                         T_setpoint_DHW_modbus = np.nan
                         T_setpoint_SPACE_HEATING_modbus = np.nan
-
-                    # READ COILS AGAIN
-                    # Residential_or_office_mode
-                    Residential_office = result_coils2.bits[0]
-                    # IF ON MODE IS OFFICE, IF OFF MODE IS RESIDENTIAL
-                    # print(f"Residential_office: {Residential_office}")
-
-                    # COILS FOR BMES to know the valve position
-                    BTES_HEATING_DHW_THREE_WAY = result_coils2.bits[1]
-                    # IF BTES_HEATING_DHW_THREE_WAY = 0N THEN SPACE BUFFER, IF ITS OFF THEN DHW
-                    # print(f"BTES_HEATING_DHW_THREE_WAY: {BTES_HEATING_DHW_THREE_WAY}")
-                    BTES_GROUND_SOLAR_VALVE = result_coils2.bits[2]
-                    # IF ON MODE IS GROUND , IF OFF MODE IS SOLAR_BUFFER
-                    # print(f"BTES_GROUND_SOLAR_VALVE: {BTES_GROUND_SOLAR_VALVE}")
-                    BTES_SOLAR_THREE_WAY_VALVE = result_coils2.bits[3]
-                    # IF ON MODE IS DHW TANK , IF OFF MODE IS SOLAR_BUFFER
-                    # print(f"BTES_SOLAR_THREE_WAY_VALVE: {BTES_SOLAR_THREE_WAY_VALVE}")
-                    BTES_WATER_AIR_OPERATION = result_coils2.bits[4]
-                    # IF ON MODE IS AIR SOURCE , IF OFF MODE IS WATER_SOURCE
-                    # print(f"BTES_WATER_AIR_OPERATION: {BTES_WATER_AIR_OPERATION}")
-
-                    # HEATING_COOLING_MODE
-                    HEATING_COOLING_MODE = result_coils2.bits[5]
-                    # IF ON MODE IS HEATING , IF OFF MODE IS COOLING
-                    # print(f"HEATING_COOLING_MODE: {HEATING_COOLING_MODE}")
-                    # BMES_LOCAL_CONTROL
-                    BMES_LOCAL_CONTROL = result_coils2.bits[6]
-                    # IF ON MODE IS LOCAL , IF OFF MODE IS MODBUS
-                    # print(f"BMES_LOCAL_CONTROL: {BMES_LOCAL_CONTROL}")
 
                     # Get some dates
                     current_datetime = datetime.utcnow()
