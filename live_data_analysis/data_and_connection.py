@@ -87,6 +87,8 @@ if __name__ == "__main__":
                     results_registers2 = client.read_holding_registers(520, 18)  # Read registers from 520 to 527
                     setpoint_registers = client.read_holding_registers(540, 2)  # Read holding registers 540 and 541, setpoint SH and setpoint DHW
 
+                    other_registers = client.read_holding_registers(542, 25)  # Read remaining pressure and temp registers
+
                     # Read from PLC and convert to specific unit
 
                     # READ COILS FROM PLC
@@ -105,85 +107,71 @@ if __name__ == "__main__":
                     BMES_LOCAL_CONTROL = result_coils2.bits[6]
 
                     # READ PLC REGISTERS
-                    # T_cond_out = result.registers[0] / 10
                     T_cond_out = read_reg_value(result, 0, 10)
-                    # T_cond_in = result.registers[1] / 10
                     T_cond_in = read_reg_value(result, 1, 10)
-                    # flow_condenser = result.registers[2] / 10000
                     flow_condenser = read_reg_value(result, 2, 10000)
-                    #T_evap_out = result.registers[3] / 10
                     T_evap_out = read_reg_value(result, 3, 10)
-                    # T_evap_in = result.registers[4] / 10
                     T_evap_in = read_reg_value(result, 4, 10)
-                    # flow_evap = result.registers[5] / 10000
                     flow_evap = read_reg_value(result, 5, 10000)
-                    # T_air_source = result.registers[6] / 10
                     T_air_source = read_reg_value(result, 6, 10)
-                    #T_BTES_source = result.registers[7] / 10
                     T_BTES_source = read_reg_value(result, 7, 10)
-                    #T_solar_buffer_source = result.registers[8] / 10
                     T_solar_buffer_source = read_reg_value(result, 8, 10)
-                    #T_space_heating_buffer = result.registers[9] / 10
                     T_space_heating_buffer = read_reg_value(result, 9, 10)
-                    #T_DHW_buffer = result.registers[10] / 10
                     T_DHW_buffer = read_reg_value(result, 10, 10)
-                    #T_indoor_temp = result.registers[11] / 10
                     T_indoor_temp = read_reg_value(result, 11, 10)
-                    #T_dhw_out = result.registers[12] / 10
                     T_dhw_out = read_reg_value(result, 12, 10)
-                    #T_dhw_in = result.registers[13] / 10
                     T_dhw_in = read_reg_value(result, 13, 10)
-                    #flow_dhw = result.registers[14] / 10000
                     flow_dhw = read_reg_value(result, 14, 10000)
-                    #T_hp_out_sh_in = result.registers[15] / 10
                     T_hp_out_sh_in = read_reg_value(result, 15, 10)
-                    #T_sh_out_hp_in = result.registers[16] / 10
                     T_sh_out_hp_in = read_reg_value(result, 16, 10)
-                    #T_hp_out_to_dhw_tank = result.registers[17] / 10
                     T_hp_out_to_dhw_tank = read_reg_value(result, 17, 10)
-                    #T_hp_in_from_dhw_tank = result.registers[18] / 10
                     T_hp_in_from_dhw_tank = read_reg_value(result, 18, 10)
-                    #Total_electric_power = result.registers[19] / 1000
                     Total_electric_power = read_reg_value(result, 19, 1000)
 
                     # READ HOLDING REGISTERS AGAIN
-                    #T_from_sh_to_demand = results_registers2.registers[0] / 10
                     T_from_sh_to_demand = read_reg_value(results_registers2, 0, 10)
-                    #T_from_demand_to_space_bufer = results_registers2.registers[1] / 10
                     T_from_demand_to_space_bufer = read_reg_value(results_registers2, 1, 10)
-                    #flow_water_demand = results_registers2.registers[2] / 10000
                     flow_water_demand = read_reg_value(results_registers2, 2, 10000)
-                    #Power_PV = results_registers2.registers[3] / 10000
                     Power_PV = read_reg_value(results_registers2, 3, 10000)
-                    #Solar_irr_tilted = results_registers2.registers[4] / 10000
                     Solar_irr_tilted = read_reg_value(results_registers2, 4, 10000)
-                    #T_pvt_in = results_registers2.registers[5] / 10
                     T_pvt_in = read_reg_value(results_registers2, 5, 10)
-                    #T_pvt_out = results_registers2.registers[6] / 10
                     T_pvt_out = read_reg_value(results_registers2, 6, 10)
-                    #T_pvt_in_to_dhw = results_registers2.registers[7] / 10
                     T_pvt_in_to_dhw = read_reg_value(results_registers2, 7, 10)
-                    #T_dhw_out_to_pvt = results_registers2.registers[8] / 10
                     T_dhw_out_to_pvt = read_reg_value(results_registers2, 8, 10)
-                    #T_pvt_in_to_solar_buffer = results_registers2.registers[9] / 10
                     T_pvt_in_to_solar_buffer = read_reg_value(results_registers2, 9, 10)
-                    #T_solar_buffer_out_to_pvt = results_registers2.registers[10] / 10
                     T_solar_buffer_out_to_pvt = read_reg_value(results_registers2, 10, 10)
-                    #flow_solar_circuit = results_registers2.registers[11] / 10000
                     flow_solar_circuit = read_reg_value(results_registers2, 11, 10000)
-                    #T_hp_out_to_solar_buffer_in = results_registers2.registers[12] / 10
                     T_hp_out_to_solar_buffer_in = read_reg_value(results_registers2, 12, 10)
-                    #T_hp_in_from_solar_buffer = results_registers2.registers[13] / 10
                     T_hp_in_from_solar_buffer = read_reg_value(results_registers2, 13, 10)
-                    #T_hp_out_to_btes_in = results_registers2.registers[14] / 10
                     T_hp_out_to_btes_in = read_reg_value(results_registers2, 14, 10)
-                    #T_BTES_out_to_hp_in = results_registers2.registers[15] / 10
-                    T_BTES_out_to_hp_in = read_reg_value(results_registers2,15, 10)
+                    T_BTES_out_to_hp_in = read_reg_value(results_registers2, 15, 10)
+
+                    # READ REMAINING PRESSURES AND TEMP
+                    T_cond_out_ref = read_reg_value(other_registers, 0, 10)
+                    T_evap_out_ref = read_reg_value(other_registers, 1, 10)
+                    T_cond_in_ref = read_reg_value(other_registers, 2, 10)
+                    T_receiv_in_liq_ref = read_reg_value(other_registers, 3, 10)
+                    T_receiv_out_liq_ref = read_reg_value(other_registers, 4, 10)
+                    T_eco_liq_out_ref = read_reg_value(other_registers, 5, 10)
+                    T_suction_ref = read_reg_value(other_registers, 6, 10)
+                    T_discharge_ref = read_reg_value(other_registers, 7, 10)
+                    T_eco_vap_ref = read_reg_value(other_registers, 8, 10)
+                    T_expansion_ref = read_reg_value(other_registers, 9, 10)
+                    T_eco_expansion_ref = read_reg_value(other_registers, 10, 10)
+
+                    P_suction = read_reg_value(other_registers, 18, 10)
+                    P_discharge = read_reg_value(other_registers, 19, 10)
+                    P_eco = read_reg_value(other_registers, 20, 10)
+
+                    eev_main_percentage = read_reg_value(other_registers, 21, 10)
+                    eev_eco_percentage = read_reg_value(other_registers, 22, 10)
+
+                    T_dhw_bottom = read_reg_value(other_registers, 23, 10)
+
+                    compressor_HZ = read_reg_value(other_registers, 24, 10)
 
                     # READ SET-POINTS
-                    #T_setpoint_DHW_modbus = setpoint_registers.registers[1] / 10
                     T_setpoint_DHW_modbus = read_reg_value(setpoint_registers, 1, 10)
-                    #T_setpoint_SPACE_HEATING_modbus = setpoint_registers.registers[0] / 10
                     T_setpoint_SPACE_HEATING_modbus = read_reg_value(setpoint_registers, 0, 10)
 
                     # Round the set-points so that the code is not sensitive to changes beyond the second decimal
@@ -227,7 +215,7 @@ if __name__ == "__main__":
                                "AIR_HP_TO_BTES_TANK": np.nan,
                                "DHW_INLET": T_dhw_in,
                                "DHW_OUTLET": T_dhw_out,
-                               "DHW_BOTTOM": np.nan,
+                               "DHW_BOTTOM": T_dhw_bottom,
                                "SH_INLET": T_from_sh_to_demand,
                                "SH_RETURN": T_from_demand_to_space_bufer,
                                "PVT_IN": T_pvt_in,
@@ -238,17 +226,17 @@ if __name__ == "__main__":
                                "SH_BUFFER": T_space_heating_buffer,
                                "DHW_BUFFER": T_DHW_buffer,
                                "INDOOR_TEMP": T_indoor_temp,
-                               "RECEIVER_LIQUID_IN": np.nan,
-                               "RECEIVER_LIQUID_OUT": np.nan,
-                               "ECO_LIQUID_OUT": np.nan,
-                               "SUCTION_TEMP": np.nan,
-                               "DISCHARGE_TEMP": np.nan,
-                               "ECO_VAPOR_TEMP": np.nan,
-                               "EXPANSION_TEMP": np.nan,
-                               "ECO_EXPANSION_TEMP": np.nan,
-                               "SUCTION_PRESSURE": np.nan,
-                               "DISCHARGE_PRESSURE": np.nan,
-                               "ECO_PRESSURE": np.nan,
+                               "RECEIVER_LIQUID_IN": T_receiv_in_liq_ref,
+                               "RECEIVER_LIQUID_OUT": T_receiv_out_liq_ref,
+                               "ECO_LIQUID_OUT": T_eco_liq_out_ref,
+                               "SUCTION_TEMP": T_evap_out_ref,
+                               "DISCHARGE_TEMP": T_discharge_ref,
+                               "ECO_VAPOR_TEMP": T_eco_vap_ref,
+                               "EXPANSION_TEMP": T_expansion_ref,
+                               "ECO_EXPANSION_TEMP": T_eco_expansion_ref,
+                               "SUCTION_PRESSURE": P_suction,
+                               "DISCHARGE_PRESSURE": P_discharge,
+                               "ECO_PRESSURE": P_eco,
                                "FLOW_EVAPORATOR": flow_evap,
                                "FLOW_CONDENSER": flow_condenser,
                                "FLOW_DHW": flow_dhw,
@@ -258,8 +246,8 @@ if __name__ == "__main__":
                                "POWER_HP": Total_electric_power,
                                "POWER_PVT": Power_PV,
                                "PYRANOMETER": Solar_irr_tilted,
-                               "Compressor_HZ": np.nan,
-                               "EEV_LOAD1": np.nan, "EEV_LOAD2": np.nan,
+                               "Compressor_HZ": compressor_HZ,
+                               "EEV_LOAD1": eev_main_percentage, "EEV_LOAD2": eev_eco_percentage,
                                "THREE_WAY_EVAP_OPERATION": BTES_GROUND_SOLAR_VALVE,
                                "THREE_WAY_COND_OPERATION": BTES_HEATING_DHW_THREE_WAY,
                                "THREE_WAY_SOLAR_OPERATION": BTES_SOLAR_THREE_WAY_VALVE,

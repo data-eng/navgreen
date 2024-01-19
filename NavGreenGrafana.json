@@ -55,7 +55,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": 3600000,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -298,7 +298,7 @@
           "custom": {
             "fillOpacity": 70,
             "lineWidth": 0,
-            "spanNulls": false
+            "spanNulls": 300000
           },
           "mappings": [
             {
@@ -393,7 +393,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": 3600000,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -492,8 +492,8 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "always",
-            "spanNulls": false,
+            "showPoints": "auto",
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -579,7 +579,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": false,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -633,7 +633,7 @@
           "refId": "A"
         }
       ],
-      "title": "Other : Compressor HZ",
+      "title": "Other : Compressor (HZ)",
       "type": "timeseries"
     },
     {
@@ -665,7 +665,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": 3600000,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -755,7 +755,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": false,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -842,8 +842,8 @@
             "scaleDistribution": {
               "type": "linear"
             },
-            "showPoints": "always",
-            "spanNulls": false,
+            "showPoints": "auto",
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -924,7 +924,7 @@
           "refId": "PressureValues"
         }
       ],
-      "title": "Pressures",
+      "title": "Pressures (G)",
       "type": "timeseries"
     },
     {
@@ -957,7 +957,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "spanNulls": false,
+            "spanNulls": 300000,
             "stacking": {
               "group": "A",
               "mode": "none"
@@ -1067,6 +1067,6 @@
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 203,
+  "version": 213,
   "weekStart": ""
 }
