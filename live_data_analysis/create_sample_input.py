@@ -38,7 +38,7 @@ def create_sample_input():
                 break
 
         for press in pressure:
-            if row[press] < 0.0 or row[press] > 35.0:
+            if row[press] < 0.0 or row[press] > 30.0:
                 press_outlier = index
                 break
 
@@ -47,7 +47,7 @@ def create_sample_input():
                 sol_outlier = index
                 break
 
-        if row['FLOW_CONDENSER'] >= 4.0:
+        if row['FLOW_CONDENSER'] >= 3.27:
             flow_outlier = index
 
         if temp_outlier != -1 and press_outlier != -1 and sol_outlier != -1 and flow_outlier != -1:
@@ -75,19 +75,19 @@ def create_sample_input():
     # For the time being 'pressure' hasn't got any values at all
     random_index_press = random.randint(0, df.shape[0]-1)
     j = random.randint(0, len(pressure) - 1)
-    df.loc[random_index_press, pressure[j]] = 36.0
+    df.loc[random_index_press, pressure[j]] = 31.0
 
     logger.info(f'Twitched pressure sensor {pressure[j]} at index: {random_index_press}')
 
     # One fake outlier for a random solar value
     random_index_solar = random.randint(0, df.shape[0]-1)
     k = random.randint(0, len(solar) - 1)
-    df.loc[random_index_solar, solar[k]] = 6.0
+    df.loc[random_index_solar, solar[k]] = 2.1
 
     logger.info(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
 
     random_index_flow = random.randint(0, df.shape[0]-1)
-    df.at[random_index_flow, 'FLOW_CONDENSER'] = 5.0
+    df.at[random_index_flow, 'FLOW_CONDENSER'] = 3.721
 
     logger.info(f'Twitched flow condenser sensor at index: {random_index_flow}')
 
