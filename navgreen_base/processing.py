@@ -49,6 +49,15 @@ temp_sensors.extend(other_temp)
 temp_sensors.extend(ref_temp)
 
 
+value_limits = {
+    "pressure_min" : 0.0, "pressure_max" : 30.0,
+    "temp_min" : -20.0, "temp_max" : 100.0,
+    "solar_max" : 2.0,
+    "flow_condenser_max" : 3.27,
+    "EEV_min" : 0.0, "EEV_max" : 100.0
+}
+
+
 def process_data(df, hist_data=True):
     """
     This function applies the needed transformations to the columns of the input DataFrame and to the data outliers.
@@ -122,17 +131,17 @@ def process_data(df, hist_data=True):
 
     # Apply reasonable limits
     for col in solar:
-        df[col] = df[col].apply(lambda x: 0.0 if x > 2.0 else x)
+        df[col] = df[col].apply(lambda x: 0.0 if x > value_limits["solar_max"] else x)
     for col in temp_sensors:
-        df[col] = df[col].apply(lambda x: np.nan if x < -20.0 or x > 100.0 else x)
+        df[col] = df[col].apply(lambda x: np.nan if x < value_limits["temp_min"] or x > value_limits["temp_max"] else x)
     for col in pressure:
-        df[col] = df[col].apply(lambda x: np.nan if x < 0.0 or x > 30 else x)
+        df[col] = df[col].apply(lambda x: np.nan if x < value_limits["pressure_min"] or x > value_limits["pressure_max"] else x)
 
-    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= 3.27 else x)
+    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= value_limits["flow_condenser_max"] else x)
 
     # The EEV's should be percentages
-    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(lambda x: np.nan if x < 0 or x > 100 else x)
-    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(lambda x: np.nan if x < 0 or x > 100 else x)
+    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
+    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
 
     return df
 # end def process_data
