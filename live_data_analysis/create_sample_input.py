@@ -81,7 +81,6 @@ def create_sample_input():
     logger.info(f'Twitched temp sensor {temp_sensors[i]} at index: {random_index_temp}')
 
     # One fake outlier for a random pressure value.
-    # For the time being 'pressure' hasn't got any values at all
     random_index_press = random.randint(0, df.shape[0]-1)
     j = random.randint(0, len(pressure) - 1)
     df.loc[random_index_press, pressure[j]] = value_limits["pressure_max"] + 1
