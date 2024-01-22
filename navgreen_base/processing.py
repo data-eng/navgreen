@@ -130,5 +130,9 @@ def process_data(df, hist_data=True):
 
     df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= 3.27 else x)
 
+    # The EEV's should be percentages
+    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(lambda x: np.nan if x < 0 or x > 100 else x)
+    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(lambda x: np.nan if x < 0 or x > 100 else x)
+
     return df
 # end def process_data
