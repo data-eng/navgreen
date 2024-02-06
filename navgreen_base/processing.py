@@ -34,7 +34,7 @@ flow = ["FLOW_EVAPORATOR", "FLOW_CONDENSER", "FLOW_DHW", "FLOW_SOLAR_HEAT_REJECT
 
 power = ["POWER_HP", "POWER_PVT"]
 
-solar = ["PYRANOMETER", "DIFFUSE_SOLAR_IRR"]
+solar = ["PYRANOMETER"]
 
 other = ["Compressor_HZ", "EEV_LOAD1", "EEV_LOAD2"]
 
@@ -101,18 +101,16 @@ def process_data(df, hist_data=True):
                          "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "DHW_BOTTOM",
                          "RECEIVER_LIQUID_IN", "RECEIVER_LIQUID_OUT", "ECO_LIQUID_OUT", "SUCTION_TEMP", "DISCHARGE_TEMP",
                          "ECO_VAPOR_TEMP", "EXPANSION_TEMP", "ECO_EXPANSION_TEMP", "SUCTION_PRESSURE",
-                         "DISCHARGE_PRESSURE", "ECO_PRESSURE", "DIFFUSE_SOLAR_IRR"]
+                         "DISCHARGE_PRESSURE", "ECO_PRESSURE"]
 
         columns_div1000 = ["POWER_HP"]
 
         columns_div10000 = ["FLOW_CONDENSER", "FLOW_EVAPORATOR", "FLOW_DHW", "FLOW_FAN_COILS_INDOOR", "POWER_PVT",
                             "PYRANOMETER", "FLOW_PVT"]
 
-        '''
         # Measurements we do not read from the PLC yet
-        columns_nan = ["SOLAR_HEAT_REJECTION_IN", "SOLAR_HEAT_REJECTION_OUT", "FLOW_SOLAR_HEAT_REJECTION"]
+        # columns_nan = ["SOLAR_HEAT_REJECTION_IN", "SOLAR_HEAT_REJECTION_OUT", "AIR_HP_TO_BTES_TANK", "FLOW_SOLAR_HEAT_REJECTION"]
 
-        '''
         for col in columns_div10:
             df[col] = df[col] / 10
 
@@ -127,7 +125,7 @@ def process_data(df, hist_data=True):
             df[col] = np.nan
         '''
 
-        df["DATETIME"] = pd.to_datetime(df['DATETIME'], format="%Y-%m-%d %H:%M:%S")
+        df['DATETIME'] = pd.to_datetime(df['DATETIME'], utc=True)
 
     # Apply reasonable limits
     for col in solar:
