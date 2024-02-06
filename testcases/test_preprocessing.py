@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection, temp_sensors, pressure, solar, process_data
+from navgreen_base import write_data, delete_data, read_data, set_bucket, establish_influxdb_connection, temp_sensors, pressure, solar, process_data, value_limits
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -93,18 +93,27 @@ class TestPreproc( unittest.TestCase ):
         if columns_unique_to_input != set():
             for column in columns_unique_to_input:
                 # Check that it is indeed in the columns to which pre-processing is applied
-                self.assertTrue( (column in temp_sensors) or (column in pressure) )
+                self.assertTrue( (column in temp_sensors) or (column in pressure) or (column in ["EEV_LOAD1", "EEV_LOAD2",  "FLOW_CONDENSER"]))
                 # Check that all their values are either np.nan or outliers
                 if column in temp_sensors:
                     self.assertTrue(
                         ((pd.isna(sample_input[column])) |
-                         (sample_input[column] < -20.0) |
-                         (sample_input[column] > 100.0)).all() )
-                else:
+                         (sample_input[column] < value_limits["temp_min"]) |
+                         (sample_input[column] > value_limits["temp_max"])).all() )
+                elif column in pressure:
                     self.assertTrue(
                         ((pd.isna(sample_input[column])) |
-                         (sample_input[column] < 0.0) |
-                         (sample_input[column] > 35.0)).all() )
+                         (sample_input[column] < value_limits["pressure_min"]) |
+                         (sample_input[column] > value_limits["pressure_max"])).all() )
+                elif column in ["EEV_LOAD1", "EEV_LOAD2"]:
+                    self.assertTrue(
+                    ((pd.isna(sample_input[column])) |
+                     (sample_input[column] < value_limits["EEV_min"]) |
+                     (sample_input[column] > value_limits["EEV_min"])).all() )
+                else:
+                    self.assertTrue(
+                    ((pd.isna(sample_input[column])) |
+                    (sample_input[column] >= value_limits["flow_condenser_max"])).all() )
 
                 # If it passed the check, it can be dropped from the sample input
                 sample_input = sample_input.drop(columns=[column])
@@ -125,13 +134,18 @@ class TestPreproc( unittest.TestCase ):
         for col in sample_input.columns:
             # Treat the 'solar' outliers
             if col in solar:
-                sample_input.loc[sample_input[col] > 2.0, col] = 0.0
+                sample_input.loc[sample_input[col] > value_limits["solar_max"], col] = 0.0
             # Treat the 'temperature' outliers
             if col in temp_sensors:
-                sample_input.loc[(sample_input[col] < -20.0) | (sample_input[col] > 100.0), col] = np.nan
+                sample_input.loc[(sample_input[col] < value_limits["temp_min"]) | (sample_input[col] > value_limits["temp_max"]), col] = np.nan
             # Treat the 'pressure' outliers
             if col in pressure:
-                sample_input.loc[(sample_input[col] < 0.0) | (sample_input[col] > 35.0), col] = np.nan
+                sample_input.loc[(sample_input[col] < value_limits["pressure_min"]) | (sample_input[col] > value_limits["pressure_max"]), col] = np.nan
+            if col in ["EEV_LOAD1", "EEV_LOAD2"]:
+                sample_input.loc[(sample_input[col] < value_limits["EEV_min"]) | (sample_input[col] > value_limits["EEV_max"]), col] = np.nan
+            if col == "FLOW_CONDENSER":
+                sample_input.loc[sample_input[col] > value_limits["flow_condenser_max"], col] = 0.0
+
 
         # Compare the two DataFrames
         self.assertTrue( sample_input.compare(sample_output).empty )

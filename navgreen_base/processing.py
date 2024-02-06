@@ -34,7 +34,7 @@ flow = ["FLOW_EVAPORATOR", "FLOW_CONDENSER", "FLOW_DHW", "FLOW_SOLAR_HEAT_REJECT
 
 power = ["POWER_HP", "POWER_PVT"]
 
-solar = ["PYRANOMETER"]
+solar = ["PYRANOMETER", "DIFFUSE_SOLAR_IRR"]
 
 other = ["Compressor_HZ", "EEV_LOAD1", "EEV_LOAD2"]
 
@@ -47,6 +47,15 @@ temp_sensors = []
 temp_sensors.extend(water_temp)
 temp_sensors.extend(other_temp)
 temp_sensors.extend(ref_temp)
+
+
+value_limits = {
+    "pressure_min" : 0.0, "pressure_max" : 30.0,
+    "temp_min" : -20.0, "temp_max" : 100.0,
+    "solar_max" : 2.0,
+    "flow_condenser_max" : 3.27,
+    "EEV_min" : 0.0, "EEV_max" : 100.0
+}
 
 
 def process_data(df, hist_data=True):
@@ -92,7 +101,7 @@ def process_data(df, hist_data=True):
                          "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "DHW_BOTTOM",
                          "RECEIVER_LIQUID_IN", "RECEIVER_LIQUID_OUT", "ECO_LIQUID_OUT", "SUCTION_TEMP", "DISCHARGE_TEMP",
                          "ECO_VAPOR_TEMP", "EXPANSION_TEMP", "ECO_EXPANSION_TEMP", "SUCTION_PRESSURE",
-                         "DISCHARGE_PRESSURE", "ECO_PRESSURE"]
+                         "DISCHARGE_PRESSURE", "ECO_PRESSURE", "DIFFUSE_SOLAR_IRR"]
 
         columns_div1000 = ["POWER_HP"]
 
@@ -101,7 +110,7 @@ def process_data(df, hist_data=True):
 
         '''
         # Measurements we do not read from the PLC yet
-        columns_nan = ["SOLAR_HEAT_REJECTION_IN", "SOLAR_HEAT_REJECTION_OUT", "AIR_HP_TO_BTES_TANK", "FLOW_SOLAR_HEAT_REJECTION"]
+        columns_nan = ["SOLAR_HEAT_REJECTION_IN", "SOLAR_HEAT_REJECTION_OUT", "FLOW_SOLAR_HEAT_REJECTION"]
 
         '''
         for col in columns_div10:
@@ -122,13 +131,17 @@ def process_data(df, hist_data=True):
 
     # Apply reasonable limits
     for col in solar:
-        df[col] = df[col].apply(lambda x: 0.0 if x > 2.0 else x)
+        df[col] = df[col].apply(lambda x: 0.0 if x > value_limits["solar_max"] else x)
     for col in temp_sensors:
-        df[col] = df[col].apply(lambda x: np.nan if x < -20.0 or x > 100.0 else x)
+        df[col] = df[col].apply(lambda x: np.nan if x < value_limits["temp_min"] or x > value_limits["temp_max"] else x)
     for col in pressure:
-        df[col] = df[col].apply(lambda x: np.nan if x < 0.0 or x > 30 else x)
+        df[col] = df[col].apply(lambda x: np.nan if x < value_limits["pressure_min"] or x > value_limits["pressure_max"] else x)
 
-    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= 3.27 else x)
+    df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= value_limits["flow_condenser_max"] else x)
+
+    # The EEV's should be percentages
+    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
+    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
 
     return df
 # end def process_data
