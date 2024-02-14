@@ -212,7 +212,7 @@ if __name__ == "__main__":
                                "WATER_OUT_COND": T_cond_out,
                                "SH1_IN": T_hp_out_sh_in,
                                "SH1_RETURN": T_sh_out_hp_in,
-                               "DIFFUSE_SOLAR_IRR": np.nan,
+                               "AIR_HP_TO_BTES_TANK": np.nan,
                                "DHW_INLET": T_dhw_in,
                                "DHW_OUTLET": T_dhw_out,
                                "DHW_BOTTOM": T_dhw_bottom,
