@@ -1,35 +1,65 @@
 import socket
 import os
 
-def start_listening(host, port):
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((host, port))
+# Server's host and listening port
+server_host = '0.0.0.0'
+server_port = os.environ.get('Server_port_navgreen_control')
 
-    server_socket.listen(1)
-    print('Server listening on ' + str(host) + ':' + str(port))
+# Create a TCP socket
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_socket.bind((server_host, server_port))
 
-    try:
-        while True:
-            client_socket, client_address = server_socket.accept()
-            print('Connection established with' + str(client_address))
+# Only one connection allowed
+server_socket.listen(1)
+print('Server listening on ' + str(server_host) + ':' + str(server_port))
 
-            data = client_socket.recv(1024)
-            print('Received message:' + str(data.decode('utf-8')))
+try:
+    while True:
 
-            answer = "ok mate"
-            client_socket.send(answer.encode('utf-8'))
+        # Incoming connection
+        client_socket, client_address = server_socket.accept()
+        print('Connection established with' + str(client_address))
 
-            client_socket.close()
+        # Receive the invitation
+        data = client_socket.recv(1024)
+        print('Received message:' + str(data.decode('utf-8')))
 
-            print('closing connection with ' + str(client_address))
+        setpoint_DHW = None
+        confirmation = None
 
-    except KeyboardInterrupt:
-        print("Bye from the server")
+        # Get the setpoint from the user - only check for numerical value.
+        # The PLC-related checks will be conducted from the client process
 
-if __name__ == "__main__":
+        while confirmation != "y":
+            setpoint_DHW = input("Please enter the desired value: ")
 
-    server_host = os.environ.get('Server_ip_navgreen_control')
-    server_port = int(os.environ.get('Server_port_navgreen_control'))
+            try:
+                # Only accept numerical values
+                setpoint_DHW = float(setpoint_DHW)
 
-    start_listening(server_host, server_port)
+                while True:
+                    confirmation = input("Is the entered value the new DHW setpoint? (y/n): ").lower()
 
+                    if confirmation == "y":
+                        print("Sending the value to the PLC.")
+                        break
+                    elif confirmation == "n":
+                        print("Re-enter DHW setpoint.")
+                        break
+                    else:
+                        print("Invalid input. Please enter 'y' or 'n'.")
+
+            except ValueError:
+                print("Invalid input. Please enter a number.")
+                continue
+
+        # If is number and user is sure about their choices, send setpoint to client
+        client_socket.send(str(setpoint_DHW).encode('utf-8'))
+
+        # Terminate connection
+        client_socket.close()
+        print('Closing connection with ' + str(client_address))
+
+except KeyboardInterrupt:
+    # User performed Ctrl ^C
+    print("\nServer stops listening")
