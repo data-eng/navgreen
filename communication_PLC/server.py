@@ -20,10 +20,6 @@ try:
         client_socket, client_address = server_socket.accept()
         print('Connection established with' + str(client_address))
 
-        # Receive the invitation
-        data = client_socket.recv(1024)
-        print('Received message:' + str(data.decode('utf-8')))
-
         setpoint_DHW = None
         confirmation = None
 
