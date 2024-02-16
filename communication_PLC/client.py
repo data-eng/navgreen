@@ -64,6 +64,11 @@ if __name__ == "__main__":
 
                 client_socket.close()
 
+                if setpoint_DHW < 15 or setpoint_DHW > 51:
+                    # Threshold for setpoint is [15, 51]
+                    logger.info("Setpoint not in threshold [15, 51]. Not accepted.")
+                    continue
+
                 # Now, write the new setpoint to the PLC
                 # Connect with the PLC
                 modbus_client = None
@@ -79,116 +84,48 @@ if __name__ == "__main__":
                             modbus_client = ModbusTcpClient(plc_ip, port=plc_port)
                             modbus_client.connect()
 
-                            logger.info("Acquire and write data.")
+                            logger.info("Aquire and write data.")
 
-                            # Read holding register D500, D501, D502
-                            result_coils2 = modbus_client.read_coils(8192 + 509, 7, int=0)  # read coils from 509 to 515
-                            result_coils = modbus_client.read_coils(8192 + 500, 4)  # Read coils from 500 to 503
-
+                            # Read holding registers
                             result = modbus_client.read_holding_registers(500, 20)  # Read registers from 500 to 519
-                            results_registers2 = modbus_client.read_holding_registers(520, 18)  # Read registers from 520 to 527
-                            setpoint_registers = modbus_client.read_holding_registers(540, 2)  # Read holding registers 540 and 541, setpoint SH and setpoint DHW
-
+                            setpoint_registers = modbus_client.read_holding_registers(540,2)  # Read holding registers 540 and 541, setpoints
                             other_registers = modbus_client.read_holding_registers(542, 25)  # Read remaining pressure and temp registers
+                            result_alarm = modbus_client.read_coils(8192 + 506, 1, int=0)
 
-                            # READ COILS FROM PLC
-                            Air_source_valve = result_coils.bits[0]
-                            BTES_source_valve = result_coils.bits[1]
-                            PVT_setting_valve = result_coils.bits[2]
-                            Condenser_three_way = result_coils.bits[3]
-
-                            # READ COILS AGAIN
-                            Residential_office = result_coils2.bits[0]
-                            BTES_HEATING_DHW_THREE_WAY = result_coils2.bits[1]
-                            BTES_GROUND_SOLAR_VALVE = result_coils2.bits[2]
-                            BTES_SOLAR_THREE_WAY_VALVE = result_coils2.bits[3]
-                            BTES_WATER_AIR_OPERATION = result_coils2.bits[4]
-                            HEATING_COOLING_MODE = result_coils2.bits[5]
-                            BMES_LOCAL_CONTROL = result_coils2.bits[6]
-
-                            # READ PLC REGISTERS
-                            T_cond_out = read_reg_value(result, 0, 10)
-                            T_cond_in = read_reg_value(result, 1, 10)
-                            flow_condenser = read_reg_value(result, 2, 10000)
-                            T_evap_out = read_reg_value(result, 3, 10)
-                            T_evap_in = read_reg_value(result, 4, 10)
-                            flow_evap = read_reg_value(result, 5, 10000)
-                            T_air_source = read_reg_value(result, 6, 10)
-                            T_BTES_source = read_reg_value(result, 7, 10)
-                            T_solar_buffer_source = read_reg_value(result, 8, 10)
-                            T_space_heating_buffer = read_reg_value(result, 9, 10)
-                            T_DHW_buffer = read_reg_value(result, 10, 10)
-                            T_indoor_temp = read_reg_value(result, 11, 10)
-                            T_dhw_out = read_reg_value(result, 12, 10)
-                            T_dhw_in = read_reg_value(result, 13, 10)
-                            flow_dhw = read_reg_value(result, 14, 10000)
-                            T_hp_out_sh_in = read_reg_value(result, 15, 10)
-                            T_sh_out_hp_in = read_reg_value(result, 16, 10)
-                            T_hp_out_to_dhw_tank = read_reg_value(result, 17, 10)
-                            T_hp_in_from_dhw_tank = read_reg_value(result, 18, 10)
-                            Total_electric_power = read_reg_value(result, 19, 1000)
-
-                            # READ HOLDING REGISTERS AGAIN
-                            T_from_sh_to_demand = read_reg_value(results_registers2, 0, 10)
-                            T_from_demand_to_space_bufer = read_reg_value(results_registers2, 1, 10)
-                            flow_water_demand = read_reg_value(results_registers2, 2, 10000)
-                            Power_PV = read_reg_value(results_registers2, 3, 10000)
-                            Solar_irr_tilted = read_reg_value(results_registers2, 4, 10000)
-                            T_pvt_in = read_reg_value(results_registers2, 5, 10)
-                            T_pvt_out = read_reg_value(results_registers2, 6, 10)
-                            T_pvt_in_to_dhw = read_reg_value(results_registers2, 7, 10)
-                            T_dhw_out_to_pvt = read_reg_value(results_registers2, 8, 10)
-                            T_pvt_in_to_solar_buffer = read_reg_value(results_registers2, 9, 10)
-                            T_solar_buffer_out_to_pvt = read_reg_value(results_registers2, 10, 10)
-                            flow_solar_circuit = read_reg_value(results_registers2, 11, 10000)
-                            T_hp_out_to_solar_buffer_in = read_reg_value(results_registers2, 12, 10)
-                            T_hp_in_from_solar_buffer = read_reg_value(results_registers2, 13, 10)
-                            T_hp_out_to_btes_in = read_reg_value(results_registers2, 14, 10)
-                            T_BTES_out_to_hp_in = read_reg_value(results_registers2, 15, 10)
-
-                            # READ REMAINING PRESSURES AND TEMP
-                            T_cond_out_ref = read_reg_value(other_registers, 0, 10)
-                            T_evap_out_ref = read_reg_value(other_registers, 1, 10)
-                            T_cond_in_ref = read_reg_value(other_registers, 2, 10)
-                            T_receiv_in_liq_ref = read_reg_value(other_registers, 3, 10)
-                            T_receiv_out_liq_ref = read_reg_value(other_registers, 4, 10)
-                            T_eco_liq_out_ref = read_reg_value(other_registers, 5, 10)
-                            T_suction_ref = read_reg_value(other_registers, 6, 10)
-                            T_discharge_ref = read_reg_value(other_registers, 7, 10)
-                            T_eco_vap_ref = read_reg_value(other_registers, 8, 10)
-                            T_expansion_ref = read_reg_value(other_registers, 9, 10)
-                            T_eco_expansion_ref = read_reg_value(other_registers, 10, 10)
-
-                            P_suction = read_reg_value(other_registers, 18, 10)
-                            P_discharge = read_reg_value(other_registers, 19, 10)
-                            P_eco = read_reg_value(other_registers, 20, 10)
-
-                            eev_main_percentage = read_reg_value(other_registers, 21, 10)
-                            eev_eco_percentage = read_reg_value(other_registers, 22, 10)
-
-                            T_dhw_bottom = read_reg_value(other_registers, 23, 10)
-
+                            # Get the values we want
+                            general_alarm = result_alarm.bits[0]
+                            BTES_TANK = read_reg_value(result, 7, 10)
+                            DHW_buffer = read_reg_value(result, 10, 10)
+                            POWER_HP = read_reg_value(result, 19, 1000)
                             compressor_HZ = read_reg_value(other_registers, 24, 10)
-
-                            # READ SET-POINTS
                             T_setpoint_DHW_modbus = read_reg_value(setpoint_registers, 1, 10)
-                            T_setpoint_SPACE_HEATING_modbus = read_reg_value(setpoint_registers, 0, 10)
 
-                            ############################################
-                            # Write when conditions are met:
+                            # Setpoint value given by the server
+                            new_DHW_setpoint = setpoint_DHW
 
-                            # - If heat pump is on and temperature of DHW tank (top layer) > 52 oC, hp must be turned off
-                            # - If temp of the gorund (BTES tank) < 8 oC, hp must be turned off AND turned back on IF themp of ground tank is above 12 oC
+                            # Get ready to write:
 
-                            # write(num_of_register, value)
-                            # CONVERT IT TO INTEGER !!
-                            # client_modbus.write_coil(8192 + 126, True)
+                            # If no alarm is raised
+                            if not general_alarm:
 
-                            ############################################
+                                # If heat pump is on
+                                if compressor_HZ >= 30 and POWER_HP > 2:
+                                    if DHW_buffer > 52.0:
+                                        # Turn of HP
+                                        new_DHW_setpoint = 15
 
-                            # PLC must write no sooner than 5 minutes
-                            time.sleep(10)
-                            # time.sleep(5*60)
+                                ############################################
+                                # Write when conditions are met:
+
+                                # - If heat pump is on and temperature of DHW tank (top layer) > 52 oC, hp must be turned off
+                                # - If temp of the gorund (BTES tank) < 8 oC, hp must be turned off AND turned back on IF themp of ground tank is above 12 oC
+                                # - not alarm!
+
+                                # write(num_of_register, value)
+                                # CONVERT IT TO INTEGER !!
+                                # client.write_coil(8192+126, True)
+
+                                ############################################
 
                             break
 
@@ -205,11 +142,14 @@ if __name__ == "__main__":
                         modbus_client.close()
                         logger.info("Closed PLC socket.")
 
+                # PLC must write no sooner than 5 minutes
+                time.sleep(10)
+                # time.sleep(5*60)
+
             except Exception as e:
                 logger.error(f"{e}")
                 logger.info(f"Sleeping for {reconnect_interval} seconds..")
                 time.sleep(reconnect_interval)
-
 
     except KeyboardInterrupt:
         logger.info("Client ends process.")
