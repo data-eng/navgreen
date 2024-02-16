@@ -9,7 +9,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
-from navgreen_base.processing import flow, power, solar, temp_sensors, other, pressure, control, checkpoints
+from navgreen_base.processing import flow, power, solar, solar_diff_source, temp_sensors, other, pressure, control, checkpoints
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -47,7 +47,7 @@ def make_point(measurement, row, value_columns, tag_columns):
             if row[col] is not np.nan:
                 p.field(col, row[col])
         except KeyError:  # Checkpoints are not always stored e.g. historical data or if they have not changed
-            if col not in checkpoints:
+            if (col not in checkpoints) and (col not in solar_diff_source):
                 logger.critical(f"Cannot find column {col}.")
                 sys.exit(1)
 
@@ -79,7 +79,7 @@ def write_data(row, influx_client):
     api.write(bucket=bucket, org=organization, record=p)
     p = make_point("power", row, power, control)
     api.write(bucket=bucket, org=organization, record=p)
-    p = make_point("solar", row, solar, control)
+    p = make_point("solar", row, solar+solar_diff_source, control)
     api.write(bucket=bucket, org=organization, record=p)
     p = make_point("other", row, other, control)
     api.write(bucket=bucket, org=organization, record=p)

@@ -1,4 +1,6 @@
 from pymodbus.client import ModbusTcpClient
+import urllib.request
+import json
 
 import logging
 
@@ -28,6 +30,26 @@ stream_handler.setFormatter(formatter)
 # Add handlers to logger
 logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
+
+
+def read_diffuse_solar():
+    """
+    Reads diffuse solar radiation from a different source than the PLC
+    :return: Diffuse_solar value
+    """
+
+    diff_solar_radiation_url = 'http://10.10.3.183/api/?command=dataquery&uri=dl:Public.Gdif&format=json&mode=most-recent&p1=1'
+    try:
+       d = json.loads(urllib.request.urlopen(diff_solar_radiation_url).read().decode())
+       diffuse_solar = d['data'][0]['vals'][0]  # diffuse solar radiation
+       diffuse_solar = 0.0 if diffuse_solar < 1.0 else diffuse_solar
+       # Set it to correct metric
+       diffuse_solar /= 1000
+    except:
+       diffuse_solar = np.nan
+
+    return diffuse_solar
+
 
 def read_reg_value(register, index, divisor):
     """
@@ -185,6 +207,9 @@ if __name__ == "__main__":
                         T_setpoint_DHW_modbus = np.nan
                         T_setpoint_SPACE_HEATING_modbus = np.nan
 
+                    # Read Diffuse Solar Radiation from another source
+                    diffuse_solar_radiation = read_diffuse_solar()
+
                     # Get some dates
                     current_datetime = datetime.utcnow()
                     current_datetime = current_datetime.strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -246,6 +271,7 @@ if __name__ == "__main__":
                                "POWER_HP": Total_electric_power,
                                "POWER_PVT": Power_PV,
                                "PYRANOMETER": Solar_irr_tilted,
+                               "DIFFUSE_SOLAR_RADIATION": diffuse_solar_radiation,
                                "Compressor_HZ": compressor_HZ,
                                "EEV_LOAD1": eev_main_percentage, "EEV_LOAD2": eev_eco_percentage,
                                "THREE_WAY_EVAP_OPERATION": BTES_GROUND_SOLAR_VALVE,

@@ -14,7 +14,8 @@ columns = ['Date_time_local', 'DATETIME', 'PVT_IN_TO_DHW', 'PVT_OUT_FROM_DHW', '
            'SH_INLET', 'SH_RETURN', 'PVT_IN', 'PVT_OUT', 'POWER_HP', 'POWER_GLOBAL_SOL', 'POWER_PVT',
            'FLOW_EVAPORATOR', 'FLOW_CONDENSER', 'FLOW_DHW', 'FLOW_SOLAR_HEAT_REJECTION', 'FLOW_PVT',
            'FLOW_FAN_COILS_INDOOR', 'PYRANOMETER', 'Compressor_HZ', 'Residential_office_mode',
-           'MODBUS_LOCAL', 'EEV_LOAD1', 'EEV_LOAD2', "T_CHECKPOINT_DHW_MODBUS", "T_CHECKPOINT_SPACE_HEATING_MODBUS"]
+           'MODBUS_LOCAL', 'EEV_LOAD1', 'EEV_LOAD2', "T_CHECKPOINT_DHW_MODBUS",
+           "T_CHECKPOINT_SPACE_HEATING_MODBUS", "DIFFUSE_SOLAR_RADIATION"]
 
 water_temp = ["PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
               "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "SOLAR_HEAT_REJECTION_IN",
@@ -35,6 +36,7 @@ flow = ["FLOW_EVAPORATOR", "FLOW_CONDENSER", "FLOW_DHW", "FLOW_SOLAR_HEAT_REJECT
 power = ["POWER_HP", "POWER_PVT"]
 
 solar = ["PYRANOMETER"]
+solar_diff_source = ["DIFFUSE_SOLAR_RADIATION"]
 
 other = ["Compressor_HZ", "EEV_LOAD1", "EEV_LOAD2"]
 
@@ -48,13 +50,12 @@ temp_sensors.extend(water_temp)
 temp_sensors.extend(other_temp)
 temp_sensors.extend(ref_temp)
 
-
 value_limits = {
-    "pressure_min" : 0.0, "pressure_max" : 30.0,
-    "temp_min" : -20.0, "temp_max" : 100.0,
-    "solar_max" : 2.0,
-    "flow_condenser_max" : 3.27,
-    "EEV_min" : 0.0, "EEV_max" : 100.0
+    "pressure_min": 0.0, "pressure_max": 30.0,
+    "temp_min": -20.0, "temp_max": 100.0,
+    "solar_max": 2.0,
+    "flow_condenser_max": 3.27,
+    "EEV_min": 0.0, "EEV_max": 100.0
 }
 
 
@@ -84,62 +85,33 @@ def process_data(df, hist_data=True):
     # For actual time
     columns_to_drop += ["Date_time_local"]
 
+    if hist_data:
+        columns_to_drop += ['DIFFUSE_SOLAR_RADIATION']
+
     # Check if these columns exist and then drop them. This check is needed as the input DataFrame might not be
     # consistent in that matter as it may come from different sources (historical, live and other combinations)
     for col in columns_to_drop:
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
 
-    # The historical data in our disposal (the ones that refer to the data collected before we took over the project)
-    # were not converted to the preferred units, so when these data are used, the following conversions should be made
-    if hist_data:
-        # Convert to correct units
-        columns_div10 = ["WATER_OUT_COND", "WATER_IN_COND", "WATER_IN_EVAP", "WATER_OUT_EVAP", "OUTDOOR_TEMP",
-                         "BTES_TANK", "SOLAR_BUFFER_TANK", "SH_BUFFER", "DHW_BUFFER", "INDOOR_TEMP", "DHW_OUTLET",
-                         "DHW_INLET", "SH1_IN", "SH1_RETURN", "SH_INLET", "SH_RETURN", "PVT_IN", "PVT_OUT",
-                         "PVT_IN_TO_DHW", "PVT_OUT_FROM_DHW", "PVT_IN_TO_SOLAR_BUFFER", "PVT_OUT_FROM_SOLAR_BUFFER",
-                         "SOLAR_BUFFER_IN", "SOLAR_BUFFER_OUT", "BTES_TANK_IN", "BTES_TANK_OUT", "DHW_BOTTOM",
-                         "RECEIVER_LIQUID_IN", "RECEIVER_LIQUID_OUT", "ECO_LIQUID_OUT", "SUCTION_TEMP", "DISCHARGE_TEMP",
-                         "ECO_VAPOR_TEMP", "EXPANSION_TEMP", "ECO_EXPANSION_TEMP", "SUCTION_PRESSURE",
-                         "DISCHARGE_PRESSURE", "ECO_PRESSURE"]
-
-        columns_div1000 = ["POWER_HP"]
-
-        columns_div10000 = ["FLOW_CONDENSER", "FLOW_EVAPORATOR", "FLOW_DHW", "FLOW_FAN_COILS_INDOOR", "POWER_PVT",
-                            "PYRANOMETER", "FLOW_PVT"]
-
-        # Measurements we do not read from the PLC yet
-        # columns_nan = ["SOLAR_HEAT_REJECTION_IN", "SOLAR_HEAT_REJECTION_OUT", "AIR_HP_TO_BTES_TANK", "FLOW_SOLAR_HEAT_REJECTION"]
-
-        for col in columns_div10:
-            df[col] = df[col] / 10
-
-        for col in columns_div1000:
-            df[col] = df[col] / 1000
-
-        for col in columns_div10000:
-            df[col] = df[col] / 10000
-
-        '''
-        for col in columns_nan:
-            df[col] = np.nan
-        '''
-
-        df['DATETIME'] = pd.to_datetime(df['DATETIME'], utc=True)
-
     # Apply reasonable limits
-    for col in solar:
+    solar_columns = solar if hist_data else solar + solar_diff_source
+
+    for col in solar_columns:
         df[col] = df[col].apply(lambda x: 0.0 if x > value_limits["solar_max"] else x)
     for col in temp_sensors:
         df[col] = df[col].apply(lambda x: np.nan if x < value_limits["temp_min"] or x > value_limits["temp_max"] else x)
     for col in pressure:
-        df[col] = df[col].apply(lambda x: np.nan if x < value_limits["pressure_min"] or x > value_limits["pressure_max"] else x)
+        df[col] = df[col].apply(
+            lambda x: np.nan if x < value_limits["pressure_min"] or x > value_limits["pressure_max"] else x)
 
     df['FLOW_CONDENSER'] = df['FLOW_CONDENSER'].apply(lambda x: 0.0 if x >= value_limits["flow_condenser_max"] else x)
 
     # The EEV's should be percentages
-    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
-    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
+    df['EEV_LOAD1'] = df['EEV_LOAD1'].apply(
+        lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
+    df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(
+        lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
 
     return df
 # end def process_data
