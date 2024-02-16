@@ -36,7 +36,12 @@ def read_reg_value(register, index, divisor):
     return value / divisor
 
 
-# def read_reg_value(register, index, multiplier):
+def write_reg_value(client, register, value, multiplier):
+    # Convert float to integer
+    new_value = value * multiplier
+    client.write_coil(register, new_value)
+
+    return
 
 
 if __name__ == "__main__":
@@ -50,6 +55,9 @@ if __name__ == "__main__":
     plc_port = 502
     reconnect_interval = 30  # Seconds
 
+    too_cold = False
+    min_setpoint, max_setpoint = 15.0, 51.0
+
     try:
         while True:
             # Try to connect with the server to get the new DHW - setpoint value
@@ -59,14 +67,22 @@ if __name__ == "__main__":
                 client_socket.connect((server_host, server_port))
                 logger.info(f"Connected to {server_host}:{server_port}.")
 
-                setpoint_DHW = float(client_socket.recv(1024).decode('utf-8'))
+                setpoint_range = f"{min_setpoint}-{max_setpoint}"
+                client_socket.sendall(setpoint_range.encode('utf-8'))
+                logger.info(f"Sent the setpoint range to the server : [{min_setpoint}, {max_setpoint}].")
+
+                setpoint_DHW = client_socket.recv(1024).decode('utf-8')
                 logger.info(f"Setpoint from server: {setpoint_DHW}.")
 
                 client_socket.close()
 
-                if setpoint_DHW < 15 or setpoint_DHW > 51:
-                    # Threshold for setpoint is [15, 51]
-                    logger.info("Setpoint not in threshold [15, 51]. Not accepted.")
+                # Sometimes server may send unexpected values i.e. Ctrl ^C etc.
+                try:
+                    setpoint_DHW = float(setpoint_DHW)
+                except Exception as e:
+                    logger.error(f"{e}")
+                    logger.info(f"Sleeping for {reconnect_interval} seconds..")
+                    time.sleep(reconnect_interval)
                     continue
 
                 # Now, write the new setpoint to the PLC
@@ -84,12 +100,12 @@ if __name__ == "__main__":
                             modbus_client = ModbusTcpClient(plc_ip, port=plc_port)
                             modbus_client.connect()
 
-                            logger.info("Aquire and write data.")
+                            logger.info("Acquire and write data.")
 
                             # Read holding registers
-                            result = modbus_client.read_holding_registers(500, 20)  # Read registers from 500 to 519
-                            setpoint_registers = modbus_client.read_holding_registers(540,2)  # Read holding registers 540 and 541, setpoints
-                            other_registers = modbus_client.read_holding_registers(542, 25)  # Read remaining pressure and temp registers
+                            result = modbus_client.read_holding_registers(500, 20)
+                            setpoint_registers = modbus_client.read_holding_registers(540, 2)  # Read setpoints
+                            other_registers = modbus_client.read_holding_registers(542, 25)  # Read pressure and temp registers
                             result_alarm = modbus_client.read_coils(8192 + 506, 1, int=0)
 
                             # Get the values we want
@@ -107,25 +123,28 @@ if __name__ == "__main__":
 
                             # If no alarm is raised
                             if not general_alarm:
+                                # If the heatpump was not turned off previously due to cold temperature
+                                if not too_cold:
+                                    # If heat pump is on
+                                    if compressor_HZ >= 30.0 and POWER_HP > 2.0:
+                                        # Top of tank is too hot
+                                        if DHW_buffer > 52.0:
+                                            # Turn of HP
+                                            new_DHW_setpoint = min_setpoint
 
-                                # If heat pump is on
-                                if compressor_HZ >= 30 and POWER_HP > 2:
-                                    if DHW_buffer > 52.0:
-                                        # Turn of HP
-                                        new_DHW_setpoint = 15
+                                        # Bottom of tank is too cold
+                                        if BTES_TANK <= 8.0:
+                                            too_cold = True
+                                            new_DHW_setpoint = min_setpoint
 
-                                ############################################
-                                # Write when conditions are met:
-
-                                # - If heat pump is on and temperature of DHW tank (top layer) > 52 oC, hp must be turned off
-                                # - If temp of the gorund (BTES tank) < 8 oC, hp must be turned off AND turned back on IF themp of ground tank is above 12 oC
-                                # - not alarm!
-
-                                # write(num_of_register, value)
-                                # CONVERT IT TO INTEGER !!
-                                # client.write_coil(8192+126, True)
-
-                                ############################################
+                                    # Everything written regardless whether hp is on?????
+                                    write_reg_value(modbus_client, 541, new_DHW_setpoint, 10)
+                                else:
+                                    # If hp was closed due to cold temperature, should wait until it is at least 12
+                                    if BTES_TANK >= 12.0:
+                                        too_cold = False
+                                        new_DHW_setpoint = max_setpoint
+                                        write_reg_value(modbus_client, 541, new_DHW_setpoint, 10)
 
                             break
 
@@ -143,8 +162,8 @@ if __name__ == "__main__":
                         logger.info("Closed PLC socket.")
 
                 # PLC must write no sooner than 5 minutes
-                time.sleep(10)
-                # time.sleep(5*60)
+                # time.sleep(10)
+                time.sleep(5*60)
 
             except Exception as e:
                 logger.error(f"{e}")
