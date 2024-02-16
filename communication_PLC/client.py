@@ -37,8 +37,16 @@ def read_reg_value(register, index, divisor):
 
 
 def write_reg_value(client, register, value, multiplier):
+    """
+    Change the value of some registers.
+    :param client: ModBus client
+    :param register: Register to change
+    :param value: New value (semantic)
+    :param multiplier: Multiplier to make semantic value integer
+    :return: None
+    """
     # Convert float to integer
-    new_value = value * multiplier
+    new_value = int(value * multiplier)
     client.write_coil(register, new_value)
 
     return
