@@ -64,7 +64,7 @@ if __name__ == "__main__":
     reconnect_interval = 30  # Seconds
 
     too_cold = False
-    min_setpoint, max_setpoint = 15.0, 51.0
+    min_setpoint, max_setpoint = 15.0, 49.0
 
     try:
         while True:
@@ -136,7 +136,7 @@ if __name__ == "__main__":
                                     # If heat pump is on
                                     if compressor_HZ >= 30.0 and POWER_HP > 2.0:
                                         # Top of tank is too hot
-                                        if DHW_buffer > 52.0:
+                                        if DHW_buffer > 50.0:
                                             # Turn of HP
                                             new_DHW_setpoint = min_setpoint
 
