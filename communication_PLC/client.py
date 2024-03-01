@@ -122,7 +122,7 @@ if __name__ == "__main__":
                             DHW_buffer = read_reg_value(result, 10, 10)
                             POWER_HP = read_reg_value(result, 19, 1000)
                             compressor_HZ = read_reg_value(other_registers, 24, 10)
-                            T_setpoint_DHW_modbus = read_reg_value(setpoint_registers, 1, 10)
+                            # T_setpoint_DHW_modbus = read_reg_value(setpoint_registers, 1, 10)
 
                             # Setpoint value given by the server
                             new_DHW_setpoint = setpoint_DHW
@@ -145,7 +145,7 @@ if __name__ == "__main__":
                                             too_cold = True
                                             new_DHW_setpoint = min_setpoint
 
-                                    # Everything written regardless whether hp is on?????
+                                    # Everything written regardless whether hp is on
                                     write_reg_value(modbus_client, 541, new_DHW_setpoint, 10)
                                 else:
                                     # If hp was closed due to cold temperature, should wait until it is at least 12
