@@ -32,6 +32,8 @@ def create_sample_input():
     df = df.loc[200: df.shape[0]//6]  # Customized index so that we have both day and night values
     df = df.reset_index()
 
+    # Note that the historical data is in a different unit that the value limits, so we adjust it accordingly
+
     for index, row in df.iterrows():
 
         for temp in temp_sensors:
