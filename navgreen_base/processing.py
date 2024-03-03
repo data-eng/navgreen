@@ -94,20 +94,10 @@ def process_data(df, hist_data=True):
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
 
-    # If the data is indeed historical, convert it to the corresponding 'useful' units
+    # If the data is indeed historical, convert solar value PYRANOMETER to the corresponding 'useful' unit (W/m^2 to kW/m^2).
+    # The other measurements are already converted from the default PLC units to the ones the domain experts are accustomed to.
     if hist_data:
-        div_10000 = ["FLOW_CONDENSER", "FLOW_EVAPORATOR", "FLOW_DHW", "FLOW_FAN_COILS_INDOOR", "FLOW_PVT", "POWER_PVT", "PYRANOMETER"]
-        div_1000 = ["POWER_HP"]
-        div_10 = [col for col in df.columns if col not in div_10000 + div_1000]
-
-        for col in div_10:
-            df[col] = df[col].apply(lambda x: round(x / 10, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
-
-        for col in div_1000:
-            df[col] = df[col].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
-
-        for col in div_10000:
-            df[col] = df[col].apply(lambda x: round(x / 10000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
+        df['PYRANOMETER'] = df['PYRANOMETER'].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
 
     # Apply reasonable limits
     solar_columns = solar if hist_data else solar + solar_diff_source

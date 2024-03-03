@@ -32,32 +32,32 @@ def create_sample_input():
     df = df.loc[200: df.shape[0]//6]  # Customized index so that we have both day and night values
     df = df.reset_index()
 
-    # Note that the historical data is in a different unit that the value limits, so we adjust it accordingly
+    # Note that in the historical data the solar value (PYRANOMETER) is in a different unit that the value limits, so we adjust it accordingly
 
     for index, row in df.iterrows():
 
         for temp in temp_sensors:
-            if row[temp] < value_limits["temp_min"] * 10 or row[temp] > value_limits["temp_max"] * 10:
+            if row[temp] < value_limits["temp_min"] or row[temp] > value_limits["temp_max"]:
                 temp_outlier = index
                 break
 
         for press in pressure:
-            if row[press] < value_limits["pressure_min"] * 10 or row[press] > value_limits["pressure_max"] * 10:
+            if row[press] < value_limits["pressure_min"] or row[press] > value_limits["pressure_max"]:
                 press_outlier = index
                 break
 
         for sol in solar:
-            if row[sol] > value_limits["solar_max"] * 10000:
+            if row[sol] > value_limits["solar_max"] * 1000:
                 sol_outlier = index
                 break
 
-        if row['FLOW_CONDENSER'] >= value_limits["flow_condenser_max"] * 10000:
+        if row['FLOW_CONDENSER'] >= value_limits["flow_condenser_max"]:
             flow_outlier = index
 
-        if row['EEV_LOAD1'] < value_limits["EEV_min"] * 10 or row['EEV_LOAD1'] > value_limits["EEV_max"] * 10:
+        if row['EEV_LOAD1'] < value_limits["EEV_min"] or row['EEV_LOAD1'] > value_limits["EEV_max"]:
             EEV1_outlier = index
 
-        if row['EEV_LOAD2'] < value_limits["EEV_min"] * 10 or row['EEV_LOAD2'] > value_limits["EEV_max"] * 10:
+        if row['EEV_LOAD2'] < value_limits["EEV_min"] or row['EEV_LOAD2'] > value_limits["EEV_max"]:
             EEV2_outlier = index
 
         if (temp_outlier != -1 and press_outlier != -1 and sol_outlier != -1 and flow_outlier != -1 and
@@ -78,39 +78,39 @@ def create_sample_input():
         if not np.isnan(df.loc[random_index_temp, temp_sensors[i]]):
             break
 
-    df.loc[random_index_temp, temp_sensors[i]] = value_limits["temp_min"] * 10 - 1 * 10
+    df.loc[random_index_temp, temp_sensors[i]] = value_limits["temp_min"] - 1
 
     logger.info(f'Twitched temp sensor {temp_sensors[i]} at index: {random_index_temp}')
 
     # One fake outlier for a random pressure value.
     random_index_press = random.randint(0, df.shape[0]-1)
     j = random.randint(0, len(pressure) - 1)
-    df.loc[random_index_press, pressure[j]] = value_limits["pressure_max"] * 10 + 1 * 10
+    df.loc[random_index_press, pressure[j]] = value_limits["pressure_max"] + 1
 
     logger.info(f'Twitched pressure sensor {pressure[j]} at index: {random_index_press}')
 
     # One fake outlier for a random solar value
     random_index_solar = random.randint(0, df.shape[0]-1)
     k = random.randint(0, len(solar) - 1)
-    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"] * 10000 + 0.1 * 10000
+    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"] * 1000 + 0.1 * 1000
 
     logger.info(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
 
     # One fake outlier for flow condenser value
     random_index_flow = random.randint(0, df.shape[0]-1)
-    df.at[random_index_flow, 'FLOW_CONDENSER'] = value_limits["flow_condenser_max"] * 10000 + 0.001 * 10000
+    df.at[random_index_flow, 'FLOW_CONDENSER'] = value_limits["flow_condenser_max"] + 0.001
 
     logger.info(f'Twitched flow condenser sensor at index: {random_index_flow}')
 
     # One fake outlier for a random EEV1 value
     random_index_EEV1 = random.randint(0, df.shape[0]-1)
-    df.at[random_index_EEV1, 'EEV_LOAD1'] = value_limits["EEV_max"] * 10 + 1 * 10
+    df.at[random_index_EEV1, 'EEV_LOAD1'] = value_limits["EEV_max"] + 1
 
     logger.info(f'Twitched EEV_LOAD1 sensor at index: {random_index_EEV1}')
 
     # One fake outlier for a random EEV2 value
     random_index_EEV2 = random.randint(0, df.shape[0] - 1)
-    df.at[random_index_EEV2, 'EEV_LOAD2'] = value_limits["EEV_min"] * 10 - 1 * 10
+    df.at[random_index_EEV2, 'EEV_LOAD2'] = value_limits["EEV_min"] - 1
 
     logger.info(f'Twitched EEV_LOAD2 sensor at index: {random_index_EEV2}')
 
