@@ -94,6 +94,11 @@ def process_data(df, hist_data=True):
         if col in df.columns:
             df.drop(col, axis=1, inplace=True)
 
+    # If the data is indeed historical, convert solar value PYRANOMETER to the corresponding 'useful' unit (W/m^2 to kW/m^2).
+    # The other measurements are already converted from the default PLC units to the ones the domain experts are accustomed to.
+    if hist_data:
+        df['PYRANOMETER'] = df['PYRANOMETER'].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
+
     # Apply reasonable limits
     solar_columns = solar if hist_data else solar + solar_diff_source
 
@@ -112,6 +117,7 @@ def process_data(df, hist_data=True):
         lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
     df['EEV_LOAD2'] = df['EEV_LOAD2'].apply(
         lambda x: np.nan if x < value_limits["EEV_min"] or x > value_limits["EEV_max"] else x)
+
 
     return df
 # end def process_data

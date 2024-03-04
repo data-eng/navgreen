@@ -32,6 +32,8 @@ def create_sample_input():
     df = df.loc[200: df.shape[0]//6]  # Customized index so that we have both day and night values
     df = df.reset_index()
 
+    # Note that in the historical data the solar value (PYRANOMETER) is in a different unit that the value limits, so we adjust it accordingly
+
     for index, row in df.iterrows():
 
         for temp in temp_sensors:
@@ -45,7 +47,7 @@ def create_sample_input():
                 break
 
         for sol in solar:
-            if row[sol] > value_limits["solar_max"]:
+            if row[sol] > value_limits["solar_max"] * 1000:
                 sol_outlier = index
                 break
 
@@ -90,7 +92,7 @@ def create_sample_input():
     # One fake outlier for a random solar value
     random_index_solar = random.randint(0, df.shape[0]-1)
     k = random.randint(0, len(solar) - 1)
-    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"] + 0.1
+    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"] * 1000 + 0.1 * 1000
 
     logger.info(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
 
