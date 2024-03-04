@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 
 import scipy.signal
 import sklearn.linear_model
+import sklearn.preprocessing
+import sklearn.metrics
+
 import navgreen_base
 
 
@@ -13,16 +16,7 @@ pv_cols = ["DATETIME","OUTDOOR_TEMP","PYRANOMETER","DHW_BOTTOM","POWER_PVT","Q_P
 
 def load_data():
     df = pandas.read_csv( "data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], low_memory=False )
-    if 1==1:
-        navgreen_base.process_data( df, hist_data=True )
-    else:
-        df.rename(columns={
-            "3-WAY_EVAP_OPERATION": "THREE_WAY_EVAP_OPERATION",
-            "3-WAY_COND_OPERATION": "THREE_WAY_COND_OPERATION",
-            "3-WAY_SOLAR_OPERATION": "THREE_WAY_SOLAR_OPERATION",
-            "4_WAY_VALVE": "FOUR_WAY_VALVE",
-            "Date&time": "DATETIME",
-            "RECEIVER LIQUID_OUT": "RECEIVER_LIQUID_OUT"}, inplace=True)
+    navgreen_base.process_data( df, hist_data=True )
         
     print( "All data: {} rows".format(len(df)) )
     df = df[(df['DATETIME'] > '2022-05-01') & (df['DATETIME'] < '2023-09-01')]
@@ -39,16 +33,17 @@ def load_data():
     # Cannot be done on df_hp,df_pv views, modifying views is unsafe.
     for c in df.columns:
         if (c not in hp_cols) and (c not in pv_cols):
-            df.drop( c, axis="columns" )
+            df.drop( c, axis="columns", inplace=True )
     df.dropna( inplace=True )
     print( "No NaNs: {} rows".format(len(df)) )
 
     df_hp = df[ hp_cols ]
-    print( "HP: {} rows".format(len(df)) )
+    df_hp = df_hp[ df_hp["POWER_HP"] > 1 ]
+    print( "HP, POWER > 1: {} rows".format(len(df)) )
 
     df_pv = df[ pv_cols ]
-    df_pv = df_pv.loc[ df_pv["PYRANOMETER"] > 0.15 ]
-    print( "PV, PYRAN above 0.15: {} rows".format(len(df)) )
+    df_pv = df_pv[ df_pv["PYRANOMETER"] > 0.15 ]
+    print( "PV, PYRAN > 0.15: {} rows".format(len(df)) )
 
     return df, df_hp, df_pv
 #end def load_data
@@ -66,10 +61,10 @@ def normalize( df, cols ):
 
 
 def prepare_hp( df, with_diff=False ):
-    df = df.loc[ df["POWER_HP"] > 1000 ]
     X = df[ ["BTES_TANK","DHW_BUFFER"] ]
-    y = df[ "POWER_HP" ]
-    return X, y
+    y1 = df[ "POWER_HP" ]
+    y2 = df[ "Q_CON_HEAT" ]
+    return X, y1, y2
 #end def prepare_hp
 
 
@@ -78,34 +73,91 @@ def prepare_pv( df ):
     y1 = df[ "POWER_PVT" ]    
     y2 = df[ "Q_PV" ]    
     return X, y1, y2
+#end def prepare_pv
 
-def prepare_pv_diff( df ):
-    X = df[ ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "PREV_POWER_PVT", "DIFF_POWER_PVT"] ]
-    y = df[ "POWER_PVT" ]    
-    return X, y
+
+def regress( name, model, X, y, testX, testY ):
+    model.fit( X, y )
+    score = model.score( X, y )
+    yy = model.predict( X )
+    err = sklearn.metrics.mean_absolute_error( y, yy )
+    print( "{}, train set: explained var {}".format(name,score) ) 
+    print( "               abs error {}, where mean is {}".format(err,y.mean()) ) 
+    yy = model.predict( testX )
+    err = sklearn.metrics.mean_absolute_error( testY, yy )
+    print( "{}, test set: explained var {}".format(name,score) ) 
+    print( "               abs error {}, where mean is {}".format(err,testY.mean()) )
+    return model
+#end def regress
 
 
 df, df_hp, df_pv = load_data()
 
+grp = "1h"
+
 train = df_pv[(df_pv.DATETIME > "2023-08-01") & (df_pv.DATETIME < "2023-08-21")]
-# Drop NaN again, as there are empty 3h periods
-train = train.set_index( "DATETIME" ).resample( "3h" ).mean().dropna()
-print( "1-20 Aug 2023, groupby 3h: {} rows".format(len(train)) )
+# Drop NaN again, as there are empty periods
+train = train.set_index( "DATETIME" ).resample( grp ).mean().dropna()
+print( "1-20 Aug 2023, groupby {}: {} rows".format(grp,len(train)) )
 test = df_pv[(df_pv.DATETIME > "2023-08-21") & (df_pv.DATETIME < "2023-09-01")]
-test = test.set_index( "DATETIME" ).resample( "3h" ).mean().dropna()
-print( "21-31 Aug 2023, groupby 3h: {} rows".format(len(test)) )
+test = test.set_index( "DATETIME" ).resample( grp ).mean().dropna()
+print( "21-31 Aug 2023, groupby {}: {} rows".format(grp,len(test)) )
 X, y1, y2 = prepare_pv( train )
-m1 = sklearn.linear_model.LinearRegression()
-m1.fit( X, y1 )
-print( "LR, result: y = {} * X + {}".format(m1.coef_,m1.intercept_) ) 
-print( "LR, training set: {}".format(m1.score(X,y1)) ) 
-m2 = sklearn.linear_model.LinearRegression()
-m2.fit( X, y2 )
-print( "LR, result: y = {} * X + {}".format(m2.coef_,m2.intercept_) ) 
-print( "LR, training set: {}".format(m2.score(X,y2)) ) 
-X, y1, y2 = prepare_pv( test )
-print( "LR, test set: {}".format(m1.score(X,y1)) ) 
-print( "LR, test set: {}".format(m2.score(X,y2)) ) 
+testX, testY1, testY2 = prepare_pv( test )
+
+print()
+
+regress( "POWER_PVT/LR", sklearn.linear_model.LinearRegression(),
+         X, y1, testX, testY1 )
+regress( "Q_PV/LR", sklearn.linear_model.LinearRegression(),
+         X, y2, testX, testY2 )
+
+print()
+
+converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
+sqX = converter.fit_transform( X )
+testSqX = converter.fit_transform( testX )
+
+regress( "POWER_PVT/SQ-LR", sklearn.linear_model.LinearRegression(),
+         sqX, y1, testSqX, testY1 )
+regress( "Q_PV/SQ-LR", sklearn.linear_model.LinearRegression(),
+         sqX, y2, testSqX, testY2 )
+
+#print( "LR, result: y = {} * X + {}".format(m1.coef_,m1.intercept_) ) 
+
+print()
+
+grp = "1h"
+
+train = df_hp[(df_hp.DATETIME > "2023-08-01") & (df_hp.DATETIME < "2023-08-21")]
+# Drop NaN again, as there are empty "grp" periods
+train = train.set_index( "DATETIME" ).resample( grp ).mean().dropna()
+print( "1-20 Aug 2023, groupby {}: {} rows".format(grp,len(train)) )
+test = df_hp[(df_hp.DATETIME > "2023-08-21") & (df_hp.DATETIME < "2023-09-01")]
+test = test.set_index( "DATETIME" ).resample( grp ).mean().dropna()
+print( "21-31 Aug 2023, groupby {}: {} rows".format(grp,len(test)) )
+X, y1, y2 = prepare_hp( train )
+testX, testY1, testY2 = prepare_hp( test )
+
+print()
+
+
+regress( "POWER_HP/LR", sklearn.linear_model.LinearRegression(),
+         X, y1, testX, testY1 )
+regress( "Q_CON_HEAT/LR", sklearn.linear_model.LinearRegression(),
+         X, y2, testX, testY2 )
+
+print()
+
+converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
+sqX = converter.fit_transform( X )
+testSqX = converter.fit_transform( testX )
+
+regress( "POWER_HP/SQ-LR", sklearn.linear_model.LinearRegression(),
+         sqX, y1, testSqX, testY1 )
+regress( "Q_CON_HEAT/SQ-LR", sklearn.linear_model.LinearRegression(),
+         sqX, y2, testSqX, testY2 )
+
 
 if 1==0:
     d["PREV_POWER_PVT"] = d["POWER_PVT"].shift(1)
