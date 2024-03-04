@@ -19,8 +19,8 @@ def load_data():
     navgreen_base.process_data( df, hist_data=True )
         
     print( "All data: {} rows".format(len(df)) )
-    df = df[(df['DATETIME'] > '2022-05-01') & (df['DATETIME'] < '2023-09-01')]
-    print( "16 full months, 2022-05 to 2023-08: {} rows".format(len(df)) )
+    df = df[(df['DATETIME'] > '2022-06-01') & (df['DATETIME'] < '2023-09-01')]
+    print( "15 full months, 2022-06 to 2023-08: {} rows".format(len(df)) )
     df = df.loc[ df["FOUR_WAY_VALVE"] == "HEATING" ]
     print( "HEATING: {} rows".format(len(df)) )
 
@@ -75,8 +75,40 @@ def prepare_pv( df ):
     return X, y1, y2
 #end def prepare_pv
 
+# Makes a list of 2nd-order-poly feature names
+# in the same order as returned by converter
+def make_feature_names( converter ):
+    retv = []
+    for line in converter.powers_:
+        name = ""
+        for i,exp in enumerate(line):
+            if exp == 2:
+                name = "{}^2".format(converter.feature_names_in_[i])
+            if exp == 1:
+                if name == "":
+                    name = converter.feature_names_in_[i]
+                else:
+                    name = name + "*" + converter.feature_names_in_[i]
+        #end for exp
+        retv.append(name)
+    #end for line
+    return retv
+#end def
 
-def regress( name, model, X, y, testX, testY ):
+def make_plot( index, label, X, realY, predY ):
+    fig,ax = plt.subplots(1,2)
+    ax[0].plot( index, realY, 'r-',label="Real values" )
+    ax[0].plot( index, predY, 'g-',label="Pred values" )
+    xx = X.to_numpy()
+    ax[1].plot( index, realY, 'r-',label="Real values" )
+    ax[1].plot( index, xx[:,0],'b-',label="X[0]" )
+    ax[1].plot( index, xx[:,1],'b-',label="X[1]" )
+    fig.supxlabel( label )
+    return fig
+#end def make_plot
+
+
+def regress( name, model, X, y, testX, testY, plot_index=None ):
     model.fit( X, y )
     score = model.score( X, y )
     yy = model.predict( X )
@@ -87,19 +119,20 @@ def regress( name, model, X, y, testX, testY ):
     err = sklearn.metrics.mean_absolute_error( testY, yy )
     print( "{}, test set: explained var {}".format(name,score) ) 
     print( "               abs error {}, where mean is {}".format(err,testY.mean()) )
-    return model
+    if plot_index is None: return None
+    else: return make_plot( plot_index, name, testX, testY, yy )
 #end def regress
 
 
+
 df, df_hp, df_pv = load_data()
+grp = "4h"
 
-grp = "1h"
-
-train = df_pv[(df_pv.DATETIME > "2023-08-01") & (df_pv.DATETIME < "2023-08-21")]
+train = df_pv[(df_pv.DATETIME > "2023-04-01") & (df_pv.DATETIME < "2023-08-01")]
 # Drop NaN again, as there are empty periods
 train = train.set_index( "DATETIME" ).resample( grp ).mean().dropna()
 print( "1-20 Aug 2023, groupby {}: {} rows".format(grp,len(train)) )
-test = df_pv[(df_pv.DATETIME > "2023-08-21") & (df_pv.DATETIME < "2023-09-01")]
+test = df_pv[(df_pv.DATETIME > "2023-08-01") & (df_pv.DATETIME < "2023-09-01")]
 test = test.set_index( "DATETIME" ).resample( grp ).mean().dropna()
 print( "21-31 Aug 2023, groupby {}: {} rows".format(grp,len(test)) )
 X, y1, y2 = prepare_pv( train )
@@ -107,27 +140,34 @@ testX, testY1, testY2 = prepare_pv( test )
 
 print()
 
-regress( "POWER_PVT/LR", sklearn.linear_model.LinearRegression(),
-         X, y1, testX, testY1 )
-regress( "Q_PV/LR", sklearn.linear_model.LinearRegression(),
-         X, y2, testX, testY2 )
+print( "X: {}, y1: {}, y2: {}, testX: {}, testY1: {}, testY2:{}".format(
+    X.shape, y1.shape, y2.shape, testX.shape, testY1.shape, testY2.shape) )
+
+p = regress( "POWER_PVT/LR", sklearn.linear_model.LinearRegression(),
+             X, y1, testX, testY1, test.index )
+p.savefig( "{}.png".format("pvt_LR") )
+p = regress( "Q_PV/LR", sklearn.linear_model.LinearRegression(),
+             X, y2, testX, testY2, test.index )
+p.savefig( "{}.png".format("qpv_LR") )
 
 print()
 
 converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
-sqX = converter.fit_transform( X )
-testSqX = converter.fit_transform( testX )
+sqX = converter.fit_transform( X.to_numpy() )
+testSqX = pandas.DataFrame(
+    converter.fit_transform(testX),
+    columns=make_feature_names(converter) )
 
-regress( "POWER_PVT/SQ-LR", sklearn.linear_model.LinearRegression(),
-         sqX, y1, testSqX, testY1 )
-regress( "Q_PV/SQ-LR", sklearn.linear_model.LinearRegression(),
-         sqX, y2, testSqX, testY2 )
+p = regress( "POWER_PVT/SQ-LR", sklearn.linear_model.LinearRegression(),
+             sqX, y1, testSqX, testY1, test.index )
+p.savefig( "{}.png".format("pvt_SQ") )
+p = regress( "Q_PV/SQ-LR", sklearn.linear_model.LinearRegression(),
+             sqX, y2, testSqX, testY2, test.index )
+p.savefig( "{}.png".format("qpv_SQ") )
 
 #print( "LR, result: y = {} * X + {}".format(m1.coef_,m1.intercept_) ) 
 
 print()
-
-grp = "1h"
 
 train = df_hp[(df_hp.DATETIME > "2023-08-01") & (df_hp.DATETIME < "2023-08-21")]
 # Drop NaN again, as there are empty "grp" periods
@@ -142,21 +182,27 @@ testX, testY1, testY2 = prepare_hp( test )
 print()
 
 
-regress( "POWER_HP/LR", sklearn.linear_model.LinearRegression(),
-         X, y1, testX, testY1 )
-regress( "Q_CON_HEAT/LR", sklearn.linear_model.LinearRegression(),
-         X, y2, testX, testY2 )
+p = regress( "POWER_HP/LR", sklearn.linear_model.LinearRegression(),
+             X, y1, testX, testY1, test.index )
+p.savefig( "{}.png".format("php_LR") )
+p = regress( "Q_CON_HEAT/LR", sklearn.linear_model.LinearRegression(),
+             X, y2, testX, testY2, test.index )
+p.savefig( "{}.png".format("qcon_LR") )
 
 print()
 
 converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
-sqX = converter.fit_transform( X )
-testSqX = converter.fit_transform( testX )
+sqX = converter.fit_transform( X.to_numpy() )
+testSqX = pandas.DataFrame(
+    converter.fit_transform(testX),
+    columns=make_feature_names(converter) )
 
-regress( "POWER_HP/SQ-LR", sklearn.linear_model.LinearRegression(),
-         sqX, y1, testSqX, testY1 )
-regress( "Q_CON_HEAT/SQ-LR", sklearn.linear_model.LinearRegression(),
-         sqX, y2, testSqX, testY2 )
+p = regress( "POWER_HP/SQ-LR", sklearn.linear_model.LinearRegression(),
+             sqX, y1, testSqX, testY1, test.index )
+p.savefig( "{}.png".format("php_SQ") )
+p = regress( "Q_CON_HEAT/SQ-LR", sklearn.linear_model.LinearRegression(),
+             sqX, y2, testSqX, testY2, test.index )
+p.savefig( "{}.png".format("qcon_SQ") )
 
 
 if 1==0:
