@@ -19,8 +19,8 @@ def load_data():
     navgreen_base.process_data( df, hist_data=True )
         
     print( "All data: {} rows".format(len(df)) )
-    df = df[(df['DATETIME'] > '2022-06-01') & (df['DATETIME'] < '2023-09-01')]
-    print( "15 full months, 2022-06 to 2023-08: {} rows".format(len(df)) )
+    df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
+    print( "12 full months, 2022-09 to 2023-08: {} rows".format(len(df)) )
     df = df.loc[ df["FOUR_WAY_VALVE"] == "HEATING" ]
     print( "HEATING: {} rows".format(len(df)) )
 
@@ -44,6 +44,17 @@ def load_data():
     df_pv = df[ pv_cols ]
     df_pv = df_pv[ df_pv["PYRANOMETER"] > 0.15 ]
     print( "PV, PYRAN > 0.15: {} rows".format(len(df)) )
+
+    # Print some monthly stats about the data
+    for m in range(9,21):
+        df_monthly = df[ df.DATETIME.dt.month == ((m-1)%12)+1 ]
+        print( "{} to {}".format(
+            df_monthly.DATETIME.dt.date.iloc[0],
+            df_monthly.DATETIME.dt.date.iloc[-1]) )
+        for col in df_monthly.columns:
+            print( "  {}: {} {} {}".format(
+                col,df_monthly[col].min(),
+                df_monthly[col].mean(),df_monthly[col].max()) )
 
     return df, df_hp, df_pv
 #end def load_data
@@ -108,101 +119,110 @@ def make_plot( index, label, X, realY, predY ):
 #end def make_plot
 
 
-def regress( name, model, X, y, testX, testY, plot_index=None ):
+# Trains and applies model and returns
+# [val_score,val_rel_err,test_score,test_rel_err] array,
+# relative error and score (fraction of variance in
+# dependent var that is explained by indep variables.
+# val_: validation on training data itself
+# test_: on unseen data
+# If plot_index is the x axis (time points), it also
+# plots predictions, truths over the test data.
+def regress( model, X, y, testX, testY, plot_index=None, label=None ):
     model.fit( X, y )
-    score = model.score( X, y )
+    score = round(100*model.score( X, y ))
     yy = model.predict( X )
-    err = sklearn.metrics.mean_absolute_error( y, yy )
-    print( "{}, train set: explained var {}".format(name,score) ) 
-    print( "               abs error {}, where mean is {}".format(err,y.mean()) ) 
+    err = round(100*sklearn.metrics.mean_absolute_error(y,yy)/y.mean())
+    retv = [score, err]
     yy = model.predict( testX )
-    err = sklearn.metrics.mean_absolute_error( testY, yy )
-    print( "{}, test set: explained var {}".format(name,score) ) 
-    print( "               abs error {}, where mean is {}".format(err,testY.mean()) )
-    if plot_index is None: return None
-    else: return make_plot( plot_index, name, testX, testY, yy )
+    err = round(100*sklearn.metrics.mean_absolute_error(testY,yy)/y.mean())
+    retv.extend( [score, err] )
+    if plot_index is None:
+        return (retv,None)
+    else:
+        p = make_plot( plot_index, label, testX, testY, yy )
+        return (retv,p)
 #end def regress
 
 
-
 df, df_hp, df_pv = load_data()
-grp = "4h"
+grp = "6h"
 
-train = df_pv[(df_pv.DATETIME > "2023-04-01") & (df_pv.DATETIME < "2023-08-01")]
-# Drop NaN again, as there are empty periods
-train = train.set_index( "DATETIME" ).resample( grp ).mean().dropna()
-print( "1-20 Aug 2023, groupby {}: {} rows".format(grp,len(train)) )
-test = df_pv[(df_pv.DATETIME > "2023-08-01") & (df_pv.DATETIME < "2023-09-01")]
-test = test.set_index( "DATETIME" ).resample( grp ).mean().dropna()
-print( "21-31 Aug 2023, groupby {}: {} rows".format(grp,len(test)) )
-X, y1, y2 = prepare_pv( train )
-testX, testY1, testY2 = prepare_pv( test )
-
+print( "##### SCENARIO 1 #####" )
+print( "Each month, train on 20 days and test on rest" )
 print()
 
-print( "X: {}, y1: {}, y2: {}, testX: {}, testY1: {}, testY2:{}".format(
-    X.shape, y1.shape, y2.shape, testX.shape, testY1.shape, testY2.shape) )
+if 1==1:
+    mydf = df_hp
+    prepare = prepare_hp
+    name = "PV"
+else:
+    mydf = df_pv
+    prepare = prepare_pv
+    name = "HP"
 
-p = regress( "POWER_PVT/LR", sklearn.linear_model.LinearRegression(),
-             X, y1, testX, testY1, test.index )
-p.savefig( "{}.png".format("pvt_LR") )
-p = regress( "Q_PV/LR", sklearn.linear_model.LinearRegression(),
-             X, y2, testX, testY2, test.index )
-p.savefig( "{}.png".format("qpv_LR") )
+results = []
+for mm in range(9,21):
+    m = ((mm-1)%12)+1
+    mydf1 = mydf[ mydf.DATETIME.dt.month == m ]
+    # Drop NaN again, as there might be empty periods
+    train = mydf1[mydf1.DATETIME.dt.day<21].set_index( "DATETIME" ).resample( grp ).mean().dropna()
+    test = mydf1[mydf1.DATETIME.dt.day>=21].set_index( "DATETIME" ).resample( grp ).mean().dropna()
+    X, y1, y2 = prepare( train )
+    testX, testY1, testY2 = prepare( test )
+    #print( "X: {}, y1: {}, y2: {}, testX: {}, testY1: {}, testY2:{}".format(
+    #    X.shape, y1.shape, y2.shape, testX.shape, testY1.shape, testY2.shape) )
 
-print()
+    # Prepare features for regressing on squares
+    converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
+    sqX = pandas.DataFrame(
+        converter.fit_transform(X),
+        columns=make_feature_names(converter) )
+    testSqX = pandas.DataFrame(
+        converter.fit_transform(testX),
+        columns=make_feature_names(converter) )
 
-converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
-sqX = converter.fit_transform( X.to_numpy() )
-testSqX = pandas.DataFrame(
-    converter.fit_transform(testX),
-    columns=make_feature_names(converter) )
+    make_plots = None
+    #make_plots = test.index
 
-p = regress( "POWER_PVT/SQ-LR", sklearn.linear_model.LinearRegression(),
-             sqX, y1, testSqX, testY1, test.index )
-p.savefig( "{}.png".format("pvt_SQ") )
-p = regress( "Q_PV/SQ-LR", sklearn.linear_model.LinearRegression(),
-             sqX, y2, testSqX, testY2, test.index )
-p.savefig( "{}.png".format("qpv_SQ") )
+    row = [ name, "POWER", "LR", m ]
+    r,p = regress( sklearn.linear_model.LinearRegression(),
+                   X, y1, testX, testY1, make_plots )
+    row.extend( r )
+    results.append( row )
+    if p is not None: p.savefig( "{}_{}.png".format("pvt_LR",m) )
+    #The actual model is:
+    #print( "LR, result: y = {} * X + {}".format(m1.coef_,m1.intercept_) )
 
-#print( "LR, result: y = {} * X + {}".format(m1.coef_,m1.intercept_) ) 
+    row = [ name, "Q", "LR", m ]
+    r,p = regress( sklearn.linear_model.LinearRegression(),
+                   X, y2, testX, testY2, make_plots )
+    row.extend( r )
+    results.append( row )
+    if p is not None: p.savefig( "{}_{}.png".format("qpv_LR",m) )
 
-print()
+    row = [ name, "POWER", "SQ", m ]
+    r,p = regress( sklearn.linear_model.LinearRegression(),
+                   sqX, y1, testSqX, testY1, make_plots )
+    row.extend( r )
+    results.append( row )
+    if p is not None: p.savefig( "{}_{}.png".format("pvt_SQ",m) )
 
-train = df_hp[(df_hp.DATETIME > "2023-08-01") & (df_hp.DATETIME < "2023-08-21")]
-# Drop NaN again, as there are empty "grp" periods
-train = train.set_index( "DATETIME" ).resample( grp ).mean().dropna()
-print( "1-20 Aug 2023, groupby {}: {} rows".format(grp,len(train)) )
-test = df_hp[(df_hp.DATETIME > "2023-08-21") & (df_hp.DATETIME < "2023-09-01")]
-test = test.set_index( "DATETIME" ).resample( grp ).mean().dropna()
-print( "21-31 Aug 2023, groupby {}: {} rows".format(grp,len(test)) )
-X, y1, y2 = prepare_hp( train )
-testX, testY1, testY2 = prepare_hp( test )
+    row = [ name, "Q", "SQ", m ]
+    r,p = regress( sklearn.linear_model.LinearRegression(),
+                   sqX, y2, testSqX, testY2, make_plots )
+    row.extend( r )
+    results.append( row )
+    if p is not None: p.savefig( "{}_{}.png".format("qpv_SQ",m) )
+# end for all months
 
-print()
+# results is a list of result rows
+df_res = pandas.DataFrame(
+    results,
+    columns=["name","depvar","method","month",
+             "val_score","val_rel_err","test_score","test_rel_err"] )
 
-
-p = regress( "POWER_HP/LR", sklearn.linear_model.LinearRegression(),
-             X, y1, testX, testY1, test.index )
-p.savefig( "{}.png".format("php_LR") )
-p = regress( "Q_CON_HEAT/LR", sklearn.linear_model.LinearRegression(),
-             X, y2, testX, testY2, test.index )
-p.savefig( "{}.png".format("qcon_LR") )
-
-print()
-
-converter = sklearn.preprocessing.PolynomialFeatures( degree=2, include_bias=False )
-sqX = converter.fit_transform( X.to_numpy() )
-testSqX = pandas.DataFrame(
-    converter.fit_transform(testX),
-    columns=make_feature_names(converter) )
-
-p = regress( "POWER_HP/SQ-LR", sklearn.linear_model.LinearRegression(),
-             sqX, y1, testSqX, testY1, test.index )
-p.savefig( "{}.png".format("php_SQ") )
-p = regress( "Q_CON_HEAT/SQ-LR", sklearn.linear_model.LinearRegression(),
-             sqX, y2, testSqX, testY2, test.index )
-p.savefig( "{}.png".format("qcon_SQ") )
+print( df_res[ (df_res.depvar=="POWER") & (df_res.method=="SQ") ]["test_rel_err"] )
+print( df_res[ (df_res.depvar=="POWER") & (df_res.method=="LR") ]["test_rel_err"] )
 
 
 if 1==0:
