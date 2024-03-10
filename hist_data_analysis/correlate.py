@@ -31,7 +31,7 @@ def load_data(print_stats=False):
     :return: whole dataframe, dataframe for hp, dataframe for solar
     """
     df = pd.read_csv("data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], low_memory=False)
-    navgreen_base.process_data(df, hist_data=True)
+    df = navgreen_base.process_data(df, hist_data=True)
 
     logger.info("All data: {} rows".format(len(df)))
     df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
@@ -314,7 +314,7 @@ def scenario2(name, mydf, prepare, grp):
         testX, testY1, _ = prepare(test)
 
         if X.shape[0]<3 or testX.shape[0]<1:
-            logger.info('Dataframe not enough values for training and/or evaluating. Cannot compute score. Continue.')
+            logger.info(f'Dataframe not enough values for training and/or evaluating at month {m}. Cannot compute score. Continue.')
             continue
 
         col_keep = ["DATETIME", "DHW_BUFFER", "POWER_HP", "PYRANOMETER", "POWER_PVT"]
