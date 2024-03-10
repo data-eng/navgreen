@@ -50,7 +50,7 @@ class TestPreproc( unittest.TestCase ):
         cls._sample_output = read_data( influx_client )
         logger.info("DONE.")
 
-        # cls._sample_output.to_csv(cls.test_data_path+"sample_output.csv", mode='w', index=False)
+        cls._sample_output.to_csv(cls.test_data_path+"sample_output.csv", mode='w', index=False)
 
         # Get the columns of the sample input that have all their values equal to np.nan
         all_nan_columns_input = cls._sample_input.columns[cls._sample_input.isna().all()]
