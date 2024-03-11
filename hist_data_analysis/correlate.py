@@ -58,11 +58,11 @@ def load_data(print_stats=False):
 
     df_hp = df[hp_cols]
     df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
-    logger.info("HP, POWER > 1: {} rows".format(len(df)))
+    logger.info("HP, POWER > 1: {} rows".format(len(df_hp)))
 
     df_pv = df[pv_cols]
     df_pv = df_pv[df_pv["PYRANOMETER"] > 0.15]
-    logger.info("PV, PYRAN > 0.15: {} rows".format(len(df)))
+    logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pv)))
 
     if print_stats:
         # No need to re-run every time
