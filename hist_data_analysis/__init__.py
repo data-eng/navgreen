@@ -1,2 +1,3 @@
 from hist_data_analysis.analytics import analyse,similarity
 from hist_data_analysis.sampling_rate import runme,undersampling_error
+from hist_data_analysis.correlate import correlate
