@@ -363,48 +363,4 @@ def correlate(): # Main callable function
 
     scenario2("HP", df_hp, prepare_hp, grp)
     scenario2("PV", df_pv, prepare_pv, grp)
-
-    if 1 == 0:
-        d["PREV_POWER_PVT"] = d["POWER_PVT"].shift(1)
-        d["DIFF_POWER_PVT"] = d["POWER_PVT"] - d["PREV_POWER_PVT"]
-        d.dropna(inplace=True)
-        tzise = int(len(d) * 0.8)
-        d_train = d.iloc[:tzise, :]
-        d_test = d.iloc[tzise:, :]
-        X, y = prepare_pv_diff(d_train)
-        m = sklearn.linear_model.LinearRegression()
-        m.fit(X, y)
-        logger.info("Group by 6h, with prev, result: y = {} * X + {}".format(m.coef_, m.intercept_))
-        logger.info("Group by 6h, with prev, on training set: {}".format(m.score(X, y)))
-        X, y = prepare_pv_diff(d_test)
-        logger.info("Group by 6h, with prev, on test set: {}".format(m.score(X, y)))
-
-        d = df_pv.rolling("6h", on="DATETIME").mean()
-        d.dropna(inplace=True)
-        tzise = int(len(d) * 0.8)
-        d_train = d.iloc[:tzise, :]
-        d_test = d.iloc[tzise:, :]
-        X, y = prepare_pv(d_train)
-        m = sklearn.linear_model.LinearRegression()
-        m.fit(X, y)
-        logger.info("Roll by 6h, result: y = {} * X + {}".format(m.coef_, m.intercept_))
-        logger.info("Roll by 6h, on training set: {}".format(m.score(X, y)))
-        X, y = prepare_pv(d_test)
-        logger.info("Roll by 6h, on test set: {}".format(m.score(X, y)))
-
-        d["PREV_POWER_PVT"] = d["POWER_PVT"].shift(1)
-        d["DIFF_POWER_PVT"] = d["POWER_PVT"] - d["PREV_POWER_PVT"]
-        d.dropna(inplace=True)
-        tzise = int(len(d) * 0.8)
-        d_train = d.iloc[:tzise, :]
-        d_test = d.iloc[tzise:, :]
-        X, y = prepare_pv_diff(d_train)
-        m = sklearn.linear_model.LinearRegression()
-        m.fit(X, y)
-        logger.info("Roll 6h, with prev, result: y = {} * X + {}".format(m.coef_, m.intercept_))
-        logger.info("Roll by 6h, with prev, on training set: {}".format(m.score(X, y)))
-        X, y = prepare_pv_diff(d_test)
-        logger.info("Roll by 6h, with prev, on test set: {}".format(m.score(X, y)))
-
-        # pivot=dforig.pivot_table(columns=pd.cut(dforig["PYRANOMETER"], bins), aggfunc='size')
 # end def correlate
