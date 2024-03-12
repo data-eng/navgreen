@@ -26,4 +26,5 @@ tester = "scripts:test"
 sampler = "hist_data_analysis:runme"
 sample_input = "live_data_analysis:create_sample_input"
 timeseries = "hist_data_analysis.timeseries:main_loop"
+correlate = "hist_data_analysis:correlate"
 
