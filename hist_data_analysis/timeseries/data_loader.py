@@ -19,29 +19,6 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-
-class TimeSeriesDataset(Dataset):
-    def __init__(self, dataframe, sequence_length, X_cols, Y_cols):
-        self.sequence_length = sequence_length
-        self.X = dataframe[X_cols]
-        self.y = dataframe[Y_cols]
-
-    def __len__(self):
-        return self.X.shape[0] - self.sequence_length + 1
-
-    def __getitem__(self, idx):
-        start_idx = idx
-        end_idx = idx + self.sequence_length
-        X = self.X.iloc[start_idx:end_idx].values
-        y = self.y.iloc[start_idx:end_idx].values
-
-        # Convert the sequence to a PyTorch tensor
-        X = torch.FloatTensor(X)
-        y = torch.FloatTensor(y)
-
-        return X, y
-
-
 def load_df(df_path, hp_cols, pvt_cols, normalize=True, grp=None):
     """
     Loads the data from the historical data DataFrame
@@ -97,3 +74,24 @@ def load_df(df_path, hp_cols, pvt_cols, normalize=True, grp=None):
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
 
     return (df, df_hp, df_pvt), mean_stds
+
+
+class TimeSeriesDataset(Dataset):
+    def __init__(self, dataframe, sequence_length, X_cols, Y_cols):
+        self.sequence_length = sequence_length
+        self.X = dataframe[X_cols]
+        self.y = dataframe[Y_cols]
+
+    def __len__(self):
+        return self.X.shape[0] - self.sequence_length + 1
+
+    def __getitem__(self, idx):
+        start_idx = idx
+        end_idx = idx + self.sequence_length
+        X = self.X.iloc[start_idx:end_idx].values
+        y = self.y.iloc[start_idx:end_idx].values
+
+        # Convert the sequence to a PyTorch tensor
+        X, y = torch.FloatTensor(X), torch.FloatTensor(y)
+
+        return X, y
