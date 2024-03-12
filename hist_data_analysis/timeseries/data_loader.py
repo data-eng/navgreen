@@ -19,18 +19,23 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def load_df(df_path, hp_cols, pvt_cols, normalize=True, grp=None):
+def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, grp=None, stats=None):
     """
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
     """
-    df = pd.read_csv(df_path, parse_dates=["Date&time"], low_memory=False)
-    df = process_data(df, hist_data=True)
+    df = pd.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
+    df = process_data(df, hist_data=hist_data)
+
+    if not hist_data:
+        logger.info(f'DHW_BOTTOM min: {df["DHW_BOTTOM"].min()}, DHW_BOTTOM max: {df["DHW_BOTTOM"].max()}')
 
     logger.info("All data: {} rows".format(len(df)))
-    df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
-    logger.info("12 full months, 2022-09 to 2023-08: {} rows".format(len(df)))
-    df = df.loc[df["FOUR_WAY_VALVE"] == "HEATING"]
+    if hist_data:
+        df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
+        logger.info("12 months data: {} rows".format(len(df)))
+
+    df = df.loc[df["FOUR_WAY_VALVE"] == "HEATING"] if hist_data else df.loc[df["FOUR_WAY_VALVE"] == "1.0"]
     logger.info("HEATING: {} rows".format(len(df)))
 
     # Add calculated columns (thermal flows)
@@ -50,17 +55,19 @@ def load_df(df_path, hp_cols, pvt_cols, normalize=True, grp=None):
     df.dropna(inplace=True)
     logger.info("No NaNs: {} rows".format(len(df)))
 
-    mean_stds = {}
+    mean_stds = {} if stats is None else stats
 
     # Normalize each column
     if normalize:
         for c in [c for c in df.columns if c != "DATETIME"]:
             series = df[c]
-            mean_stds[c] = (series.mean(), series.std())
-            df[c] = (series - series.mean()) / series.std()
-            assert round(df[c].mean(), 1) == 0.0 and round(df[c].std(), 1) == 1.0
+            logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+            if stats is None: mean_stds[c] = (series.mean(), series.std())
+            df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
+            # assert round(df[c].mean(), 1) == 0.0 and round(df[c].std(), 1) == 1.0
 
-
+    col = "DATETIME"
+    print(f"Data type of DATETIME: {df[col].dtype}")
     # If group data by time
     df = df.set_index("DATETIME").resample(grp).mean().dropna().sort_index() if grp else df.set_index("DATETIME").sort_index()
     logger.info("Grouped: {} rows".format(len(df)))
@@ -73,6 +80,7 @@ def load_df(df_path, hp_cols, pvt_cols, normalize=True, grp=None):
     df_pvt = df_pvt[df_pvt["PYRANOMETER"] > 0.15]
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
 
+    if stats is not None: mean_stds = None
     return (df, df_hp, df_pvt), mean_stds
 
 
