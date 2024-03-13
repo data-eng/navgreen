@@ -25,13 +25,15 @@ data = {
         "cols": ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"],
         "feats": ["BTES_TANK", "DHW_BUFFER"],
         "pred1": "POWER_HP",
-        "pred2": "Q_CON_HEAT"
+        "pred2": "Q_CON_HEAT",
+        "terms": [(0, 1), (-1, 2)]
     },
     "pv": {
         "cols": ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"],
         "feats": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
         "pred1": "POWER_PVT",
-        "pred2": "Q_PVT"
+        "pred2": "Q_PVT",
+        "terms": [(0, 1), (-1, 2), (3, 1)]
     }
 }
 
@@ -107,6 +109,11 @@ class Function:
         self.terms = terms
 
     def exe(self, df):
+        """
+        Executes the function on the given dataframe
+        :param df: original dataframe
+        :return: transformed dataframe
+        """
         result = pd.DataFrame()
         cols = df.columns
         num_params = len(cols)
@@ -117,83 +124,78 @@ class Function:
         return result
 
     def output(self, values):
+        """
+        Computes the output of the function for the given input values
+        :param values: list
+        :return: float
+        """
         return sum(w * (val ** e) for (w, e), val in zip(self.terms, values))
 
     def format(self, params):
+        """
+        Formats the function terms based on the given parameters
+        :param params: list of name parameters
+        :return: string representation of the function
+        """
         terms = [f"{('+' if w >= 0 else '')}{w}*{param}^{e}" for (w, e), param in zip(self.terms, params)]
         return ' '.join(terms)
 
-def prepare(mode, df, f):
+def prepare(params, df, f):
     """
-    Create input and output values for a heatpump PLC related ML problem
-    :param df: dataframe
-    :return: input, output1, output2
+    Prepare data for visualization
+    :param params: dictionary containing parameter names (features and prediction column parameters).
+    :param df: dataframme
+    :param f: function for data transformation
+    :return: tuple containing the transformed features and the two prediction dataframes
     """
-    X = df[mode["feats"]]
-    y1 = df[mode["pred1"]]
-    y2 = df[mode["pred2"]]
-    return f(X), y1, y2
 
-def make_plot(index, label, X, realY, predY):
-    """
-    Plot ML model results
-    :param index: number of plot
-    :param label: plot's label
-    :param X: input
-    :param realY: real y label
-    :param predY: predicted y label
-    :return: figure
-    """
-    fig, ax = plt.subplots(1, 2)
-    ax[0].plot(index, realY, 'r-', label="Real values")
-    ax[0].plot(index, predY, 'g-', label="Pred values")
-    xx = X.to_numpy()
-    ax[1].plot(index, realY, 'r-', label="Real values")
-    ax[1].plot(index, xx[:, 0], 'b-', label="X[0]")
-    # ax[1].plot(index, xx[:, 1], 'b-', label="X[1]")
-    fig.supxlabel(label)
-    return fig
-# end def make_plot
+    X = df[params["feats"]]
+    y1 = df[params["pred1"]]
+    y2 = df[params["pred2"]]
+    return f(X), y1, y2
 
 def make_scatter(data):
     """
     Create scatter plot of data
     :param data: 3-tuple of input and output values
-    :return: figure
+    :return: list of figures
     """
+    figs = []
     X, Y1, Y2 = data
-    if len(X.columns) == 1:
+
+    for xlabel in X.columns:
         fig, ax = plt.subplots(2, 1)
+        fig.suptitle(f"f: {xlabel}", fontsize=14)
         for i, y in enumerate([Y1, Y2]):
-            ax[i].set_xlabel(X.columns[0])
             ax[i].set_ylabel(y.name)
-            ax[i].scatter(x=X[X.columns[0]], y=y)
-    else:
-        fig, ax = plt.subplots(2, len(X.columns))
-        for i, y in enumerate([Y1, Y2]):
-            for j, xlabel in enumerate(X.columns):
-                ax[i, j].set_xlabel(xlabel)
-                ax[i, j].set_ylabel(y.name)
-                ax[i, j].scatter(x=X[xlabel], y=y)
-    fig.subplots_adjust(wspace=2, hspace=5)
-    plt.tight_layout()
-    return fig
+            ax[i].scatter(X[xlabel], y)
+        figs.append(fig)
+
+    return figs
 
 def visualize(name, df):
+    """
+    Visualizes the data for a given system (HP or PV) for each month and saves scatter plots as images
+    :param name: str name of the system (HP or PV)
+    :param df: dataframe
+    """
+    params = data[name.lower()]
+    f=Function(params["terms"]).exe
+
     for mm in range(9, 21):
         m = ((mm - 1) % 12) + 1
         newdf = df[df.DATETIME.dt.month == m]
-        f = Function(terms=[(0, 1), (-1, 2), (3, 1)]).exe
 
-        X, y1, y2 = prepare(data[name.lower()], newdf, f)
+        X, y1, y2 = prepare(params, newdf, f)
         ff = make_scatter(data=(X, y1, y2))
-        ff.savefig("{}_{}.png".format(name, m))
-        plt.close()
+        for i, fig in enumerate(ff):
+            fig.savefig("{}_{}_{}.png".format(name, m, i))
+            plt.close(fig)
 
 def main():
     logger.info("Data visualization for Heat Pump (HP) and Photovoltaic (PV) systems.")
 
     _, df_hp, df_pv = load_data()
 
-    visualize("HP", df_hp)
-    visualize("PV", df_pv)
+    visualize(name="HP", df=df_hp)
+    #visualize(name="PV", df=df_pv)
