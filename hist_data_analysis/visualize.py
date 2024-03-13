@@ -26,7 +26,7 @@ data = {
         "feats": ["BTES_TANK", "DHW_BUFFER"],
         "pred1": "POWER_HP",
         "pred2": "Q_CON_HEAT",
-        "terms": [(0, 1), (-1, 2)]
+        "terms": [(0, 1), (3, 2)]
     },
     "pv": {
         "cols": ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"],
@@ -135,10 +135,24 @@ class Function:
         """
         Formats the function terms based on the given parameters
         :param params: list of name parameters
-        :return: string representation of the function
+        :return: LaTeX-style string representation of the function
         """
-        terms = [f"{('+' if w >= 0 else '')}{w}*{param}^{e}" for (w, e), param in zip(self.terms, params)]
-        return ' '.join(terms)
+        def latex_friendly(param):
+            return param.replace('_', r'\_')
+
+        terms = []
+
+        for (w, e), param in zip(self.terms, params):
+            if w != 0:
+                sign = '+' if w > 0 else '-'
+                weight = '' if abs(w) == 1 else str(abs(w))
+                exponent = '' if e == 1 else '^{' + str(e) + '}'
+                term = f"{sign}{weight}{{{latex_friendly(param)}}}{exponent}"
+                terms.append(term)
+
+        expression = ''.join(terms)
+
+        return rf'${expression}$'
 
 def prepare(params, df, f):
     """
@@ -198,4 +212,4 @@ def main():
     _, df_hp, df_pv = load_data()
 
     visualize(name="HP", df=df_hp)
-    #visualize(name="PV", df=df_pv)
+    visualize(name="PV", df=df_pv)
