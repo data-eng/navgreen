@@ -109,7 +109,7 @@ class Function:
         self.terms = terms
         self.type = type
         self.operations = {
-            'sum': lambda values: sum(w * (val ** e) for (w, e), val in zip(self.terms, values)),
+            'sum': lambda values: values.apply(lambda row: np.sum([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
             'prod': lambda values: values.apply(lambda row: np.prod([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
             'mean': lambda values: values.apply(lambda row: np.mean([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
             'median': lambda values: values.apply(lambda row: np.median([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
