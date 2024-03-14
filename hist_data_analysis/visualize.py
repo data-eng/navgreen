@@ -116,8 +116,7 @@ class Function:
             'min': lambda values: values.apply(lambda values: min(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
             'max': lambda values: values.apply(lambda values: max(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
             'std': lambda values: values.apply(lambda row: np.std([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
-            'var': lambda values: values.apply(lambda row: np.var([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
-            'kurt': lambda values: values.apply(lambda row: scipy.stats.kurtosis([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1)
+            'var': lambda values: values.apply(lambda row: np.var([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1)
         }
 
     def exe(self, df):
