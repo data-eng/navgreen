@@ -24,8 +24,8 @@ data = {
         "feats": ["BTES_TANK", "DHW_BUFFER"],
         "pred1": "POWER_HP",
         "pred2": "Q_CON_HEAT",
-        "terms": [(1, 1), (3, 2)],
-        "type": "min"
+        "terms": [(2, 1), (3, 2)],
+        "type": "mean"
     },
     "pv": {
         "cols": ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"],
@@ -110,11 +110,14 @@ class Function:
         self.type = type
         self.operations = {
             'sum': lambda values: sum(w * (val ** e) for (w, e), val in zip(self.terms, values)),
-            'product': lambda values: values.apply(lambda values: np.prod(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
-            'mean': lambda values: values.apply(lambda values: np.mean(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
-            'median': lambda values: values.apply(lambda values: np.median(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'prod': lambda values: values.apply(lambda row: np.prod([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
+            'mean': lambda values: values.apply(lambda row: np.mean([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
+            'median': lambda values: values.apply(lambda row: np.median([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
             'min': lambda values: values.apply(lambda values: min(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
-            'max': lambda values: values.apply(lambda values: max(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1)
+            'max': lambda values: values.apply(lambda values: max(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'std': lambda values: values.apply(lambda row: np.std([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
+            'var': lambda values: values.apply(lambda row: np.var([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1),
+            'kurt': lambda values: values.apply(lambda row: scipy.stats.kurtosis([w * (val ** e) for (w, e), val in zip(self.terms, row)]), axis=1)
         }
 
     def exe(self, df):
