@@ -1,11 +1,9 @@
 import logging
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from itertools import combinations, permutations
+from itertools import permutations
 import scipy.signal
-import sklearn.linear_model
-import sklearn.preprocessing
-import sklearn.metrics
 
 import navgreen_base
 
@@ -26,14 +24,16 @@ data = {
         "feats": ["BTES_TANK", "DHW_BUFFER"],
         "pred1": "POWER_HP",
         "pred2": "Q_CON_HEAT",
-        "terms": [(0, 1), (3, 2)]
+        "terms": [(1, 1), (3, 2)],
+        "type": "min"
     },
     "pv": {
         "cols": ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"],
         "feats": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
         "pred1": "POWER_PVT",
         "pred2": "Q_PVT",
-        "terms": [(0, 1), (-1, 2), (3, 1)]
+        "terms": [(0, 1), (-1, 2), (3, 1)],
+        "type": "sum"
     }
 }
 
@@ -105,8 +105,17 @@ def normalize(df, cols):
     return pd.DataFrame(newdf)
 
 class Function:
-    def __init__(self, terms):
+    def __init__(self, terms, type):
         self.terms = terms
+        self.type = type
+        self.operations = {
+            'sum': lambda values: sum(w * (val ** e) for (w, e), val in zip(self.terms, values)),
+            'product': lambda values: values.apply(lambda values: np.prod(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'mean': lambda values: values.apply(lambda values: np.mean(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'median': lambda values: values.apply(lambda values: np.median(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'min': lambda values: values.apply(lambda values: min(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1),
+            'max': lambda values: values.apply(lambda values: max(w * (val ** e) for (w, e), val in zip(terms, values)), axis=1)
+        }
 
     def exe(self, df):
         """
@@ -117,19 +126,15 @@ class Function:
         result = pd.DataFrame()
         cols = df.columns
         num_params = len(cols)
+
         for combo in permutations(cols, num_params):
             name = self.format(combo)
-            values = [df[param] for param in combo]
-            result[name] = self.output(values)
+            values = pd.concat([df[param] for param in combo], axis=1)
+            values.columns = combo
+            operation = self.operations.get(self.type)
+            result[name] = operation(values)
+            
         return result
-
-    def output(self, values):
-        """
-        Computes the output of the function for the given input values
-        :param values: list
-        :return: float
-        """
-        return sum(w * (val ** e) for (w, e), val in zip(self.terms, values))
 
     def format(self, params):
         """
@@ -150,9 +155,7 @@ class Function:
                 term = f"{sign}{weight}{{{latex_friendly(param)}}}{exponent}"
                 terms.append(term)
 
-        expression = ''.join(terms)
-
-        return rf'${expression}$'
+        return '[' + ', '.join([rf'${term}$' for term in terms]) + ']'
 
 def prepare(params, df, f):
     """
@@ -168,7 +171,7 @@ def prepare(params, df, f):
     y2 = df[params["pred2"]]
     return f(X), y1, y2
 
-def make_scatter(data):
+def make_scatter(data, ftype):
     """
     Create scatter plot of data
     :param data: 3-tuple of input and output values
@@ -176,10 +179,10 @@ def make_scatter(data):
     """
     figs = []
     X, Y1, Y2 = data
-
+    
     for xlabel in X.columns:
         fig, ax = plt.subplots(2, 1)
-        fig.suptitle(f"f: {xlabel}", fontsize=14)
+        fig.suptitle(f"{ftype}: {xlabel}", fontsize=14)
         for i, y in enumerate([Y1, Y2]):
             ax[i].set_ylabel(y.name)
             ax[i].scatter(X[xlabel], y)
@@ -194,14 +197,14 @@ def visualize(name, df):
     :param df: dataframe
     """
     params = data[name.lower()]
-    f=Function(params["terms"]).exe
+    f=Function(params["terms"], params["type"]).exe
 
     for mm in range(9, 21):
         m = ((mm - 1) % 12) + 1
         newdf = df[df.DATETIME.dt.month == m]
 
         X, y1, y2 = prepare(params, newdf, f)
-        ff = make_scatter(data=(X, y1, y2))
+        ff = make_scatter(data=(X, y1, y2), ftype=params["type"])
         for i, fig in enumerate(ff):
             fig.savefig("{}_{}_{}.png".format(name, m, i))
             plt.close(fig)
