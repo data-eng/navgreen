@@ -5,6 +5,7 @@ packages = [ {include = "live_data_analysis"},
 version = "0.1"
 description = ""
 authors = [ "Tatiana Boura <tat.boura@gmail.com>",
+	    "Natalia Koliou <natalykoliou@yahoo.gr>",
 	    "Stasinos Konstantopoulos <konstant@iit.demokritos.gr>" ]
 readme = "README.md"
 
@@ -26,5 +27,5 @@ build-backend = "poetry.core.masonry.api"
 tester = "scripts:test"
 sampler = "hist_data_analysis:runme"
 correlate = "hist_data_analysis:correlate"
+visualize = "hist_data_analysis:main"
 sample_input = "live_data_analysis:create_sample_input"
-
