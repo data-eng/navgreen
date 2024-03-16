@@ -5,6 +5,7 @@ packages = [ {include = "live_data_analysis"},
 version = "0.1"
 description = ""
 authors = [ "Tatiana Boura <tat.boura@gmail.com>",
+	    "Natalia Koliou <natalykoliou@yahoo.gr>",
 	    "Stasinos Konstantopoulos <konstant@iit.demokritos.gr>" ]
 readme = "README.md"
 
