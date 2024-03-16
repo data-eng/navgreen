@@ -39,12 +39,14 @@ def month_stats( df, incr_avg ):
             assert len(incr_avg) == 1
             reldiffavg = mavg/incr_avg[col][0] - 1
             if reldiffavg < 0: reldiffavg = -reldiffavg
+            if reldiffavg < 1: reldiffavg = 1/reldiffavg
             if reldiffavg > 42.0:
                 print("{} is having a bad month, rel diff {}".format(col, reldiffavg))
         for day in range(day00, day30 + 1):
             df_daily = df[df.DATETIME.dt.day == day]
             reldiffavg = df_daily[col].mean()/mavg - 1
             if reldiffavg < 0: reldiffavg = -reldiffavg
+            # Do not check for too small as with months, it happens
             if reldiffavg > 42.0:
                 print( "{} is having a bad day, rel diff {}".format(col,reldiffavg) )
     dfretv = pandas.DataFrame([retv], columns=navgreen_base.numerical_columns)
