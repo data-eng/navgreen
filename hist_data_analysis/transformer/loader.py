@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, random_split
 import logging
 from navgreen_base import process_data
 from hist_data_analysis import utils
@@ -72,8 +72,17 @@ def prepare(df, system):
 
     df.to_csv(name)
     df = pd.read_csv(name, parse_dates=['DATETIME'], index_col='DATETIME')
+
     return df
 
+def split(dataset, vperc=0.2):
+    ds_size = len(dataset)
+
+    valid_size = int(vperc * ds_size)
+    train_size = ds_size - valid_size
+
+    return random_split(dataset, [train_size, valid_size])
+    
 class TSDataset(Dataset):
     def __init__(self, dataframe, seq, X, y):
         self.seq = seq
