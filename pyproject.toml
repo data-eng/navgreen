@@ -26,5 +26,6 @@ build-backend = "poetry.core.masonry.api"
 tester = "scripts:test"
 sampler = "hist_data_analysis:runme"
 correlate = "hist_data_analysis:correlate"
+visualize = "hist_data_analysis:main"
 sample_input = "live_data_analysis:create_sample_input"
 
