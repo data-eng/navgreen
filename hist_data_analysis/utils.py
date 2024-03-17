@@ -16,29 +16,28 @@ def normalize(df):
             newdf[col] = series
     return newdf
 
-def filter(df, columns, thresholds):
+def filter(df, column, threshold):
     """
-    Filter dataframe based on multiple columns and their respective thresholds if the columns exist
+    Filter dataframe based on a single column and its threshold if the column exists
     :param df: dataframe
-    :param columns: list of column names to filter
-    :param thresholds: list of threshold values for filtering
-    :return: filtered dataframe if columns exist, otherwise original dataframe
+    :param column: column name to filter
+    :param threshold: threshold value for filtering
+    :return: filtered dataframe if column exists, otherwise original dataframe
     """
-    for col, threshold in zip(columns, thresholds):
-        if col in df.columns:
-            if threshold is not None:
-                df = df[df[col] > threshold]
-            else:
-                df.drop(col, axis="columns", inplace=True)
+    if column in df.columns:
+        if threshold is not None:
+            df = df[df[column] > threshold]
+        else:
+            df.drop(column, axis="columns", inplace=True)
     return df
 
-def aggregate(df, grp, func):
+def aggregate(df, grp="1T", func=None):
     """
     Resample dataframe based on the provided frequency and aggregate using the specified function.
     
     :param df: dataframe
-    :param grp: resampling frequency
-    :param func: aggregation function
+    :param grp: resampling frequency (1T: original)
+    :param func: aggregation function (None: no aggregation)
     :return: aggregated dataframe
     """
     df = df.set_index("DATETIME")
