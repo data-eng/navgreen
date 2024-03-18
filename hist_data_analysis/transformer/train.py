@@ -1,6 +1,6 @@
 import logging
 from torch.utils.data import DataLoader
-from loader import *
+from .loader import *
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -28,7 +28,7 @@ def main():
     dl_train_hp = DataLoader(ds_train_hp, batch_size=16, shuffle=True)
     dl_valid_hp = DataLoader(ds_valid_hp, batch_size=16, shuffle=False)
 
-    model = ... .to(device)
+    #model = ... .to(device)
 
     # PV SYSTEM ####################################################
 
@@ -40,4 +40,4 @@ def main():
     dl_train_pv = DataLoader(ds_train_pv, batch_size=16, shuffle=True)
     dl_valid_pv = DataLoader(ds_valid_pv, batch_size=16, shuffle=False)
 
-    model = ... .to(device)
+    #model = ... .to(device)
