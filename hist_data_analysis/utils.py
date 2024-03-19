@@ -31,13 +31,13 @@ def filter(df, column, threshold):
             df.drop(column, axis="columns", inplace=True)
     return df
 
-def aggregate(df, grp="1T", func=None):
+def aggregate(df, grp="1min", func=None):
     """
     Resample dataframe based on the provided frequency and aggregate using the specified function.
     
     :param df: dataframe
-    :param grp: resampling frequency (1T: original)
-    :param func: aggregation function (None: no aggregation)
+    :param grp: resampling frequency ('1min' -> original)
+    :param func: aggregation function (lambda x: x -> no aggregation)
     :return: aggregated dataframe
     """
     df = df.set_index("DATETIME")
