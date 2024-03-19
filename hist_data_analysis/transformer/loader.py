@@ -29,6 +29,16 @@ data = {
 }
 
 def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
+    """
+    Loads and preprocesses data from a CSV file.
+    :param path: path to the CSV file
+    :param parse_dates: columns to parse as dates in the dataframe
+    :param normalize: normalization flag
+    :param grp: frequency to group data by
+    :param agg: aggregation function
+    :param hist_data: hist_data flag
+    :return: dataframe
+    """
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
     df = process_data(df, hist_data=hist_data)
 
@@ -64,7 +74,13 @@ def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
     return df
 
 def prepare(df, system):
-    params = data["system"]
+    """
+    Prepares the dataframe for training by filtering columns and saving to CSV.
+    :param df: dataframe
+    :param system: str name of the system (HP or PV)
+    :return: dataframe
+    """
+    params = data[system]
     name = "df_" + system + ".csv"
 
     for column, threshold in params["ignore"]:
@@ -76,6 +92,12 @@ def prepare(df, system):
     return df
 
 def split(dataset, vperc=0.2):
+    """
+    Splits a dataset into training and validation sets.
+    :param dataset: dataset
+    :param vperc: percentage of data to allocate for validation
+    :return: tuple containing training and validation datasets
+    """
     ds_size = len(dataset)
 
     valid_size = int(vperc * ds_size)
@@ -85,14 +107,29 @@ def split(dataset, vperc=0.2):
     
 class TSDataset(Dataset):
     def __init__(self, dataframe, seq, X, y):
+        """
+        Initializes a time series dataset.
+        :param dataframe: dataframe
+        :param seq: length of the input sequence
+        :param X: input features names
+        :param y: target variables names
+        """
         self.seq = seq
         self.X = dataframe[X]
         self.y = dataframe[y]
 
     def __len__(self):
+        """
+        :return: length of the dataset
+        """
         return self.X.shape[0] - self.seq + 1
 
     def __getitem__(self, idx):
+        """
+        Retrieves a sample from the dataset at the specified index.
+        :param idx: index of the sample
+        :return: tuple containing input features sequence and target variables
+        """
         start_idx = idx
         end_idx = idx + self.seq
         X = self.X.iloc[start_idx:end_idx].values

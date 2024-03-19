@@ -30,4 +30,3 @@ visualize = "hist_data_analysis:main"
 train_transformer = "hist_data_analysis.transformer.train:main"
 test_transformer = "hist_data_analysis.transformer.test:main"
 sample_input = "live_data_analysis:create_sample_input"
-
