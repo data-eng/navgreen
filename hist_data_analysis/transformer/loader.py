@@ -90,39 +90,25 @@ def prepare(df, system):
     df = pd.read_csv(name, parse_dates=['DATETIME'], index_col='DATETIME')
 
     return df
-
-def split(dataset, vperc=0.2):
-    """
-    Splits a dataset into training and validation sets.
-    :param dataset: dataset
-    :param vperc: percentage of data to allocate for validation
-    :return: tuple containing training and validation datasets
-    """
-    ds_size = len(dataset)
-
-    valid_size = int(vperc * ds_size)
-    train_size = ds_size - valid_size
-
-    return random_split(dataset, [train_size, valid_size])
     
 class TSDataset(Dataset):
-    def __init__(self, dataframe, seq, X, y):
+    def __init__(self, dataframe, len_seq, X, y):
         """
         Initializes a time series dataset.
         :param dataframe: dataframe
-        :param seq: length of the input sequence
+        :param len_seq: length of the input sequence
         :param X: input features names
         :param y: target variables names
         """
-        self.seq = seq
+        self.len_seq = len_seq
         self.X = dataframe[X]
         self.y = dataframe[y]
 
     def __len__(self):
         """
-        :return: length of the dataset
+        :return: number of sequences that can be created from dataset X
         """
-        return self.X.shape[0] - self.seq + 1
+        return self.max_seq_id + 1
 
     def __getitem__(self, idx):
         """
@@ -131,8 +117,38 @@ class TSDataset(Dataset):
         :return: tuple containing input features sequence and target variables
         """
         start_idx = idx
-        end_idx = idx + self.seq
+        end_idx = idx + self.len_seq
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[start_idx:end_idx].values
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
         return X, y
+    
+    @property
+    def max_seq_id(self):
+        return self.X.shape[0] - self.len_seq
+    
+def split(dataset, vperc=0.2):
+    """
+    Splits a dataset into training and validation sets.
+    :param dataset: dataset
+    :param vperc: percentage of data to allocate for validation
+    :return: tuple containing training and validation datasets
+    """
+    ds_seqs = len(dataset)
+
+    valid_seqs = int(vperc * ds_seqs)
+    train_seqs = ds_seqs - valid_seqs
+
+    return random_split(dataset, [train_seqs, valid_seqs])
+
+def create_sequences(dataset):
+    seqs = []
+    len_seq = dataset.len_seq
+    num_seqs = len(dataset)
+    
+    for i in range(num_seqs-len_seq-1):
+        X = dataset[i:i+len_seq]
+        y = dataset[i+len_seq+1:i+2*len_seq+1]
+        seqs.append((X, y))
+
+    return torch.FloatTensor(seqs)

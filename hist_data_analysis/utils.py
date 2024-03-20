@@ -31,7 +31,7 @@ def filter(df, column, threshold):
             df.drop(column, axis="columns", inplace=True)
     return df
 
-def aggregate(df, grp="1min", func=None):
+def aggregate(df, grp="1min", func=lambda x: x):
     """
     Resample dataframe based on the provided frequency and aggregate using the specified function.
     
