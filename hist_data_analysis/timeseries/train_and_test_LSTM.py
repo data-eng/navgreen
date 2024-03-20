@@ -26,7 +26,7 @@ logger.addHandler(stream_handler)
 torch.manual_seed(15)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.info(f'Device is {device}')
+# logger.info(f'Device is {device}')
 
 hp_cols = ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"]
 pvt_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"]
