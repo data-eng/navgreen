@@ -40,8 +40,9 @@ def train(train_data, val_data):
 
         for X, y in train_data:
             X, y = X.to(device), y.to(device)
-            y_pred = model(X)
+            logger.debug(f"X shape: {X.shape}, y shape: {y.shape}")
 
+            y_pred = model(X)
             loss = criterion(y_pred, y)
 
             optimizer.zero_grad()

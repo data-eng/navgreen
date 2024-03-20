@@ -3,44 +3,43 @@ import torch
 import torch.nn as nn
 
 class PosEncoding(nn.Module):
-    def __init__(self, batch_size, max_timesteps=5000, scaling=10000.0, increment=2):
+    def __init__(self, d_model, max_timesteps=1000, scaling=10000.0, increment=2):
         """
         Initializes the positional encoding module:
 
         - Positional indices represent positions within the sequences.
         - Sine and cosine functions of the scaled positional indices define the positional encodings.
 
-        :param batch_size: the batch size of the input sequences
+        :param d_model: the size of the embeddings that represent the inputs/outputs of the transformer (dimensionality)
         :param max_timesteps: the maximum number of timesteps in the input sequences
         :param scaling: scaling factor
         :param increment: increment factor
         """
         super(PosEncoding, self).__init__() 
-        self.batch_size = batch_size
-        self.max_timesteps = max_timesteps  
+        self.d_model = d_model
         self.scaling = scaling
         self.increment = increment
+        self.dropout = nn.Dropout(p=0.1)
         
-        pe = torch.zeros(self.max_timesteps, self.batch_size)
+        pe = torch.zeros(max_timesteps, 1, self.d_model)
 
-        pos = torch.arange(0, self.max_timesteps, dtype=torch.float).unsqueeze(1)
-        scaled_pos = self.scaled_indices * pos
+        pos = torch.arange(0, max_timesteps, dtype=torch.float).unsqueeze(1)
+        scaled_pos = self.div_term * pos
 
-        pe[:, 0::2] = torch.sin(scaled_pos)
-        pe[:, 1::2] = torch.cos(scaled_pos)
-        pe = pe.unsqueeze(0).transpose(0, 1)
+        pe[:, 0, 0::2] = torch.sin(scaled_pos)
+        pe[:, 0, 1::2] = torch.cos(scaled_pos)
     
-        self.register_buffer('pe', self.pe)
+        self.register_buffer('pe', pe)
 
     @property
-    def scaled_indices(self):
+    def div_term(self):
         """
-        Computes scaled indices, used to modulate the frequency of the sine and cosine pe representations.
+        Computes div_term, used to modulate the frequency of the sine and cosine pe representations.
 
-        :return: tensor containing scaled indices
+        :return: tensor containing scaled indices (div_term)
         """
-        indices = torch.arange(0, self.batch_size, self.increment).float()
-        w_i = -math.log(self.scaling) / self.batch_size
+        indices = torch.arange(0, self.d_model, self.increment).float()
+        w_i = -math.log(self.scaling) / self.d_model
         return torch.exp(w_i * indices)
 
     def forward(self, x):
@@ -51,16 +50,16 @@ class PosEncoding(nn.Module):
         :return: encoded tensor
         """
         return x + self.pe[:x.size(0), :]        
-    
+
 class Transformer(nn.Module):
-    def __init__(self, num_features=2, num_layers=1, dropout=0.1):
+    def __init__(self, output_size=1, d_model=192, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
         super(Transformer, self).__init__()
 
-        self.mask = None
-        self.pos_encoder = PosEncoding(num_features)
-        self.layer = nn.TransformerEncoderLayer(d_model=num_features, nhead=10, dropout=dropout)
+        self.pos_encoder = PosEncoding(d_model)
+        
+        self.layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
         self.encoder = nn.TransformerEncoder(self.layer, num_layers=num_layers)
-        self.decoder = nn.Linear(num_features, 1)
+        self.decoder = nn.Linear(d_model, output_size)
         self.init_weights()
 
     def init_weights(self):
@@ -73,10 +72,10 @@ class Transformer(nn.Module):
         initrange = 0.1    
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
-
+        
     def forward(self, x):
         """
-        Forward pass of the Transformer model:
+        Forward pass of the transformer model:
 
         - Adds positional encodings to the input tensor.
         - Passes the encoded input through the transformer encoder layer.
@@ -85,25 +84,9 @@ class Transformer(nn.Module):
         :param x: input tensor
         :return: output tensor after passing through the transformer model
         """
-        timesteps = len(x)
-        if self.mask is None or self.mask.size(0) != timesteps:
-            device = x.device
-            mask = self.generate_mask(size=timesteps).to(device)
-            self.mask = mask
-
+        x = x.permute(1, 0, 2)  # (sequence length, batch size, feature size)
         x = self.pos_encoder(x)
-        x = self.encoder(src=x, mask=self.mask)
+        x = self.encoder(src=x)
+        x = x.permute(1, 0, 2)  # (batch size, sequence length, feature size)
         x = self.decoder(input=x)
         return x
-
-    def generate_mask(self, size):
-        """
-        Generates a square subsequent mask so that each timestep can only attend to previous
-        timesteps and not to future ones.
-        
-        :param size: size of the sequence (number of timesteps)
-        :return: square subsequent mask tensor
-        """
-        mask = (torch.triu(torch.ones(size, size)) == 1).transpose(0, 1)
-        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
-        return mask
