@@ -134,7 +134,7 @@ def split(dataset, vperc=0.2):
     :param vperc: percentage of data to allocate for validation
     :return: tuple containing training and validation datasets
     """
-    ds_seqs = len(dataset)
+    ds_seqs = int(len(dataset))
 
     valid_seqs = int(vperc * ds_seqs)
     train_seqs = ds_seqs - valid_seqs
@@ -143,12 +143,16 @@ def split(dataset, vperc=0.2):
 
 def create_sequences(dataset):
     seqs = []
-    len_seq = dataset.len_seq
-    num_seqs = len(dataset)
-    
-    for i in range(num_seqs-len_seq-1):
-        X = dataset[i:i+len_seq]
-        y = dataset[i+len_seq+1:i+2*len_seq+1]
-        seqs.append((X, y))
+    len_seq = dataset.dataset.len_seq
 
-    return torch.FloatTensor(seqs)
+    for i in range(len(dataset) - len_seq - 1):
+
+        X_seq, y_seq = [], []
+        for j in range(i, i + len_seq):
+            X, y = dataset[j]
+            X_seq.append(X)
+            y_seq.append(y)
+
+        seqs.append((torch.stack(X_seq), torch.stack(y_seq)))
+
+    return seqs

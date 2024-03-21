@@ -94,7 +94,7 @@ def main():
     hp, pv = data["hp"], data["pv"]
 
     day_dur, group_dur = 1440, 30
-    num_pairs = day_dur / group_dur
+    num_pairs = day_dur // group_dur
     func = lambda x: x.mean()
 
     df = load(path=path, parse_dates=["Date&time"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
