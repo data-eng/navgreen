@@ -42,8 +42,8 @@ def undersampling_error( t, v ):
 
 
 def runme():
-    df = pd.read_csv("data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], low_memory=False)
-    df = process_data(df, hist_data=True)
+    df = pd.read_csv("data/DATA_FROM_PLC_CONV.csv", parse_dates=["DATETIME"], low_memory=False)
+    df = process_data(df)
 
     dfQ4=df[(df['DATETIME'] > '2022-10-01') & (df['DATETIME'] < '2023-01-01')]
     err = None

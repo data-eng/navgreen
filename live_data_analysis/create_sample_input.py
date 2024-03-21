@@ -47,7 +47,7 @@ def create_sample_input():
                 break
 
         for sol in solar:
-            if row[sol] > value_limits["solar_max"] * 1000:
+            if row[sol] > value_limits["solar_max"]:
                 sol_outlier = index
                 break
 
@@ -92,7 +92,7 @@ def create_sample_input():
     # One fake outlier for a random solar value
     random_index_solar = random.randint(0, df.shape[0]-1)
     k = random.randint(0, len(solar) - 1)
-    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"] * 1000 + 0.1 * 1000
+    df.loc[random_index_solar, solar[k]] = value_limits["solar_max"]  + 0.1
 
     logger.info(f'Twitched solar sensor {solar[k]} at index: {random_index_solar}')
 

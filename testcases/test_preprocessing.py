@@ -31,7 +31,7 @@ class TestPreproc( unittest.TestCase ):
         cls.test_data_path = "./testcases/sample_data/"
         cls._sample_input = pd.read_csv( cls.test_data_path+"sample_input.csv" )
         # Apply transformation
-        cls._sample_input = process_data(cls._sample_input, hist_data=True)
+        cls._sample_input = process_data(cls._sample_input)
 
         # Wipe clean the test bucket
         logger.info( f"Emptying {bucket}... ")
