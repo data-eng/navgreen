@@ -43,6 +43,7 @@ def train(train_data, val_data):
             logger.debug(f"X shape: {X.shape}, y shape: {y.shape}")
 
             y_pred = model(X)
+            
             loss = criterion(y_pred, y)
 
             optimizer.zero_grad()
@@ -106,11 +107,11 @@ def main():
     ds_hp = TSDataset(dataframe=df_hp, len_seq=num_pairs, X=hp["X"], y=hp["y"])
     ds_train_hp, ds_val_hp = split(ds_hp, vperc=0.2)
 
-    seqs_train_hp = create_sequences(ds_train_hp)
-    seqs_val_hp = create_sequences(ds_val_hp)
+    #seqs_train_hp = create_sequences(ds_train_hp)
+    #seqs_val_hp = create_sequences(ds_val_hp)
 
-    dl_train_hp = DataLoader(seqs_train_hp, batch_size, shuffle=True)
-    dl_val_hp = DataLoader(seqs_val_hp, batch_size, shuffle=False)
+    dl_train_hp = DataLoader(ds_train_hp, batch_size, shuffle=True)
+    dl_val_hp = DataLoader(ds_val_hp, batch_size, shuffle=False)
 
     train_loss_hp, val_loss_hp = train(dl_train_hp, dl_val_hp)
     logger.info(f'HP | Final Training Loss : {train_loss_hp:.6f} & Validation Loss : {val_loss_hp:.6f}\n')
@@ -122,11 +123,8 @@ def main():
     ds_pv = TSDataset(dataframe=df_pv, len_seq=num_pairs, X=pv["X"], y=pv["y"])
     ds_train_pv, ds_val_pv = split(ds_pv, vperc=0.2)
 
-    seqs_train_pv = create_sequences(ds_train_pv)
-    seqs_val_pv = create_sequences(ds_val_pv)
-
-    dl_train_pv = DataLoader(seqs_train_pv, batch_size, shuffle=True)
-    dl_val_pv = DataLoader(seqs_val_pv, batch_size, shuffle=False)
+    dl_train_pv = DataLoader(ds_train_pv, batch_size, shuffle=True)
+    dl_val_pv = DataLoader(ds_val_pv, batch_size, shuffle=False)
 
     train_loss_pv, val_loss_pv = train(dl_train_pv, dl_val_pv)
     logger.info(f'PV | Final Training Loss : {train_loss_pv:.6f} & Validation Loss : {val_loss_pv:.6f}\n')

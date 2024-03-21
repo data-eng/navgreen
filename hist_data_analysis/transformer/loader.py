@@ -101,26 +101,28 @@ class TSDataset(Dataset):
         :param y: target variables names
         """
         self.len_seq = len_seq
-        self.X = dataframe[X]
-        self.y = dataframe[y]
+        self.X = dataframe[X][:-1]
+        self.y = dataframe[y][1:]
 
     def __len__(self):
         """
         :return: number of sequences that can be created from dataset X
         """
         return self.max_seq_id + 1
-
+    
     def __getitem__(self, idx):
         """
         Retrieves a sample from the dataset at the specified index.
         :param idx: index of the sample
-        :return: tuple containing input features sequence and target variables
+        :return: tuple containing input features sequence and target variables sequence
         """
         start_idx = idx
-        end_idx = idx + self.len_seq
+        end_idx = start_idx + self.len_seq
+    
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[start_idx:end_idx].values
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
+
         return X, y
     
     @property
@@ -140,19 +142,3 @@ def split(dataset, vperc=0.2):
     train_seqs = ds_seqs - valid_seqs
 
     return random_split(dataset, [train_seqs, valid_seqs])
-
-def create_sequences(dataset):
-    seqs = []
-    len_seq = dataset.dataset.len_seq
-
-    for i in range(len(dataset) - len_seq - 1):
-
-        X_seq, y_seq = [], []
-        for j in range(i, i + len_seq):
-            X, y = dataset[j]
-            X_seq.append(X)
-            y_seq.append(y)
-
-        seqs.append((torch.stack(X_seq), torch.stack(y_seq)))
-
-    return seqs
