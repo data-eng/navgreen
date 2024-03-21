@@ -25,7 +25,7 @@ hp_cols = ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"]
 pv_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"]
 
 
-def load_data(print_stats=False):
+def load_data():
     """
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
@@ -64,18 +64,7 @@ def load_data(print_stats=False):
     df_pv = df_pv[df_pv["PYRANOMETER"] > 0.15]
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pv)))
 
-    if print_stats:
-        # No need to re-run every time
-        # Print some monthly stats about the data
-        for m in range(9, 21):
-            df_monthly = df[df.DATETIME.dt.month == ((m - 1) % 12) + 1]
-            logger.info("{} to {}".format(df_monthly.DATETIME.dt.date.iloc[0],
-                                          df_monthly.DATETIME.dt.date.iloc[-1]))
-            for col in df_monthly.columns:
-                logger.info("  {}: {} {} {}".format(col, df_monthly[col].min(),
-                                                    df_monthly[col].mean(), df_monthly[col].max()))
-
-    return df, df_hp, df_pv
+    return df_hp, df_pv
 # end def load_data
 
 
@@ -348,7 +337,7 @@ def scenario2(name, mydf, prepare, grp):
 
 
 def correlate(): # Main callable function
-    df, df_hp, df_pv = load_data()
+    df_hp, df_pv = load_data()
     grp = "6h"
 
     logger.info("##### SCENARIO 1 #####")
