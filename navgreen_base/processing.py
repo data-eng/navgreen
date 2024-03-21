@@ -72,51 +72,18 @@ value_limits = {
 }
 
 
-def process_data(df, hist_data=True):
+def process_data(df):
     """
     This function applies the needed transformations to the columns of the input DataFrame and to the data outliers.
     :param df: DataFrame to be processed
-    :param hist_data: Boolean parameter that indicated whether the input DataFrame refers to the historical data (below
-    is explained why this is needed)
     :return: The processed DataFrame
     """
 
-    # Rename some columns. Note that when these columns are not in the DataFrame no error is raised and of course the
-    # renaming is not performed.
-    df.rename(columns={
-        "3-WAY_EVAP_OPERATION": "THREE_WAY_EVAP_OPERATION",
-        "3-WAY_COND_OPERATION": "THREE_WAY_COND_OPERATION",
-        "3-WAY_SOLAR_OPERATION": "THREE_WAY_SOLAR_OPERATION",
-        "4_WAY_VALVE": "FOUR_WAY_VALVE",
-        "Date&time": "DATETIME",
-        "RECEIVER LIQUID_OUT": "RECEIVER_LIQUID_OUT"}, inplace=True)
-
-    # Columns marked as "not important"
-    columns_to_drop = ["SPARE_NTC_SENSOR", "POWER_GLOBAL_SOL"]
-    # Redundant columns
-    columns_to_drop += ["Date", "Time"]
-    # For actual time
-    columns_to_drop += ["Date_time_local"]
-
-    if hist_data:
-        columns_to_drop += ['DIFFUSE_SOLAR_RADIATION']
-
-    # Check if these columns exist and then drop them. This check is needed as the input DataFrame might not be
-    # consistent in that matter as it may come from different sources (historical, live and other combinations)
-    for col in columns_to_drop:
-        if col in df.columns:
-            df.drop(col, axis=1, inplace=True)
-
-    # If the data is indeed historical, convert solar value PYRANOMETER to the corresponding 'useful' unit (W/m^2 to kW/m^2).
-    # Do the same for POWER_PVT and POWER_HP
-    # The other measurements are already converted from the default PLC units to the ones the domain experts are accustomed to.
-    if hist_data:
-        df['PYRANOMETER'] = df['PYRANOMETER'].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
-        df['POWER_PVT'] = df['POWER_PVT'].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
-        df['POWER_HP'] = df['POWER_HP'].apply(lambda x: round(x / 1000, 6) if (pd.notna(x) and isinstance(x, (int, float))) else x)
+    if 'Date_time_local' in df.columns:
+        df.drop('Date_time_local', axis=1, inplace=True)
 
     # Apply reasonable limits
-    solar_columns = solar if hist_data else solar + solar_diff_source
+    solar_columns = solar if "DIFFUSE_SOLAR_RADIATION" not in df.columns else solar + solar_diff_source
 
     for col in solar_columns:
         df[col] = df[col].apply(lambda x: 0.0 if x > value_limits["solar_max"] else x)
