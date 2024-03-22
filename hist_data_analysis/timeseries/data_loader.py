@@ -66,17 +66,20 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
             df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
             # assert round(df[c].mean(), 1) == 0.0 and round(df[c].std(), 1) == 1.0
 
-    col = "DATETIME"
-    print(f"Data type of DATETIME: {df[col].dtype}")
     # If group data by time
-    df = df.set_index("DATETIME").resample(grp).mean().dropna().sort_index() if grp else df.set_index("DATETIME").sort_index()
+    df = df.set_index("DATETIME").resample(grp).mean().sort_index() if grp else df.set_index("DATETIME").sort_index()
     logger.info("Grouped: {} rows".format(len(df)))
 
-    df_hp = df[[c for c in hp_cols if c != "DATETIME"]]
+    # Create mask for NaN values
+    mask = df.isna().astype(int)
+    # Add mask column to the DataFrame
+    df['Mask'] = mask.apply(lambda x: tuple(x), axis=1)
+
+    df_hp = df[[c for c in hp_cols+['Mask'] if c != "DATETIME"]]
     df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
     logger.info("HP, POWER > 1: {} rows".format(len(df_hp)))
 
-    df_pvt = df[[c for c in pvt_cols if c != "DATETIME"]]
+    df_pvt = df[[c for c in pvt_cols+['Mask'] if c != "DATETIME"]]
     df_pvt = df_pvt[df_pvt["PYRANOMETER"] > 0.15]
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
 
