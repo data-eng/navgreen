@@ -3,33 +3,22 @@ import torch
 import torch.nn as nn
 
 class PosEncoding(nn.Module):
-    def __init__(self, d_model, max_timesteps=1000, scaling=10000.0, increment=2):
+    def __init__(self, d_model, max_seq_len=5000, scaling=10000.0, increment=2):
         """
         Initializes the positional encoding module:
 
         - Positional indices represent positions within the sequences.
         - Sine and cosine functions of the scaled positional indices define the positional encodings.
 
-        :param d_model: the size of the embeddings that represent the inputs/outputs of the transformer (dimensionality)
-        :param max_timesteps: the maximum number of timesteps in the input sequences
         :param scaling: scaling factor
         :param increment: increment factor
         """
         super(PosEncoding, self).__init__() 
         self.d_model = d_model
+        self.max_seq_len = max_seq_len
         self.scaling = scaling
         self.increment = increment
         self.dropout = nn.Dropout(p=0.1)
-        
-        pe = torch.zeros(max_timesteps, 1, self.d_model)
-
-        pos = torch.arange(0, max_timesteps, dtype=torch.float).unsqueeze(1)
-        scaled_pos = self.div_term * pos
-
-        pe[:, 0, 0::2] = torch.sin(scaled_pos)
-        pe[:, 0, 1::2] = torch.cos(scaled_pos)
-    
-        self.register_buffer('pe', pe)
 
     @property
     def div_term(self):
@@ -38,9 +27,22 @@ class PosEncoding(nn.Module):
 
         :return: tensor containing scaled indices (div_term)
         """
-        indices = torch.arange(0, self.d_model, self.increment).float()
+        indices = torch.arange(0, self.d_model, step=2, dtype=torch.float)
         w_i = -math.log(self.scaling) / self.d_model
         return torch.exp(w_i * indices)
+    
+    def encoding(self, arg):
+        _, _, num_feats = arg
+
+        pe = torch.zeros(self.max_seq_len, num_feats, self.d_model)
+
+        pos = torch.arange(0, self.max_seq_len).unsqueeze(1).unsqueeze(-1)
+        scaled_pos = self.div_term * pos
+
+        pe[:, :, 0::2] = torch.sin(scaled_pos)
+        pe[:, :, 1::2] = torch.cos(scaled_pos)
+
+        return pe.unsqueeze(1)
 
     def forward(self, x):
         """
@@ -49,10 +51,13 @@ class PosEncoding(nn.Module):
         :param x: input tensor
         :return: encoded tensor
         """
-        return x + self.pe[:x.size(0), :]        
+        pe = self.encoding(arg=x.size())  
+        return x.unsqueeze(-1) + pe[:x.size(0), :]
+
+        # return: torch.Size([48, 120, 2, 250]) ~ (sequence length, batch size, feature size, d_model)
 
 class Transformer(nn.Module):
-    def __init__(self, output_size=1, d_model=192, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
+    def __init__(self, output_size=1, d_model=250, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
         super(Transformer, self).__init__()
 
         self.pos_encoder = PosEncoding(d_model)
@@ -86,7 +91,11 @@ class Transformer(nn.Module):
         """
         x = x.permute(1, 0, 2)  # (sequence length, batch size, feature size)
         x = self.pos_encoder(x)
+        print("####################### pos_encoder: ", x.size())  # should be (seq_len, batch_size, num_feats, d_model)
+
         x = self.encoder(src=x)
-        x = x.permute(1, 0, 2)  # (batch size, sequence length, feature size)
-        x = self.decoder(input=x)
+        print("####################### encoder: ", x.size()) # should be (seq_len, batch_size, num_feats, d_model)
+
+        x = self.decoder(input=x)  # should be (seq_len, batch_size, num_feats, output_size)
+        print("####################### decoder: ", x.size())
         return x
