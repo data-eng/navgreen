@@ -7,3 +7,5 @@ dist/
 data/
 figures/
 exports.sh
+venv/
+meteo/
