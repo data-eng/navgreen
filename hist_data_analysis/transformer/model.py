@@ -1,6 +1,14 @@
 import math
 import torch
+import logging
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL)
+formatter = logging.Formatter('%(asctime)s:%(lineno)d:%(levelname)s:%(name)s:%(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 class PosEncoding(nn.Module):
     def __init__(self, d_model, max_seq_len=5000, scaling=10000.0, increment=2):
@@ -10,6 +18,8 @@ class PosEncoding(nn.Module):
         - Positional indices represent positions within the sequences.
         - Sine and cosine functions of the scaled positional indices define the positional encodings.
 
+        :param d_model: dimensionality of the model
+        :param max_seq_len: maximum sequence length
         :param scaling: scaling factor
         :param increment: increment factor
         """
@@ -18,7 +28,6 @@ class PosEncoding(nn.Module):
         self.max_seq_len = max_seq_len
         self.scaling = scaling
         self.increment = increment
-        self.dropout = nn.Dropout(p=0.1)
 
     @property
     def div_term(self):
@@ -31,18 +40,31 @@ class PosEncoding(nn.Module):
         w_i = -math.log(self.scaling) / self.d_model
         return torch.exp(w_i * indices)
     
-    def encoding(self, arg):
-        _, _, num_feats = arg
+    @property
+    def encoding(self):
+        """
+        Computes the positional encodings, using sine and cosine functions.
 
-        pe = torch.zeros(self.max_seq_len, num_feats, self.d_model)
+        :return: tensor containing the positional encodings
+        """
+        pe = torch.zeros(self.max_seq_len, self.d_model)
+        logger.debug("pe: %s", pe.size())
 
-        pos = torch.arange(0, self.max_seq_len).unsqueeze(1).unsqueeze(-1)
+        pos = torch.arange(0, self.max_seq_len).unsqueeze(1)
+        logger.debug("pos: %s", pos.size())
+        logger.debug("div_term: %s", self.div_term.size())
+
         scaled_pos = self.div_term * pos
+        logger.debug("scaled_pos: %s", scaled_pos.size())
 
-        pe[:, :, 0::2] = torch.sin(scaled_pos)
-        pe[:, :, 1::2] = torch.cos(scaled_pos)
+        pe[:, 0::2] = torch.sin(scaled_pos)
+        pe[:, 1::2] = torch.cos(scaled_pos)
 
-        return pe.unsqueeze(1)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+
+        logger.debug("unsq pe: %s", pe.size())
+
+        return pe
 
     def forward(self, x):
         """
@@ -51,20 +73,52 @@ class PosEncoding(nn.Module):
         :param x: input tensor
         :return: encoded tensor
         """
-        pe = self.encoding(arg=x.size())  
-        return x.unsqueeze(-1) + pe[:x.size(0), :]
+        pe = self.encoding  
+        enc_x = x + pe[:x.size(0), :]
+        return enc_x
 
-        # return: torch.Size([48, 120, 2, 250]) ~ (sequence length, batch size, feature size, d_model)
+class FeatureFuser(nn.Module):
+    def __init__(self, num_feats):
+        """
+        Initializes the feature fuser network.
 
+        :param num_feats: number of input features
+        """
+        super(FeatureFuser, self).__init__()
+        self.fc = nn.Linear(num_feats, 1)
+        self.relu = nn.ReLU()
+        
+    def forward(self, x):
+        """
+        Combines n input features into 1, using a linear layer followed by a ReLU activation function.
+
+        :param x: n-feature tensor
+        :return: 1-feature tensor
+        """
+        x = self.fc(x)
+        x = self.relu(x)
+        return x
+    
 class Transformer(nn.Module):
-    def __init__(self, output_size=1, d_model=250, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
+    def __init__(self, in_size=2, out_size=2, d_model=250, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
+        """
+        Initializes a transformer model architecture: [Positional Encoder, Feature Fuser, Transformer Encoder, Linear Decoder]
+
+        :param in_size: X features size
+        :param out_size: y features size
+        :param d_model: dimensionality of the model
+        :param nhead: number of attention heads
+        :param num_layers: number of transformer encoder layers
+        :param dim_feedforward: dimension of the feedforward network model
+        :param dropout: dropout rate
+        """
         super(Transformer, self).__init__()
 
         self.pos_encoder = PosEncoding(d_model)
-        
+        self.fuser = FeatureFuser(num_feats=in_size)
         self.layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
         self.encoder = nn.TransformerEncoder(self.layer, num_layers=num_layers)
-        self.decoder = nn.Linear(d_model, output_size)
+        self.decoder = nn.Linear(d_model, out_size)
         self.init_weights()
 
     def init_weights(self):
@@ -82,6 +136,7 @@ class Transformer(nn.Module):
         """
         Forward pass of the transformer model:
 
+        - Applies feature fusion to the input tensor, reducing their number from n to 1.
         - Adds positional encodings to the input tensor.
         - Passes the encoded input through the transformer encoder layer.
         - Passes the output of the encoder through the decoder linear layer.
@@ -89,13 +144,42 @@ class Transformer(nn.Module):
         :param x: input tensor
         :return: output tensor after passing through the transformer model
         """
-        x = x.permute(1, 0, 2)  # (sequence length, batch size, feature size)
+        x = x.permute(1, 0, 2)
+        logger.debug("initial x: %s", x.size())
+
+        x = self.fuser(x)
+        logger.debug("fused: %s", x.size())
+
         x = self.pos_encoder(x)
-        print("####################### pos_encoder: ", x.size())  # should be (seq_len, batch_size, num_feats, d_model)
+        logger.debug("pos_encoded: %s", x.size())
 
         x = self.encoder(src=x)
-        print("####################### encoder: ", x.size()) # should be (seq_len, batch_size, num_feats, d_model)
+        logger.debug("encoded: %s", x.size())
 
-        x = self.decoder(input=x)  # should be (seq_len, batch_size, num_feats, output_size)
-        print("####################### decoder: ", x.size())
+        x = self.decoder(input=x)
+        logger.debug("decoded: %s", x.size())
+
+        x = x.permute(1, 0, 2)
         return x
+    
+    # initial x:  torch.Size([sequence length, batch size, feature size])
+    # fused:  torch.Size([sequence length, batch size, 1])
+    # pe: torch.Size([max_seq_len, d_model])
+    # pos: torch.Size([max_seq_len, 1])
+    # div_term: torch.Size([d_model/2])
+    # scaled_pos: torch.Size([max_seq_len, d_model/2])
+    # unsq pe: torch.Size([max_seq_len, 1, d_model])
+    # pos_encoded:  torch.Size([sequence length, batch size, d_model])
+    # encoded:  torch.Size([sequence length, batch size, d_model])
+    # decoded:  torch.Size([sequence length, batch size, feature size])
+
+    # initial x:  torch.Size([48, 120, 2])   
+    # fused:  torch.Size([48, 120, 1])
+    # pe: torch.Size([5000, 250])
+    # pos: torch.Size([5000, 1])
+    # div_term: torch.Size([125])
+    # scaled_pos: torch.Size([5000, 125])
+    # unsq pe: torch.Size([5000, 1, 250])
+    # pos_encoded:  torch.Size([48, 120, 250])
+    # encoded:  torch.Size([48, 120, 250])
+    # decoded:  torch.Size([48, 120, 1])

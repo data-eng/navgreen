@@ -1,5 +1,7 @@
 import scipy.signal
 import pandas as pd
+import torch.optim as optim
+import torch.optim.lr_scheduler as sched
 
 def normalize(df):
     """
@@ -47,3 +49,13 @@ def aggregate(df, grp="1min", func=lambda x: x):
         df = df.dropna()
     df = df.sort_index()
     return df
+
+def get_optim(name, model, lr):
+    optim_class = getattr(optim, name)
+    optimizer = optim_class(model.parameters(), lr=lr)
+    return optimizer
+
+def get_sched(name, step_size, gamma, optimizer):
+    sched_class = getattr(sched, name)
+    scheduler = sched_class(optimizer, step_size, gamma)
+    return scheduler

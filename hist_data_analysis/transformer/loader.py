@@ -92,15 +92,15 @@ def prepare(df, system):
     return df
     
 class TSDataset(Dataset):
-    def __init__(self, dataframe, len_seq, X, y):
+    def __init__(self, dataframe, seq_len, X, y):
         """
         Initializes a time series dataset.
         :param dataframe: dataframe
-        :param len_seq: length of the input sequence
+        :param seq_len: length of the input sequence
         :param X: input features names
         :param y: target variables names
         """
-        self.len_seq = len_seq
+        self.seq_len = seq_len
         self.X = dataframe[X][:-1]
         self.y = dataframe[y][1:]
 
@@ -117,7 +117,7 @@ class TSDataset(Dataset):
         :return: tuple containing input features sequence and target variables sequence
         """
         start_idx = idx
-        end_idx = start_idx + self.len_seq
+        end_idx = start_idx + self.seq_len
     
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[start_idx:end_idx].values
@@ -127,7 +127,7 @@ class TSDataset(Dataset):
     
     @property
     def max_seq_id(self):
-        return self.X.shape[0] - self.len_seq
+        return self.X.shape[0] - self.seq_len
     
 def split(dataset, vperc=0.2):
     """
