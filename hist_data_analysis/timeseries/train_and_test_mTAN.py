@@ -26,11 +26,11 @@ pvt_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT"
 def evaluate(model, dataloader, criterion):
     model.eval()
     total_loss = 0
-    for X, y in dataloader:
+    for (X, masks), y in dataloader:
         X, y = X.to(device), y.to(device)
         observed_tp = X[:, :, -1]
         with torch.no_grad():
-            out = model(X, observed_tp)
+            out = model(X, observed_tp, masks)
             y_ = y[:, -1, :]
             total_loss += criterion(out, y_)
 
@@ -57,11 +57,11 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
         total_loss = 0
 
         start_time = time.time()
-        for X, y in train_loader:
+        for (X, masks), y in train_loader:
             X, y = X.to(device), y.to(device)
             observed_tp  = X[:, :, -1]
 
-            out = model(X, observed_tp)
+            out = model(X, observed_tp, masks)
             y_ = y[:, -1, :]
             loss = criterion(out, y_)
 
@@ -75,7 +75,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch: {epoch}, Training Loss: {average_loss:.4f}, Validation Loss: {val_loss:.4f}, '
+        print(f'Epoch: {epoch} | Training Loss: {average_loss:.4f}, Validation Loss: {val_loss:.4f}, '
               f'time : {(time.time() - start_time)/60:.2f} minutes')
 
         # Check for early stopping
@@ -103,7 +103,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
 
 
 
-def main():
+def main_loop():
 
     experiment_id = int(SystemRandom().random() * 100000)
     # Parameters:
@@ -115,7 +115,7 @@ def main():
     dim = 2
 
     sequence_length = 10
-    batch_size = 8
+    batch_size = 32
     validation_set_percentage = 0.2
 
     grp = "5T"
@@ -135,7 +135,7 @@ def main():
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_hp_cols, Y_cols=y_hp_cols)
+                                         X_cols=X_hp_cols, y_cols=y_hp_cols)
 
     # Get the total number of samples and compute size of each corresponding set
     total_samples = len(training_dataset)

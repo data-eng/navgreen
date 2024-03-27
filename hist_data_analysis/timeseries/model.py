@@ -41,6 +41,7 @@ class MultiTimeAttention(nn.Module):
         scores = scores.unsqueeze(-1).repeat_interleave(dim, dim=-1)
         if mask is not None:
             scores = scores.masked_fill(mask.unsqueeze(-3) == 0, -1e9)
+            # print(scores)
         p_attn = F.softmax(scores, dim=-2)
         if dropout is not None:
             p_attn = dropout(p_attn)
@@ -49,9 +50,9 @@ class MultiTimeAttention(nn.Module):
     def forward(self, query, key, value, mask=None, dropout=None):
         # Compute 'Scaled Dot Product Attention'
         batch, seq_len, dim = value.size()
-        if mask is not None:
+        #if mask is not None:
             # Same mask applied to all h heads.
-            mask = mask.unsqueeze(1)
+        #    mask = mask.unsqueeze(1)
         value = value.unsqueeze(1)
         query, key = [l(x).view(x.size(0), -1, self.h, self.embed_time_k).transpose(1, 2)
                       for l, x in zip(self.linears, (query, key))]
@@ -102,11 +103,9 @@ class MtanGruRegr(nn.Module):
         pe[:, :, 1::2] = torch.cos(position * div_term)
         return pe
 
-    def forward(self, x, time_steps):
+    def forward(self, x, time_steps, mask):
         # x is: [batch_size, sequence_length, input_size]
         time_steps = time_steps.cpu()
-        mask = x[:, :, self.dim:]
-        mask = torch.cat((mask, mask), 2)
         if self.learn_emb:
             key = self.learn_time_embedding(time_steps).to(self.device)
             query = self.learn_time_embedding(self.query.unsqueeze(0)).to(self.device)

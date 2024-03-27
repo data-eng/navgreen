@@ -1,6 +1,7 @@
 from navgreen_base import process_data
 
 import pandas as pd
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -31,6 +32,7 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
         logger.info(f'DHW_BOTTOM min: {df["DHW_BOTTOM"].min()}, DHW_BOTTOM max: {df["DHW_BOTTOM"].max()}')
 
     logger.info("All data: {} rows".format(len(df)))
+
     if hist_data:
         df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
         logger.info("12 months data: {} rows".format(len(df)))
@@ -46,14 +48,10 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
                      pow((df["PVT_IN"] + df["PVT_OUT"]) / 2.0, 2)) / 3600.0 * df["FLOW_PVT"]) *
                    (df["PVT_OUT"] - df["PVT_IN"]))
 
-    # Drop unneeded columns and then drop rows with NaN
-    # to avoid dropping rows with NaNs in cols we don't need anyway
-    # Cannot be done on df_hp,df_pv views, modifying views is unsafe.
+    # Drop unneeded columns
     for c in df.columns:
         if (c not in hp_cols) and (c not in pvt_cols):
             df.drop(c, axis="columns", inplace=True)
-    df.dropna(inplace=True)
-    logger.info("No NaNs: {} rows".format(len(df)))
 
     mean_stds = {} if stats is None else stats
 
@@ -70,17 +68,15 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
     df = df.set_index("DATETIME").resample(grp).mean().sort_index() if grp else df.set_index("DATETIME").sort_index()
     logger.info("Grouped: {} rows".format(len(df)))
 
-    # Create mask for NaN values
-    mask = df.isna().astype(int)
-    # Add mask column to the DataFrame
-    df['Mask'] = mask.apply(lambda x: tuple(x), axis=1)
-
-    df_hp = df[[c for c in hp_cols+['Mask'] if c != "DATETIME"]]
-    df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
+    # Represent unwanted data as irregularly sampled
+    df_hp = df[[c for c in hp_cols if c != "DATETIME"]]
+    df_hp.loc[df_hp["POWER_HP"] > 1.0, :] = float('nan')
+    # df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
     logger.info("HP, POWER > 1: {} rows".format(len(df_hp)))
 
-    df_pvt = df[[c for c in pvt_cols+['Mask'] if c != "DATETIME"]]
-    df_pvt = df_pvt[df_pvt["PYRANOMETER"] > 0.15]
+    df_pvt = df[[c for c in pvt_cols if c != "DATETIME"]]
+    df_pvt.loc[df_pvt["PYRANOMETER"] > 0.15, :] = float('nan')
+    # df_pvt = df_pvt[df_pvt["PYRANOMETER"] > 0.15]
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
 
     if stats is not None: mean_stds = None
@@ -88,10 +84,17 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
 
 
 class TimeSeriesDataset(Dataset):
-    def __init__(self, dataframe, sequence_length, X_cols, Y_cols):
+    def __init__(self, dataframe, sequence_length, X_cols, y_cols):
         self.sequence_length = sequence_length
+
+        df = dataframe
+        # Check if any column in y_cols contains NaN values for each row
+        has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
+        # Replace rows with NaN values in any of the y_cols with NaN values
+        df.loc[has_nan_in_y_cols, :] = float('nan')
+
         self.X = dataframe[X_cols]
-        self.y = dataframe[Y_cols]
+        self.y = dataframe[y_cols]
 
     def __len__(self):
         return self.X.shape[0] - self.sequence_length + 1
@@ -102,7 +105,12 @@ class TimeSeriesDataset(Dataset):
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[start_idx:end_idx].values
 
+        masks = np.isnan(X).astype(int)
+        # masks = ~masks
+        # if np.any(np.isnan(X)): print(f"This X has NaNs: {X}, {masks}")
+
         # Convert the sequence to a PyTorch tensor
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
+        masks = torch.tensor(masks)
 
-        return X, y
+        return (X, masks), y

@@ -5,6 +5,7 @@ packages = [ {include = "live_data_analysis"},
 version = "0.1"
 description = ""
 authors = [ "Tatiana Boura <tat.boura@gmail.com>",
+	    "Natalia Koliou <natalykoliou@yahoo.gr>",
 	    "Stasinos Konstantopoulos <konstant@iit.demokritos.gr>" ]
 readme = "README.md"
 
@@ -13,6 +14,7 @@ python = ">=3.10,<3.13"
 pandas = "^2.1"
 numpy = "^1.26"
 scipy = "^1.11"
+scikit-learn = "^1.4"
 matplotlib = "^3.8"
 influxdb-client = "^1.38"
 pymodbus = "^3.5.4"
@@ -22,9 +24,10 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-tester = "scripts:test"
+tester_influx = "scripts:test_influx"
+tester_hist_data_navgreen = "scripts:test_navgreen_hist_data"
 sampler = "hist_data_analysis:runme"
-sample_input = "live_data_analysis:create_sample_input"
-timeseries = "hist_data_analysis.timeseries:main"
 correlate = "hist_data_analysis:correlate"
-
+visualize = "hist_data_analysis:main"
+sample_input = "live_data_analysis:create_sample_input"
+timeseries = "hist_data_analysis:main_loop"
