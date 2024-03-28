@@ -26,11 +26,11 @@ pvt_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT"
 def evaluate(model, dataloader, criterion):
     model.eval()
     total_loss = 0
-    for (X, masks), y in dataloader:
+    for (X, masks_X, observed_tp), y  in dataloader:
         X, y = X.to(device), y.to(device)
-        observed_tp = X[:, :, -1]
+
         with torch.no_grad():
-            out = model(X, observed_tp, masks)
+            out = model(X, observed_tp, masks_X)
             y_ = y[:, -1, :]
             total_loss += criterion(out, y_)
 
@@ -57,11 +57,9 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
         total_loss = 0
 
         start_time = time.time()
-        for (X, masks), y in train_loader:
+        for (X, masks_X, observed_tp), y in train_loader:
             X, y = X.to(device), y.to(device)
-            observed_tp  = X[:, :, -1]
-
-            out = model(X, observed_tp, masks)
+            out = model(X, observed_tp, masks_X)
             y_ = y[:, -1, :]
             loss = criterion(out, y_)
 
@@ -75,8 +73,8 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch: {epoch} | Training Loss: {average_loss:.4f}, Validation Loss: {val_loss:.4f}, '
-              f'time : {(time.time() - start_time)/60:.2f} minutes')
+        print(f'Epoch {epoch} | Training Loss: {average_loss:.4f}, Validation Loss: {val_loss:.4f}, '
+              f'Time : {(time.time() - start_time)/60:.2f} minutes')
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -94,7 +92,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
             epochs_without_improvement += 1
 
         if epochs_without_improvement >= patience:
-            print(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
+            print(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
             break
 
     print("Training complete!")
@@ -107,18 +105,16 @@ def main_loop():
 
     experiment_id = int(SystemRandom().random() * 100000)
     # Parameters:
-    freq = 10.0
-    num_heads = 1
+    num_heads = 4
     rec_hidden = 32
     embed_time = 128
-    learn_emb = True
     dim = 2
 
     sequence_length = 10
     batch_size = 32
     validation_set_percentage = 0.2
 
-    grp = "5T"
+    grp = "30T"
 
     df_path = "data/DATA_FROM_PLC.csv"
     (df, df_hp, df_pvt), mean_stds = load_df(df_path=df_path, hp_cols=hp_cols, pvt_cols=pvt_cols,
@@ -152,8 +148,8 @@ def main_loop():
     print("Validation dataloader loaded")
 
     # Configure model
-    model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., 128), nhidden=rec_hidden, embed_time=embed_time,
-                        num_heads=num_heads, learn_emb=learn_emb, freq=freq, device=device).to(device)
+    model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden, embed_time=embed_time,
+                        num_heads=num_heads, device=device).to(device)
     # MSE loss
     criterion = nn.MSELoss()
     # Train the model

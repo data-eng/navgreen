@@ -88,13 +88,19 @@ class TimeSeriesDataset(Dataset):
         self.sequence_length = sequence_length
 
         df = dataframe
+        df['Datetime'] = df.index.astype('int64')
+        # Normalize Unix time between 0 and 1
+        min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
+        epsilon = 1e12 # Small epsilon value to prevent reaching exactly 1
+        df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time + epsilon)
+
         # Check if any column in y_cols contains NaN values for each row
         has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
         # Replace rows with NaN values in any of the y_cols with NaN values
         df.loc[has_nan_in_y_cols, :] = float('nan')
 
-        self.X = dataframe[X_cols]
-        self.y = dataframe[y_cols]
+        self.X, self.y = df[X_cols], df[y_cols]
+        self.time = df['Datetime']
 
     def __len__(self):
         return self.X.shape[0] - self.sequence_length + 1
@@ -104,13 +110,21 @@ class TimeSeriesDataset(Dataset):
         end_idx = idx + self.sequence_length
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[start_idx:end_idx].values
+        time = self.time.iloc[start_idx:end_idx].values
+        time = np.nan_to_num(time, nan=0)
 
-        masks = np.isnan(X).astype(int)
-        # masks = ~masks
-        # if np.any(np.isnan(X)): print(f"This X has NaNs: {X}, {masks}")
+        masks_X = np.isnan(X).astype(int)
+        masks_X = 1 - masks_X
+
+        masks_y = np.isnan(y).astype(int)
+        masks_y = 1 - masks_y
 
         # Convert the sequence to a PyTorch tensor
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
-        masks = torch.tensor(masks)
+        masks_X, masks_y = torch.tensor(masks_X), torch.tensor(masks_y)
+        time = torch.FloatTensor(time)
 
-        return (X, masks), y
+        X = X.masked_fill(masks_X == 0, 0)
+        y = y.masked_fill(masks_y == 0, 0)
+
+        return (X, masks_X, time), y
