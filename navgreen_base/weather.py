@@ -29,6 +29,14 @@ phenomena = {
     "ΒΡΟΧΗ": 7
 }
 
+comments = {
+    "ΠΟΛΥ ΧΑΜΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": -2,
+    "ΧΑΜΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": -1,
+    "ΚΑΝΟΝΙΚΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 0,
+    "ΥΨΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 1,
+    "ΠΟΛΥ ΥΨΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 2
+}
+
 def current(content, name):
     soup = BeautifulSoup(content, 'html.parser')
     live_panels = soup.find_all('div', class_='livepanel')
@@ -171,7 +179,58 @@ def historical(content, name):
         writer.writerows(csv_data)
 
 def brief(content, name):
-    pass
+    soup = BeautifulSoup(content, 'html.parser')
+    sunblockheader = soup.find('div', class_='sunblockheader')
+    dayblocks = soup.find_all('div', class_='dayblockinside')
+    csv_data = []
+
+    for dayblock in dayblocks:
+        data = {}
+
+        date = sunblockheader.text.split()[1:3]
+        day, month = date[0], date[1]
+        month = translator.translate(month).replace('Of ', '').replace('of ', '')
+        month = datetime.strptime(month, '%B').month
+        date = f"{day.strip('&nbsp;'):0>2}/{month:0>2}"
+        data['Date'] = date
+
+        subheader_calendar = dayblock.find('div', class_='subheader_calendar')
+        datenumber_calendar = subheader_calendar.find('div', class_='datenumber_calendar').text.strip()
+        month_calendar = subheader_calendar.find('div', class_='month_calendar').text.strip()
+        month = translator.translate(month_calendar).replace('Of ', '').replace('of ', '')
+        month = datetime.strptime(month, '%B').month
+        forecast = f"{datenumber_calendar.strip('&nbsp;'):0>2}/{month:0>2}"
+        data['Forecast'] = forecast
+
+        info_temp = dayblock.find('div', class_='infotemp')
+        info_temp = comments.get(info_temp.text.strip(), 'N/A')
+        data['Info_Temp'] = info_temp
+
+        sunriseset = dayblock.find('div', class_='sunriseSet_calendar')
+        sunrise = sunriseset.text.split()[1:2]
+        sunrise = datetime.strptime(sunrise[0], '%H:%M').time()
+        data['Sunrise'] = sunrise
+
+        sunset = sunriseset.text.split()[4:5]
+        sunset = datetime.strptime(sunset[0], '%H:%M').time()
+        data['Sunset'] = sunset
+
+        minmax = dayblock.find('div', class_='minmax')
+        hightemp = minmax.find('div', class_='hightemp')
+        high_temp = hightemp.text.strip().split()[0]
+        data['High_Temp'] = high_temp
+
+        lowtemp = minmax.find('div', class_='lowtemp')
+        low_temp = lowtemp.text.strip().split()[0]
+        data['Low_Temp'] = low_temp
+
+        csv_data.append(data)
+
+    with open(name, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset',
+                                                  'High_Temp', 'Low_Temp', 'Info_Temp'])
+        writer.writeheader()
+        writer.writerows(csv_data)
 
 def detailed(content, name):
     soup = BeautifulSoup(content, 'html.parser')
@@ -259,10 +318,10 @@ def main():
     out_path = "static"
 
     prefix_to_func = {
-        #"C": current,
+        "C": current,
         "H": historical,
-        #"B": brief,
-        #"D": detailed
+        "B": brief,
+        "D": detailed
     }
 
     for filename in os.listdir(in_path):
@@ -271,5 +330,3 @@ def main():
             for prefix, func in prefix_to_func.items():
                 name = os.path.join(out_path, f"{prefix}-{filename}.csv")
                 func(content=html, name=name)
-                break
-            break
