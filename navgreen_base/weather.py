@@ -41,7 +41,7 @@ def current(content, name):
         station = panel.parent.get('id').split('stations')[1]
         data['Station'] = station
 
-        date = sunblockheader.get_text(strip=False).split()[1:3]
+        date = sunblockheader.text.split()[1:3]
         day, month = date[0], date[1]
         month = translator.translate(month).replace('Of ', '')
         month = datetime.strptime(month, '%B').month
@@ -49,32 +49,32 @@ def current(content, name):
         data['Date'] = date
 
         time = panel.parent.find('span', class_='livetime')
-        time = datetime.strptime(time.get_text(strip=True), '%H:%M').time() if time else 'N/A'
+        time = datetime.strptime(time.text.strip(), '%H:%M').time() if time else 'N/A'
         data['Time'] = time
 
-        sunrise = sunblockheader.get_text(strip=False).split()[3:4] # ['06:47']
+        sunrise = sunblockheader.text.split()[3:4] # ['06:47']
         sunrise = datetime.strptime(sunrise[0], '%H:%M').time()
         data['Sunrise'] = sunrise
 
-        sunset = sunblockheader.get_text(strip=False).split()[4:5] # ['18:25']
+        sunset = sunblockheader.text.split()[4:5] # ['18:25']
         sunset = datetime.strptime(sunset[0], '%H:%M').time()
         data['Sunset'] = sunset
 
-        hours = int(sunblockheader.get_text(strip=False).split()[8])
-        minutes = int(sunblockheader.get_text(strip=False).split()[10]) 
+        hours = int(sunblockheader.text.split()[8])
+        minutes = int(sunblockheader.text.split()[10]) 
         daylight = (hours * 60) + minutes
         data['Daylight'] = daylight
 
         temp = panel.find('div', class_='newtemp')
-        temp = temp.get_text(strip=True).split('°')[0] if temp else 'N/A'
+        temp = temp.text.strip().split('°')[0] if temp else 'N/A'
         data['Temperature'] = temp
 
         humidity = panel.find('div', class_='ygrasia')
-        humidity = humidity.get_text(strip=True).split(':')[1].strip().split('%')[0] if humidity else 'N/A'
+        humidity = humidity.text.strip().split(':')[1].strip().split('%')[0] if humidity else 'N/A'
         data['Humidity'] = humidity
 
         pressure = panel.find('div', class_='piesi')
-        pressure = pressure.get_text(strip=True).split(':')[1].split()[0] if pressure else 'N/A'
+        pressure = pressure.text.strip().split(':')[1].split()[0] if pressure else 'N/A'
         data['Pressure'] = pressure
 
         wind = panel.find_all('div', class_='windnr')
@@ -85,7 +85,7 @@ def current(content, name):
         data['Beaufort'] = beaufort
 
         wind_dir = panel.find('div', class_='windtxt2')
-        wind_dir = wind_dir.get_text(strip=True) if wind_dir else 'N/A'
+        wind_dir = wind_dir.text.strip() if wind_dir else 'N/A'
         data['Wind_Direction'] = directions.get(wind_dir, 'N/A')
 
         high_temp = panel.find('span', class_='hight')
@@ -102,9 +102,9 @@ def current(content, name):
 
         peak_gust = panel.find_all('div', class_='dailydata')
         peak_gust = peak_gust[3].text.split()[3] if peak_gust else 'N/A'
-        data['Peak_Gust'] = peak_gust
+        data['Peak_Gust'] = peak_gust.replace('-', 'N/A')
 
-        if 'N/A' not in data.values():
+        if time != "N/A":
             csv_data.append(data)
 
     with open(name, mode='w', newline='', encoding='utf-8') as file:
@@ -129,7 +129,7 @@ def detailed(content, name):
     for perhour in perhours:
         data = {}
 
-        date = sunblockheader.get_text(strip=False).split()[1:3]
+        date = sunblockheader.text.split()[1:3]
         day, month = date[0], date[1]
         month = translator.translate(month).replace('Of ', '').replace('of ', '')
         month = datetime.strptime(month, '%B').month
@@ -157,35 +157,34 @@ def detailed(content, name):
         data['Sunset'] = sunset
 
         time = perhour.find('td', class_='innerTableCell fulltime')
-        time = datetime.strptime(time.get_text(strip=True), '%H:%M').time() if time else 'N/A'
+        time = datetime.strptime(time.text.strip(), '%H:%M').time() if time else 'N/A'
         data['Time'] = time
 
         temp = perhour.find('td', class_='innerTableCell temperature tempwidth')
-        temp = temp.get_text(strip=True).split('°')[0] if temp else 'N/A'
+        temp = temp.text.strip().split('°')[0] if temp else 'N/A'
         data['Temperature'] = temp
 
         humidity = perhour.find('td', class_='humidity')
-        humidity = humidity.get_text(strip=True).split()[0].strip().split('%')[0] if humidity else 'N/A'
+        humidity = humidity.text.strip().split()[0].strip().split('%')[0] if humidity else 'N/A'
         data['Humidity'] = humidity
 
         wind = perhour.find('td', class_='innerTableCell anemosfull')
-        wind_speed = wind.get_text(strip=False).split()[3] if wind else 'N/A'
+        wind_speed = wind.text.split()[3] if wind else 'N/A'
         data['Wind_Speed'] = wind_speed
 
-        beaufort = wind.get_text(strip=False).split()[0] if wind else 'N/A'
+        beaufort = wind.text.split()[0] if wind else 'N/A'
         data['Beaufort'] = beaufort
 
-        wind_dir = wind.get_text(strip=False).split()[2] if wind else 'N/A'
+        wind_dir = wind.text.split()[2] if wind else 'N/A'
         wind_dir = directions.get(wind_dir, 'N/A')
-        data['Wind_dir'] = wind_dir
+        data['Wind_Direction'] = wind_dir
 
         sky = perhour.find('td', class_='phenomeno-name')
-        sky = sky.get_text(strip=True) if sky else 'N/A'
+        sky = sky.text.strip() if sky else 'N/A'
         sky = phenomena.get(sky, 'N/A')
         data['Sky'] = sky
 
-        if 'N/A' not in data.values():
-            csv_data.append(data)
+        csv_data.append(data)
 
     with open(name, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.DictWriter(file, fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'Time', 'Temperature', 
@@ -198,10 +197,10 @@ def main():
     out_path = "static"
 
     prefix_to_func = {
-        #"C": current,
+        "C": current,
         #"H": historical,
         #"B": brief,
-        "D": detailed
+        #"D": detailed
     }
 
     for filename in os.listdir(in_path):
