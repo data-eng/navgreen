@@ -115,7 +115,60 @@ def current(content, name):
         writer.writerows(csv_data)
 
 def historical(content, name):
-    pass
+    soup = BeautifulSoup(content, 'html.parser')
+    histpanels = soup.find_all('div', class_='historicalpanel')
+    csv_data = []
+
+    for histpanel in histpanels:
+        items = histpanel.find_all(['div', 'span'], class_='historyitem')
+        data = {}
+
+        header = histpanel.find('div', class_='headernew2')
+        header = header.text.strip().split()
+        month = translator.translate(header[0]).replace('Of ', '').replace('of ', '')
+        month = datetime.strptime(month, '%B').month
+        data['Month'] = month
+
+        start_year = int(header[1].lstrip('('))
+        data['Start_Year'] = start_year
+
+        end_year = int(header[3].rstrip(')'))
+        data['End_Year'] = end_year
+
+        for item in items:
+            title = item.find('span', class_='historytitle').text.strip()
+            value = item.find(['div', 'span'], class_='historicaltemp')
+            value = float(value.text.strip().split('\xa0')[0])
+
+            if 'Μεση θερμοκρασία' in title:
+                data['Mean_Temp'] = value
+
+            elif 'Μέση μέγιστη' in title:
+                data['Mean_High_Temp'] = value
+
+            elif 'Μέση ελάχιστη' in title:
+                data['Mean_Low_Temp'] = value
+
+            elif 'Υψηλότερη μέγιστη θερμοκρασία' in title:
+                data['Max_High_Temp'] = value
+
+            elif 'Χαμηλότερη ελάχιστη θερμοκρασία' in title:
+                data['Min_Low_Temp'] = value
+
+            elif 'Μέση βροχόπτωση' in title:
+                data['Mean_Rainfall'] = value
+
+            elif 'Υψηλότερη ημερήσια βροχόπτωση' in title:
+                data['Max_Daily_Rainfall'] = value
+
+        csv_data.append(data)
+
+    with open(name, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=['Month', 'Start_Year', 'End_Year', 'Mean_Temp', 'Mean_High_Temp',
+                                                  'Mean_Low_Temp', 'Max_High_Temp', 'Min_Low_Temp',
+                                                  'Mean_Rainfall', 'Max_Daily_Rainfall'])
+        writer.writeheader()
+        writer.writerows(csv_data)
 
 def brief(content, name):
     pass
@@ -139,20 +192,29 @@ def detailed(content, name):
         forecast_date = perhour.find_previous('td', class_='forecastDate')
         flleft = forecast_date.find('div', class_='flleft')
         dayNumbercf = flleft.find('span', class_='dayNumbercf')
-        monthNumbercf = dayNumbercf.find('span', class_='monthNumbercf')
-        day = dayNumbercf.contents[0]
-        month = monthNumbercf.contents[0]
-        month = translator.translate(month).replace('Of ', '').replace('of ', '')
-        month = datetime.strptime(month, '%B').month
+        monthNumbercf = flleft.find('span', class_='monthNumbercf')
+
+        if dayNumbercf:
+            day = dayNumbercf.contents[0]
+            month = monthNumbercf.contents[0]
+            month = translator.translate(month).replace('Of ', '').replace('of ', '')
+            month = datetime.strptime(month, '%B').month
+    
+        else:
+            whole_date = monthNumbercf.contents[0]
+            day, month, _ = whole_date.strip().split('/')
+        
         forecast = f"{day:0>2}/{month:0>2}"
         data['Forecast'] = forecast
 
-        span = dayNumbercf.find('span', class_='pull-right forecastright')
-        sunrise = span.contents[0].split('-')[0].strip().split()[1]
+        span = flleft.find(['div', 'span'], class_='pull-right forecastright')
+        text = span.get_text(strip=True)
+        cycles = text.split('-')
+        sunrise = cycles[0].strip().split()[-1]
         sunrise = datetime.strptime(sunrise, '%H:%M').time()
         data['Sunrise'] = sunrise
 
-        sunset = span.contents[0].split('-')[1].strip().split()[1]
+        sunset = cycles[1].strip().split()[-1]
         sunset = datetime.strptime(sunset, '%H:%M').time()
         data['Sunset'] = sunset
 
@@ -180,7 +242,7 @@ def detailed(content, name):
         data['Wind_Direction'] = wind_dir
 
         sky = perhour.find('td', class_='phenomeno-name')
-        sky = sky.text.strip() if sky else 'N/A'
+        sky = sky.find(text=True, recursive=False).strip() if sky else 'N/A'
         sky = phenomena.get(sky, 'N/A')
         data['Sky'] = sky
 
@@ -197,8 +259,8 @@ def main():
     out_path = "static"
 
     prefix_to_func = {
-        "C": current,
-        #"H": historical,
+        #"C": current,
+        "H": historical,
         #"B": brief,
         #"D": detailed
     }
@@ -209,5 +271,5 @@ def main():
             for prefix, func in prefix_to_func.items():
                 name = os.path.join(out_path, f"{prefix}-{filename}.csv")
                 func(content=html, name=name)
-                #break
-            #break
+                break
+            break
