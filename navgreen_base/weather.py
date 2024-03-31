@@ -1,8 +1,18 @@
 import os
+import time
 import csv
 from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from deep_translator import GoogleTranslator
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s:%(lineno)d:%(levelname)s:%(name)s:%(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 translator = GoogleTranslator(source='auto', target='en')
 
@@ -37,11 +47,13 @@ comments = {
     "ΠΟΛΥ ΥΨΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 2
 }
 
-def current(content, name):
-    soup = BeautifulSoup(content, 'html.parser')
-    live_panels = soup.find_all('div', class_='livepanel')
-    sunblockheader = soup.find('div', class_='sunblockheader')
+def current(html):
+    fieldnames=['Station', 'Date', 'Time', 'Sunrise', 'Sunset', 'Daylight', 'Temperature', 'Humidity', 'Pressure',
+                'Wind_Speed', 'Beaufort', 'Wind_Direction', 'High_Temp', 'Low_Temp', 'Rainfall', 'Peak_Gust']
     csv_data = []
+
+    live_panels = html.find_all('div', class_='livepanel')
+    sunblockheader = html.find('div', class_='sunblockheader')
 
     for panel in live_panels:
         data = {}
@@ -114,18 +126,15 @@ def current(content, name):
 
         if time != "N/A":
             csv_data.append(data)
+    
+    return fieldnames, csv_data
 
-    with open(name, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['Station', 'Date', 'Time', 'Sunrise', 'Sunset', 'Daylight',
-                                                  'Temperature', 'Humidity', 'Pressure', 'Wind_Speed', 'Beaufort',
-                                                  'Wind_Direction', 'High_Temp', 'Low_Temp', 'Rainfall', 'Peak_Gust'])
-        writer.writeheader()
-        writer.writerows(csv_data)
-
-def historical(content, name):
-    soup = BeautifulSoup(content, 'html.parser')
-    histpanels = soup.find_all('div', class_='historicalpanel')
+def historical(html):
+    fieldnames=['Month', 'Start_Year', 'End_Year', 'Mean_Temp', 'Mean_High_Temp', 'Mean_Low_Temp',
+                'Max_High_Temp', 'Min_Low_Temp', 'Mean_Rainfall', 'Max_Daily_Rainfall']
     csv_data = []
+    
+    histpanels = html.find_all('div', class_='historicalpanel')
 
     for histpanel in histpanels:
         items = histpanel.find_all(['div', 'span'], class_='historyitem')
@@ -170,19 +179,15 @@ def historical(content, name):
                 data['Max_Daily_Rainfall'] = value
 
         csv_data.append(data)
+    
+    return fieldnames, csv_data
 
-    with open(name, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['Month', 'Start_Year', 'End_Year', 'Mean_Temp', 'Mean_High_Temp',
-                                                  'Mean_Low_Temp', 'Max_High_Temp', 'Min_Low_Temp',
-                                                  'Mean_Rainfall', 'Max_Daily_Rainfall'])
-        writer.writeheader()
-        writer.writerows(csv_data)
-
-def brief(content, name):
-    soup = BeautifulSoup(content, 'html.parser')
-    sunblockheader = soup.find('div', class_='sunblockheader')
-    dayblocks = soup.find_all('div', class_='dayblockinside')
+def brief(html):
+    fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'High_Temp', 'Low_Temp', 'Info_Temp']
     csv_data = []
+    
+    sunblockheader = html.find('div', class_='sunblockheader')
+    dayblocks = html.find_all('div', class_='dayblockinside')
 
     for dayblock in dayblocks:
         data = {}
@@ -226,17 +231,15 @@ def brief(content, name):
 
         csv_data.append(data)
 
-    with open(name, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset',
-                                                  'High_Temp', 'Low_Temp', 'Info_Temp'])
-        writer.writeheader()
-        writer.writerows(csv_data)
+    return fieldnames, csv_data
 
-def detailed(content, name):
-    soup = BeautifulSoup(content, 'html.parser')
-    sunblockheader = soup.find('div', class_='sunblockheader')
-    perhours = soup.find_all('tr', class_='perhour rowmargin')
+def detailed(html):
+    fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'Time', 'Temperature', 
+                'Humidity', 'Wind_Speed', 'Beaufort', 'Wind_Direction', 'Sky']
     csv_data = []
+
+    sunblockheader = html.find('div', class_='sunblockheader')
+    perhours = html.find_all('tr', class_='perhour rowmargin')
 
     for perhour in perhours:
         data = {}
@@ -306,12 +309,14 @@ def detailed(content, name):
         data['Sky'] = sky
 
         csv_data.append(data)
+    
+    return fieldnames, csv_data
 
-    with open(name, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'Time', 'Temperature', 
-                                                  'Humidity', 'Wind_Speed', 'Beaufort', 'Wind_Direction', 'Sky'])
+def write_csv(filename, fieldnames, data):
+    with open(filename, mode='w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames)
         writer.writeheader()
-        writer.writerows(csv_data)
+        writer.writerows(data)
 
 def main():
     in_path = "meteo"
@@ -324,9 +329,19 @@ def main():
         "D": detailed
     }
 
-    for filename in os.listdir(in_path):
-        with open(os.path.join(in_path, filename), "r", encoding="utf-8") as file:
+    def process(html_name):
+        with open(os.path.join(in_path, html_name), "r", encoding="utf-8") as file:
             html = file.read()
+            soup = BeautifulSoup(html, 'html.parser')
             for prefix, func in prefix_to_func.items():
-                name = os.path.join(out_path, f"{prefix}-{filename}.csv")
-                func(content=html, name=name)
+                csv_name = os.path.join(out_path, f"{prefix}-{html_name}.csv")
+                fieldnames, data = func(html=soup)
+                write_csv(csv_name, fieldnames, data)
+
+    start_time = time.time()
+
+    with ThreadPoolExecutor() as executor:
+        executor.map(process, os.listdir(in_path))
+
+    end_time = time.time()
+    logger.info("Total time: {} seconds".format(end_time - start_time))
