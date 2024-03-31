@@ -69,8 +69,8 @@ class MtanGruRegr(nn.Module):
         self.embed_time = embed_time
         self.nhidden = nhidden
         self.query = query
-        # self.att = MultiTimeAttention(2 * input_dim, nhidden, embed_time, num_heads)
-        self.att = MultiTimeAttention(input_dim, nhidden, embed_time, num_heads)
+        self.att = MultiTimeAttention(2 * input_dim, nhidden, embed_time, num_heads)
+        # self.att = MultiTimeAttention(input_dim, nhidden, embed_time, num_heads)
         self.classifier = nn.Sequential(
             nn.Linear(nhidden, 300),
             nn.ReLU(),
@@ -91,6 +91,8 @@ class MtanGruRegr(nn.Module):
 
     def forward(self, x, time_steps, mask):
         # x is: [batch_size, sequence_length, input_size]
+        x = torch.cat((x, mask), 2)
+        mask = torch.cat((mask, mask), 2)
         time_steps = time_steps.cpu()
 
         key = self.learn_time_embedding(time_steps).to(self.device)
