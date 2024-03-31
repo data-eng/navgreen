@@ -73,7 +73,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, experiment_id, criter
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch {epoch} | Training Loss: {average_loss:.4f}, Validation Loss: {val_loss:.4f}, '
+        print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
               f'Time : {(time.time() - start_time)/60:.2f} minutes')
 
         # Check for early stopping
@@ -116,12 +116,19 @@ def main_loop():
 
     grp = "30T"
 
-    df_path = "data/DATA_FROM_PLC.csv"
-    (df, df_hp, df_pvt), mean_stds = load_df(df_path=df_path, hp_cols=hp_cols, pvt_cols=pvt_cols,
+    df_path_train = "data/training_set_before_conv.csv"
+    (df_train, df_hp_train, df_pvt_train), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
                                              parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
-    df_hp.to_csv("hp_df.csv")
 
-    train_df = pd.read_csv("hp_df.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    df_path_test = "data/test_set_before_conv.csv"
+    (df_test, df_hp_test, df_pvt_test), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols,
+                                                    parse_dates=["Date&time"], normalize=True, grp=grp,
+                                                    hist_data=True, stats=mean_stds)
+    df_hp_train.to_csv("hp_df_train.csv")
+    df_hp_test.to_csv("hp_df_test.csv")
+
+    train_df = pd.read_csv("hp_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    test_df = pd.read_csv("hp_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     X_hp_cols = ["BTES_TANK", "DHW_BUFFER"]
     y_hp_cols = ["POWER_HP", "Q_CON_HEAT"]
@@ -157,3 +164,15 @@ def main_loop():
                                             checkpoint_pth=None, experiment_id=experiment_id, criterion=criterion)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
+
+    # Create a dataset and dataloader
+    testing_dataset = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
+                                         X_cols=X_hp_cols, y_cols=y_hp_cols)
+
+    test_loader = DataLoader(testing_dataset, batch_size=batch_size, shuffle=True)
+    print("Test dataloader loaded")
+
+    # Test model's performance on unseen data
+    testing_loss = evaluate(model, test_loader, criterion)
+
+    print(f'Testing Loss : {testing_loss:.6f}')
