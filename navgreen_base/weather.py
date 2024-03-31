@@ -42,13 +42,13 @@ mappings = {
     "ΥΨΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 1,
     "ΠΟΛΥ ΥΨΗΛΕΣ ΘΕΡΜΟΚΡΑΣΙΕΣ ΓΙΑ ΤΗΝ ΕΠΟΧΗ": 2,
 
-    'Μεση θερμοκρασία:': 'Mean_Temp',
-    'Μέση μέγιστη:': 'Mean_High_Temp',
-    'Μέση ελάχιστη:': 'Mean_Low_Temp',
-    'Υψηλότερη μέγιστη θερμοκρασία:': 'Max_High_Temp',
-    'Χαμηλότερη ελάχιστη θερμοκρασία:': 'Min_Low_Temp',
-    'Μέση βροχόπτωση:': 'Mean_Rainfall',
-    'Υψηλότερη ημερήσια βροχόπτωση:': 'Max_Daily_Rainfall'
+    'Μεση θερμοκρασία:': 'MEAN_TEMP',
+    'Μέση μέγιστη:': 'MEAN_HIGH_TEMP',
+    'Μέση ελάχιστη:': 'MEAN_LOW_TEMP',
+    'Υψηλότερη μέγιστη θερμοκρασία:': 'MAX_HIGH_TEMP',
+    'Χαμηλότερη ελάχιστη θερμοκρασία:': 'MIN_LOW_TEMP',
+    'Μέση βροχόπτωση:': 'MEAN_RAINFALL',
+    'Υψηλότερη ημερήσια βροχόπτωση:': 'MAX_DAILY_RAINFALL'
 }
 
 def erase(text, lst):
@@ -80,8 +80,8 @@ def current(html):
     :param html: BeautifulSoup object
     :return: tuple
     """
-    fieldnames=['Station', 'Date', 'Time', 'Sunrise', 'Sunset', 'Daylight', 'Temperature', 'Humidity', 'Pressure',
-                'Wind_Speed', 'Beaufort', 'Wind_Direction', 'High_Temp', 'Low_Temp', 'Rainfall', 'Peak_Gust']
+    fieldnames=['STATION', 'DATE', 'TIME', 'SUNRISE', 'SUNSET', 'DAYLIGHT', 'TEMPERATURE', 'HUMIDITY', 'PRESSURE',
+                'WIND_SPEED', 'BEAUFORT', 'WIND_DIRECTION', 'HIGH_TEMP', 'LOW_TEMP', 'RAINFALL', 'PEAK_GUST']
     csv_data = []
 
     live_panels = html.find_all('div', class_='livepanel')
@@ -102,57 +102,57 @@ def current(html):
         dailydata = panel.find_all('div', class_='dailydata')
 
         station = station.split('stations')[1]
-        data['Station'] = station
+        data['STATION'] = station
 
         date = sunblockheader.text.split()[1:3]
         day, month = date[0], date[1]
-        data['Date'] = get_date(day, month)
+        data['DATE'] = get_date(day, month)
 
         time = datetime.strptime(livetime.text.strip(), '%H:%M').time() if livetime else 'N/A'
-        data['Time'] = time
+        data['TIME'] = time
 
         sunrise = sunblockheader.text.split()[3:4][0]
-        sunrise = datetime.strptime(sunrise, '%H:%M').time() #if sunrise else 'N/A'
-        data['Sunrise'] = sunrise
+        sunrise = datetime.strptime(sunrise, '%H:%M').time() if sunrise else 'N/A'
+        data['SUNRISE'] = sunrise
 
         sunset = sunblockheader.text.split()[4:5][0]
-        sunset = datetime.strptime(sunset, '%H:%M').time() #if sunset else 'N/A'
-        data['Sunset'] = sunset
+        sunset = datetime.strptime(sunset, '%H:%M').time() if sunset else 'N/A'
+        data['SUNSET'] = sunset
 
         hours = int(sunblockheader.text.split()[8])
         minutes = int(sunblockheader.text.split()[10]) 
         daylight = (hours * 60) + minutes
-        data['Daylight'] = daylight
+        data['DAYLIGHT'] = daylight
 
         temp = newtemp.text.split('°')[0] if newtemp else 'N/A'
-        data['Temperature'] = temp
+        data['TEMPERATURE'] = temp
 
         humidity = ygrasia.text.split(':')[1].split('%')[0] if ygrasia else 'N/A'
-        data['Humidity'] = humidity
+        data['HUMIDITY'] = humidity
 
         pressure = piesi.text.split(':')[1].split()[0] if piesi else 'N/A'
-        data['Pressure'] = pressure
+        data['PRESSURE'] = pressure
 
         wind_speed = windnr[0].text.split()[0] if windnr else 'N/A'
-        data['Wind_Speed'] = wind_speed
+        data['WIND_SPEED'] = wind_speed
 
         beaufort = windnr[1].text.split()[0] if windnr else 'N/A'
-        data['Beaufort'] = beaufort
+        data['BEAUFORT'] = beaufort
 
         wind_dir = windtxt2.text.strip() if windtxt2 else 'N/A'
-        data['Wind_Direction'] = mappings.get(wind_dir, 'N/A')
+        data['WIND_DIRECTION'] = mappings.get(wind_dir, 'N/A')
 
         high_temp = hight.text.split('°')[0] if hight else 'N/A'
-        data['High_Temp'] = high_temp
+        data['HIGH_TEMP'] = high_temp
 
         low_temp = lowt.text.split('°')[0] if lowt else 'N/A'
-        data['Low_Temp'] = low_temp
+        data['LOW_TEMP'] = low_temp
 
         rainfall = dailydata[2].text.split()[2] if len(dailydata) > 0 else 'N/A'
-        data['Rainfall'] = rainfall
+        data['RAINFALL'] = rainfall
 
         peak_gust = dailydata[3].text.split()[3].replace('-', 'N/A') if dailydata else 'N/A'
-        data['Peak_Gust'] = peak_gust
+        data['PEAK_GUST'] = peak_gust
 
         if time != "N/A":
             csv_data.append(data)
@@ -165,8 +165,8 @@ def historical(html):
     :param html: BeautifulSoup object
     :return: tuple
     """
-    fieldnames=['Month', 'Start_Year', 'End_Year', 'Mean_Temp', 'Mean_High_Temp', 'Mean_Low_Temp',
-                'Max_High_Temp', 'Min_Low_Temp', 'Mean_Rainfall', 'Max_Daily_Rainfall']
+    fieldnames=['MONTH', 'START_YEAR', 'END_YEAR', 'MEAN_TEMP', 'MEAN_HIGH_TEMP', 'MEAN_LOW_TEMP',
+                'MAX_HIGH_TEMP', 'MIN_LOW_TEMP', 'MEAN_RAINFALL', 'MAX_DAILY_RAINFALL']
     csv_data = []
     
     histpanels = html.find_all('div', class_='historicalpanel')
@@ -180,13 +180,13 @@ def historical(html):
         header = headernew2.text.strip().split()
         month = erase(text=translator.translate(header[0]), lst=['Of ', 'of '])
         month = datetime.strptime(month, '%B').month
-        data['Month'] = month
+        data['MONTH'] = month
 
         start_year = header[1].lstrip('(')
-        data['Start_Year'] = start_year
+        data['START_YEAR'] = start_year
 
         end_year = header[3].rstrip(')')
-        data['End_Year'] = end_year
+        data['END_YEAR'] = end_year
 
         for item in items:
             title = item.find('span', class_='historytitle').text.strip()
@@ -203,7 +203,7 @@ def brief(html):
     :param html: BeautifulSoup object
     :return: tuple
     """
-    fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'High_Temp', 'Low_Temp', 'Info_Temp']
+    fieldnames=['DATE', 'FORECAST', 'SUNRISE', 'SUNSET', 'HIGH_TEMP', 'LOW_TEMP', 'INFO_TEMP']
     csv_data = []
     
     sunblockheader = html.find('div', class_='sunblockheader')
@@ -223,27 +223,27 @@ def brief(html):
 
         date = sunblockheader.text.split()[1:3]
         day, month = date[0], date[1]
-        data['Date'] = get_date(day, month)
+        data['DATE'] = get_date(day, month)
 
         day, month = datenumber_calendar.text.strip(), month_calendar.text.strip()
-        data['Forecast'] = get_date(day, month)
+        data['FORECAST'] = get_date(day, month)
 
         info_temp = mappings.get(infotemp.text.strip(), 'N/A')
-        data['Info_Temp'] = info_temp
+        data['INFO_TEMP'] = info_temp
 
         sunrise = sunriseSet_calendar.text.split()[1:2]
         sunrise = datetime.strptime(sunrise[0], '%H:%M').time()
-        data['Sunrise'] = sunrise
+        data['SUNRISE'] = sunrise
 
         sunset = sunriseSet_calendar.text.split()[4:5]
         sunset = datetime.strptime(sunset[0], '%H:%M').time()
-        data['Sunset'] = sunset
+        data['SUNSET'] = sunset
 
         high_temp = hightemp.text.split()[0]
-        data['High_Temp'] = high_temp
+        data['HIGH_TEMP'] = high_temp
 
         low_temp = lowtemp.text.split()[0]
-        data['Low_Temp'] = low_temp
+        data['LOW_TEMP'] = low_temp
 
         csv_data.append(data)
 
@@ -255,8 +255,8 @@ def detailed(html):
     :param html: BeautifulSoup object
     :return: tuple
     """    
-    fieldnames=['Date', 'Forecast', 'Sunrise', 'Sunset', 'Time', 'Temperature', 
-                'Humidity', 'Wind_Speed', 'Beaufort', 'Wind_Direction', 'Sky']
+    fieldnames=['DATE', 'FORECAST', 'SUNRISE', 'SUNSET', 'TIME', 'TEMPERATURE',
+                'HUMIDITY', 'WIND_SPEED', 'BEAUFORT', 'WIND_DIRECTION', 'SKY']
     csv_data = []
 
     sunblockheader = html.find('div', class_='sunblockheader')
@@ -267,7 +267,7 @@ def detailed(html):
 
         date = sunblockheader.text.split()[1:3]
         day, month = date[0], date[1]
-        data['Date'] = get_date(day, month)
+        data['DATE'] = get_date(day, month)
 
         forecast_date = perhour.find_previous('td', class_='forecastDate')
         flleft = forecast_date.find('div', class_='flleft')
@@ -288,41 +288,41 @@ def detailed(html):
             day, month, _ = whole_date.strip().split('/')
             forecast = f"{day:0>2}/{month:0>2}"
 
-        data['Forecast'] = forecast
+        data['FORECAST'] = forecast
 
         text = span.get_text(strip=True)
         cycles = text.split('-')
         sunrise = cycles[0].strip().split()[-1]
         sunrise = datetime.strptime(sunrise, '%H:%M').time()
-        data['Sunrise'] = sunrise
+        data['SUNRISE'] = sunrise
 
         sunset = cycles[1].strip().split()[-1]
         sunset = datetime.strptime(sunset, '%H:%M').time()
-        data['Sunset'] = sunset
+        data['SUNSET'] = sunset
 
         time = datetime.strptime(fulltime.text.strip(), '%H:%M').time() if fulltime else 'N/A'
-        data['Time'] = time
+        data['TIME'] = time
 
         temp = temperature.text.split('°')[0] if temperature else 'N/A'
-        data['Temperature'] = temp
+        data['TEMPERATURE'] = temp
 
         humidity = perhour.find('td', class_='humidity')
         humidity = humidity.text.strip().split()[0].strip().split('%')[0] if humidity else 'N/A'
-        data['Humidity'] = humidity
+        data['HUMIDITY'] = humidity
 
         wind_speed = anemosfull.text.split()[3] if anemosfull else 'N/A'
-        data['Wind_Speed'] = wind_speed
+        data['WIND_SPEED'] = wind_speed
 
         beaufort = anemosfull.text.split()[0] if anemosfull else 'N/A'
-        data['Beaufort'] = beaufort
+        data['BEAUFORT'] = beaufort
 
         wind_dir = anemosfull.text.split()[2] if anemosfull else 'N/A'
         wind_dir = mappings.get(wind_dir, 'N/A')
-        data['Wind_Direction'] = wind_dir
+        data['WIND_DIRECTION'] = wind_dir
 
         sky = phenomeno_name.find(text=True, recursive=False).strip() if phenomeno_name else 'N/A'
         sky = mappings.get(sky, 'N/A')
-        data['Sky'] = sky
+        data['SKY'] = sky
 
         csv_data.append(data)
     
