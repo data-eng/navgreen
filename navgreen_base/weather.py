@@ -2,7 +2,6 @@ import os
 import time
 import csv
 from bs4 import BeautifulSoup
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from deep_translator import GoogleTranslator
 import logging
@@ -354,7 +353,9 @@ def main():
         "D": detailed
     }
 
-    def process(html_name):
+    start_time = time.time()
+
+    for html_name in os.listdir(in_path):
         with open(os.path.join(in_path, html_name), "r", encoding="utf-8") as file:
             html = file.read()
             soup = BeautifulSoup(html, 'html.parser')
@@ -362,11 +363,6 @@ def main():
                 csv_name = os.path.join(out_path, f"{prefix}-{html_name}.csv")
                 fieldnames, data = func(html=soup)
                 write_csv(csv_name, fieldnames, data)
-
-    start_time = time.time()
-
-    with ThreadPoolExecutor() as executor:
-        executor.map(process, os.listdir(in_path))
 
     end_time = time.time()
     logger.info("Total time: {} seconds".format(end_time - start_time))
