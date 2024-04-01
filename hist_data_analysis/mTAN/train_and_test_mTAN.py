@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from random import SystemRandom
 from .model import MtanGruRegr
 
 from .data_loader import load_df, TimeSeriesDataset
