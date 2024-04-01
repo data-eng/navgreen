@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -21,21 +22,48 @@ torch.cuda.manual_seed(1505)
 hp_cols = ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"]
 pvt_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"]
 
-def evaluate(model, dataloader, criterion):
+
+def evaluate(model, dataloader, criterion, plot=False, pred_values=None):
     model.eval()
     total_loss = 0
-    for (X, masks_X, observed_tp), y  in dataloader:
+    true_values = []
+    predicted_values = []
+    for (X, masks_X, observed_tp), y in dataloader:
         X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
             y_ = y[:, -1, :]
             total_loss += criterion(out, y_)
+            true_values.append(y_.cpu().numpy())
+            predicted_values.append(out.cpu().numpy())
+
+    true_values = np.concatenate(true_values, axis=0)
+    predicted_values = np.concatenate(predicted_values, axis=0)
+
+    if plot:
+        assert pred_values is not None
+
+        plt.figure(figsize=(10, 6))
+        plt.subplot(1, 2, 1)
+        plt.scatter(true_values[:, 0], predicted_values[:, 0], color='lightblue')
+        plt.xlabel("True Value")
+        plt.ylabel("Predicted Value")
+        plt.title(pred_values[0])
+
+        plt.subplot(1, 2, 2)
+        plt.scatter(true_values[:, 1], predicted_values[:, 1], color='lightcoral')
+        plt.xlabel("True Value")
+        plt.ylabel("Predicted Value")
+        plt.title(pred_values[1])
+
+        plt.tight_layout()
+        plt.show()
 
     return total_loss / len(dataloader)
 
 
-def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate = 0.01, epochs = 5, patience=2):
+def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate = 0.01, epochs = 5, patience=3):
 
     # Early stopping variables
     best_val_loss = float('inf')
@@ -178,7 +206,7 @@ def main_loop():
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
     # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader, criterion)
+    testing_loss = evaluate(trained_model, test_loader, criterion, plot=True, pred_values=y_cols)
 
     print(f'Testing Loss (MSE) : {testing_loss:.6f}')
 
@@ -235,6 +263,6 @@ def main_loop():
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
     # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader, criterion)
+    testing_loss = evaluate(trained_model, test_loader, criterion, plot=True, pred_values=y_cols)
 
     print(f'Testing Loss (MSE) : {testing_loss:.6f}')
