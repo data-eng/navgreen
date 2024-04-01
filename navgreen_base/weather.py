@@ -1,9 +1,9 @@
 import os
 import time
 import csv
+import dateparser
 from bs4 import BeautifulSoup
 from datetime import datetime
-from deep_translator import GoogleTranslator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,8 +12,6 @@ formatter = logging.Formatter('%(asctime)s:%(lineno)d:%(levelname)s:%(name)s:%(m
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
-
-translator = GoogleTranslator(source='auto', target='en')
 
 mappings = {
     "Άπνοια": 0,
@@ -50,27 +48,15 @@ mappings = {
     'Υψηλότερη ημερήσια βροχόπτωση:': 'MAX_DAILY_RAINFALL'
 }
 
-def erase(text, lst):
+def get_date(name, format='%d/%m', lang='el'):
     """
-    Erases occurrences in a string specified within some list.
-    :param text: input str
-    :param lst: list of values to erase
-    :return: output str
+    Gets the date in the format DD/MM from the provided date string in the specified language.
+    :param name: date string
+    :param lang: language code
+    :return: numerical date string
     """
-    for elem in lst:
-        text = text.replace(elem, '')
-    return text
-
-def get_date(day, month_el):
-    """
-    Gets the date in the format DD/MM from the provided day and month.
-    :param day: day value
-    :param month_el: month name in greek
-    :return: date string
-    """
-    month_en = erase(text=translator.translate(month_el), lst=['Of ', 'of '])
-    month = datetime.strptime(month_en, '%B').month
-    date = f"{day:0>2}/{month:0>2}"
+    date = dateparser.parse(name, languages=[lang])
+    date = date.strftime(format)
     return date
 
 def current(html):
@@ -104,8 +90,7 @@ def current(html):
         data['STATION'] = station
 
         date = sunblockheader.text.split()[1:3]
-        day, month = date[0], date[1]
-        data['DATE'] = get_date(day, month)
+        data['DATE'] = get_date(name=" ".join(date))
 
         time = datetime.strptime(livetime.text.strip(), '%H:%M').time() if livetime else 'N/A'
         data['TIME'] = time
@@ -172,14 +157,11 @@ def historical(html):
 
     for histpanel in histpanels:
         items = histpanel.find_all(['div', 'span'], class_='historyitem')
+        headernew2 = histpanel.find('div', class_='headernew2')
         data = {}
 
-        headernew2 = histpanel.find('div', class_='headernew2')
-
         header = headernew2.text.strip().split()
-        month = erase(text=translator.translate(header[0]), lst=['Of ', 'of '])
-        month = datetime.strptime(month, '%B').month
-        data['MONTH'] = month
+        data['MONTH'] = get_date(name=header[0], format='%m')
 
         start_year = header[1].lstrip('(')
         data['START_YEAR'] = start_year
@@ -221,11 +203,10 @@ def brief(html):
         lowtemp = minmax.find('div', class_='lowtemp')
 
         date = sunblockheader.text.split()[1:3]
-        day, month = date[0], date[1]
-        data['DATE'] = get_date(day, month)
+        data['DATE'] = get_date(name=" ".join(date))
 
         day, month = datenumber_calendar.text.strip(), month_calendar.text.strip()
-        data['FORECAST'] = get_date(day, month)
+        data['FORECAST'] = get_date(name=f"{day} {month}")
 
         info_temp = mappings.get(infotemp.text.strip(), 'N/A')
         data['INFO_TEMP'] = info_temp
@@ -265,8 +246,7 @@ def detailed(html):
         data = {}
 
         date = sunblockheader.text.split()[1:3]
-        day, month = date[0], date[1]
-        data['DATE'] = get_date(day, month)
+        data['DATE'] = get_date(name=" ".join(date))
 
         forecast_date = perhour.find_previous('td', class_='forecastDate')
         flleft = forecast_date.find('div', class_='flleft')
@@ -281,7 +261,7 @@ def detailed(html):
         if dayNumbercf:
             day = dayNumbercf.contents[0]
             month = monthNumbercf.contents[0]
-            forecast = get_date(day, month)
+            forecast = get_date(name=f"{day} {month}")
         else:
             whole_date = monthNumbercf.contents[0]
             day, month, _ = whole_date.strip().split('/')
