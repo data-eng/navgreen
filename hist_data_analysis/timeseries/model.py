@@ -62,7 +62,7 @@ class MultiTimeAttention(nn.Module):
 
 class MtanGruRegr(nn.Module):
 
-    def __init__(self, input_dim, query, device, nhidden, embed_time, num_heads, ):
+    def __init__(self, input_dim, query, device, nhidden, embed_time, num_heads ):
         super(MtanGruRegr, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device

@@ -102,6 +102,9 @@ class TimeSeriesDataset(Dataset):
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
+        for col in y_cols:
+            print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
+
     def __len__(self):
         return self.X.shape[0] - self.sequence_length + 1
 
