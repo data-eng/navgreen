@@ -73,15 +73,16 @@ def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
 
     return df
 
-def prepare(df, system):
+def prepare(df, phase, system):
     """
     Prepares the dataframe for training by filtering columns and saving to CSV.
     :param df: dataframe
+    :param phase: str model phase (train or test)
     :param system: str name of the system (HP or PV)
     :return: dataframe
     """
     params = data[system]
-    name = "df_" + system + ".csv"
+    name = "df_" + phase + "_" + system + ".csv"
 
     for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 

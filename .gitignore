@@ -9,3 +9,5 @@ figures/
 exports.sh
 venv/
 meteo/
+
+models/
