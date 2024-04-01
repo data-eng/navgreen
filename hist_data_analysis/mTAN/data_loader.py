@@ -59,7 +59,7 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
     if normalize:
         for c in [c for c in df.columns if c != "DATETIME"]:
             series = df[c]
-            logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+            # logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
             if stats is None: mean_stds[c] = (series.mean(), series.std())
             df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
             # assert round(df[c].mean(), 1) == 0.0 and round(df[c].std(), 1) == 1.0
@@ -84,7 +84,7 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
 
 
 class TimeSeriesDataset(Dataset):
-    def __init__(self, dataframe, sequence_length, X_cols, y_cols):
+    def __init__(self, dataframe, sequence_length, X_cols, y_cols, final_train=False):
         self.sequence_length = sequence_length
 
         df = dataframe
@@ -102,8 +102,9 @@ class TimeSeriesDataset(Dataset):
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
-        for col in y_cols:
-            print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
+        if final_train:
+            for col in y_cols:
+                print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
 
     def __len__(self):
         return self.X.shape[0] - self.sequence_length + 1

@@ -7,7 +7,6 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import MtanGruRegr
-
 from .data_loader import load_df, TimeSeriesDataset
 
 
@@ -26,7 +25,7 @@ def evaluate(model, dataloader, criterion):
     model.eval()
     total_loss = 0
     for (X, masks_X, observed_tp), y  in dataloader:
-        X, y = X.to(device), y.to(device)
+        X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
@@ -57,7 +56,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
         start_time = time.time()
         for (X, masks_X, observed_tp), y in train_loader:
-            X, y = X.to(device), y.to(device)
+            X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
             out = model(X, observed_tp, masks_X)
             y_ = y[:, -1, :]
             loss = criterion(out, y_)
@@ -111,8 +110,8 @@ def main_loop():
     sequence_length = 10
     batch_size = 32
     validation_set_percentage = 0.2
-    '''
-    grp = "30T"
+
+    grp = "30min"
 
     df_path_train = "data/training_set_before_conv.csv"
     (df_train, df_hp_train, df_pvt_train), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
@@ -127,7 +126,7 @@ def main_loop():
 
     df_pvt_train.to_csv("pvt_df_train.csv")
     df_pvt_test.to_csv("pvt_df_test.csv")
-    '''
+
     print("TASK 1 | Train and evaluate on HP related prediction")
     task = "hp"
 
@@ -139,7 +138,7 @@ def main_loop():
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_cols, y_cols=y_cols)
+                                         X_cols=X_cols, y_cols=y_cols, final_train=True)
 
     # Get the total number of samples and compute size of each corresponding set
     total_samples = len(training_dataset)
@@ -196,7 +195,7 @@ def main_loop():
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_cols, y_cols=y_cols)
+                                         X_cols=X_cols, y_cols=y_cols, final_train=True)
 
     # Get the total number of samples and compute size of each corresponding set
     total_samples = len(training_dataset)
