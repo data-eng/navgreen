@@ -85,15 +85,15 @@ def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, pa
     return avg_loss, best_val_loss
 
 def main():
-    path = "data/training_set.csv"
+    path = "data/training_set_before_conv.csv"
     hp, pv = data["hp"], data["pv"]
 
     batch_size=120
-    day_dur, group_dur = 1440, 30
+    day_dur, group_dur = 1440, 120
     num_pairs = day_dur // group_dur
     func = lambda x: x.mean()
 
-    df = load(path=path, parse_dates=["DATETIME"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
+    df = load(path=path, parse_dates=["Date&time"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
     
     df_hp = prepare(df, phase="train", system="hp")
 

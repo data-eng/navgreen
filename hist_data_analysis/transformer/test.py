@@ -41,7 +41,7 @@ def test(data, criterion, model, path):
     return avg_loss
 
 def main():
-    path = "data/test_set.csv"
+    path = "data/test_set_before_conv.csv"
     hp, pv = data["hp"], data["pv"]
 
     batch_size=1
@@ -49,7 +49,7 @@ def main():
     num_pairs = day_dur // group_dur
     func = lambda x: x.mean()
 
-    df = load(path=path, parse_dates=["DATETIME"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
+    df = load(path=path, parse_dates=["Date&time"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
     
     df_hp = prepare(df, phase="test", system="hp")
     ds_test_hp = TSDataset(dataframe=df_hp, seq_len=num_pairs, X=hp["X"], y=hp["y"])

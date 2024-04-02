@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import torch
@@ -68,7 +69,12 @@ def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
     df.dropna(inplace=True)
     logger.info("No NaNs: {} rows".format(len(df)))
 
-    df = utils.normalize(df) if normalize else df
+    if os.path.exists('data/stats.json'):
+        stats = utils.load_json(filename='data/stats.json')
+    else:
+        stats = utils.get_stats(df, path='data/')
+    
+    df = utils.normalize(df, stats) if normalize else df
     df = utils.aggregate(df, grp, func=agg)
 
     return df

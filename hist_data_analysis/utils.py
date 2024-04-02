@@ -1,22 +1,70 @@
+import os
+import json
 import scipy.signal
 import pandas as pd
 import torch.optim as optim
 import torch.optim.lr_scheduler as sched
 
-def normalize(df):
+def normalize(df, stats):
     """
     Normalize and de-trend data
+
     :param df: dataframe
+    :param stats: tuple of mean and std
     :return: processed dataframe
     """
     newdf = df.copy()
     for col in df.columns:
         if col != "DATETIME":
             series = df[col]
-            series = (series - series.mean()) / series.std()
+            mean, std = stats[col]
+            series = (series - mean) / std
             series = scipy.signal.detrend(series)
             newdf[col] = series
     return newdf
+
+def get_stats(df, path='data/'):
+    """
+    Compute mean and standard deviation for each column in the dataframe.
+
+    :param df: dataframe
+    :return: dictionary
+    """
+    stats = {}
+    filename = os.path.join(path, 'stats.pkl')
+
+    for col in df.columns:
+        if col != "DATETIME":
+            series = df[col]
+            mean = series.mean()
+            std = series.std()
+            stats[col] = (mean, std)
+
+    filename = os.path.join(path, 'stats.json')
+    save_json(data=stats, filename=filename)
+
+    return stats
+
+def load_json(filename):
+    """
+    Load data from a JSON file.
+
+    :param filename: str
+    :return: dictionary
+    """
+    with open(filename, 'r') as f:
+        data = json.load(f)
+    return data
+
+def save_json(data, filename):
+    """
+    Save data to a JSON file.
+
+    :param data: dictionary
+    :param filename: str
+    """
+    with open(filename, 'w') as f:
+        json.dump(data, f)
 
 def filter(df, column, threshold):
     """
