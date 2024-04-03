@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
 import logging
@@ -32,6 +31,7 @@ data = {
 def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
     """
     Loads and preprocesses data from a CSV file.
+
     :param path: path to the CSV file
     :param parse_dates: columns to parse as dates in the dataframe
     :param normalize: normalization flag
@@ -82,6 +82,7 @@ def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
 def prepare(df, phase, system):
     """
     Prepares the dataframe for training by filtering columns and saving to CSV.
+
     :param df: dataframe
     :param phase: str model phase (train or test)
     :param system: str name of the system (HP or PV)
@@ -102,6 +103,7 @@ class TSDataset(Dataset):
     def __init__(self, dataframe, seq_len, X, y):
         """
         Initializes a time series dataset.
+
         :param dataframe: dataframe
         :param seq_len: length of the input sequence
         :param X: input features names
@@ -120,6 +122,7 @@ class TSDataset(Dataset):
     def __getitem__(self, idx):
         """
         Retrieves a sample from the dataset at the specified index.
+
         :param idx: index of the sample
         :return: tuple containing input features sequence and target variables sequence
         """
@@ -139,6 +142,7 @@ class TSDataset(Dataset):
 def split(dataset, vperc=0.2):
     """
     Splits a dataset into training and validation sets.
+
     :param dataset: dataset
     :param vperc: percentage of data to allocate for validation
     :return: tuple containing training and validation datasets

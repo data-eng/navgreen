@@ -4,7 +4,7 @@ import torch
 from torch.nn import MSELoss
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from hist_data_analysis.utils import get_optim, get_sched
+from hist_data_analysis import utils
 from .model import Transformer
 from .loader import *
 
@@ -18,11 +18,13 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def test(data, criterion, model, path):
+def test(data, labels, criterion, model, path, plot=False):
     model.load_state_dict(torch.load(path))
     model.to(device)
     batches = len(data)
     total_loss = 0.0
+    ylabels = labels["y"]
+    true_values, pred_values = [], []
 
     progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
 
@@ -34,8 +36,23 @@ def test(data, criterion, model, path):
             loss = criterion(y_pred, y)
             total_loss += loss.item()
 
-    avg_loss = total_loss / batches
+            batch_size, seq_len, features_size = y.size()
+            y = y.reshape(batch_size * seq_len, features_size)
+            y_pred = y_pred.reshape(batch_size * seq_len, features_size)
 
+            true_values.append(y.cpu().numpy())
+            pred_values.append(y_pred.cpu().numpy())
+    
+    true_values = np.concatenate(true_values)
+    pred_values = np.concatenate(pred_values)
+
+    if plot:
+        colors = ['rebeccapurple', 'brown']
+        for i, feature in enumerate(ylabels):
+            color = colors[i % len(colors)]
+            utils.visualize(true_values[:, i], pred_values[:, i], label=feature, color=color)
+
+    avg_loss = total_loss / batches
     logger.info("Evaluation complete!")
 
     return avg_loss
@@ -56,9 +73,11 @@ def main():
     dl_test_hp = DataLoader(ds_test_hp, batch_size, shuffle=False)
 
     test_loss_hp = test(data=dl_test_hp,
+                        labels=hp,
                         criterion=MSELoss(),
                         model=Transformer(in_size=len(hp["X"]), out_size=len(hp["y"])),
-                        path="models/transformer_hp.pth"
+                        path="models/transformer_hp.pth",
+                        plot=True
                         )
     logger.info(f'HP | Evaluation Loss : {test_loss_hp:.6f}\n')
 
@@ -67,8 +86,10 @@ def main():
     dl_test_pv = DataLoader(ds_test_pv, batch_size, shuffle=False)
 
     test_loss_pv = test(data=dl_test_pv,
+                        labels=pv,
                         criterion=MSELoss(),
                         model=Transformer(in_size=len(pv["X"]), out_size=len(pv["y"])),
-                        path="models/transformer_pv.pth"
+                        path="models/transformer_pv.pth",
+                        plot=True
                         )
     logger.info(f'PV | Evaluation Loss : {test_loss_pv:.6f}')

@@ -1,13 +1,33 @@
 import os
 import json
 import scipy.signal
-import pandas as pd
 import torch.optim as optim
+import matplotlib.pyplot as plt
 import torch.optim.lr_scheduler as sched
+
+def visualize(true_values, pred_values, label, color='red'):
+    """
+    Visualize true vs predicted values.
+
+    :param true_values: list
+    :param pred_values: list
+    :param label: str
+    :param color: str
+    """
+    plt.figure(figsize=(10, 6))
+    plt.scatter(true_values, pred_values, color=color)
+    plt.xlabel("True Value")
+    plt.ylabel("Predicted Value")
+    plt.title(label)
+    plt.tight_layout()
+
+    filename = f"{label.lower()}.png"
+    plt.savefig(os.path.join('static/', filename))
+    plt.close()
 
 def normalize(df, stats):
     """
-    Normalize and de-trend data
+    Normalize and de-trend data.
 
     :param df: dataframe
     :param stats: tuple of mean and std
@@ -68,7 +88,8 @@ def save_json(data, filename):
 
 def filter(df, column, threshold):
     """
-    Filter dataframe based on a single column and its threshold if the column exists
+    Filter dataframe based on a single column and its threshold if the column exists.
+
     :param df: dataframe
     :param column: column name to filter
     :param threshold: threshold value for filtering
@@ -99,11 +120,28 @@ def aggregate(df, grp="1min", func=lambda x: x):
     return df
 
 def get_optim(name, model, lr):
+    """
+    Get optimizer object based on name, model, and learning rate.
+
+    :param name: str
+    :param model: model
+    :param lr: float
+    :return: optimizer object
+    """
     optim_class = getattr(optim, name)
     optimizer = optim_class(model.parameters(), lr=lr)
     return optimizer
 
 def get_sched(name, step_size, gamma, optimizer):
+    """
+    Get scheduler object based on name, step size, gamma, and optimizer.
+
+    :param name: str
+    :param step_size: int
+    :param gamma: gamma float
+    :param optimizer: optimizer object
+    :return: scheduler object
+    """
     sched_class = getattr(sched, name)
     scheduler = sched_class(optimizer, step_size, gamma)
     return scheduler

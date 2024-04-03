@@ -4,7 +4,7 @@ import torch
 from torch.nn import MSELoss
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from hist_data_analysis.utils import get_optim, get_sched
+from hist_data_analysis import utils
 from .model import Transformer
 from .loader import *
 
@@ -25,8 +25,8 @@ def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, pa
     best_val_loss = float('inf')
     stationary = 0
 
-    optimizer = get_optim(optimizer, model, lr)
-    scheduler = get_sched(*scheduler, optimizer)
+    optimizer = utils.get_optim(optimizer, model, lr)
+    scheduler = utils.get_sched(*scheduler, optimizer)
 
     for epoch in range(epochs):
         model.train()
@@ -104,7 +104,7 @@ def main():
     dl_val_hp = DataLoader(ds_val_hp, batch_size, shuffle=False)
 
     train_loss_hp, val_loss_hp = train(data=(dl_train_hp, dl_val_hp),
-                                       epochs=2,
+                                       epochs=20,
                                        patience=3,
                                        lr=1e-4,
                                        criterion=MSELoss(),
@@ -124,7 +124,7 @@ def main():
     dl_val_pv = DataLoader(ds_val_pv, batch_size, shuffle=False)
 
     train_loss_pv, val_loss_pv = train(data=(dl_train_pv, dl_val_pv),
-                                       epochs=2,
+                                       epochs=1,
                                        patience=3,
                                        lr=1e-4,
                                        criterion=MSELoss(),
