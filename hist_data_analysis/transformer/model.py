@@ -100,7 +100,7 @@ class FeatureFuser(nn.Module):
         return x
     
 class Transformer(nn.Module):
-    def __init__(self, in_size=2, out_size=2, d_model=250, nhead=10, num_layers=1, dim_feedforward=768, dropout=0.1):
+    def __init__(self, in_size=2, out_size=2, d_model=250, nhead=8, num_layers=3, dim_feedforward=2048, dropout=0.1):
         """
         Initializes a transformer model architecture: [Positional Encoder, Feature Fuser, Transformer Encoder, Linear Decoder]
 
@@ -145,41 +145,9 @@ class Transformer(nn.Module):
         :return: output tensor after passing through the transformer model
         """
         x = x.permute(1, 0, 2)
-        logger.debug("initial x: %s", x.size())
-
         x = self.fuser(x)
-        logger.debug("fused: %s", x.size())
-
         x = self.pos_encoder(x)
-        logger.debug("pos_encoded: %s", x.size())
-
         x = self.encoder(src=x)
-        logger.debug("encoded: %s", x.size())
-
         x = self.decoder(input=x)
-        logger.debug("decoded: %s", x.size())
-
         x = x.permute(1, 0, 2)
         return x
-    
-    # initial x:  torch.Size([sequence length, batch size, feature size])
-    # fused:  torch.Size([sequence length, batch size, 1])
-    # pe: torch.Size([max_seq_len, d_model])
-    # pos: torch.Size([max_seq_len, 1])
-    # div_term: torch.Size([d_model/2])
-    # scaled_pos: torch.Size([max_seq_len, d_model/2])
-    # unsq pe: torch.Size([max_seq_len, 1, d_model])
-    # pos_encoded:  torch.Size([sequence length, batch size, d_model])
-    # encoded:  torch.Size([sequence length, batch size, d_model])
-    # decoded:  torch.Size([sequence length, batch size, feature size])
-
-    # initial x:  torch.Size([48, 120, 2])   
-    # fused:  torch.Size([48, 120, 1])
-    # pe: torch.Size([5000, 250])
-    # pos: torch.Size([5000, 1])
-    # div_term: torch.Size([125])
-    # scaled_pos: torch.Size([5000, 125])
-    # unsq pe: torch.Size([5000, 1, 250])
-    # pos_encoded:  torch.Size([48, 120, 250])
-    # encoded:  torch.Size([48, 120, 250])
-    # decoded:  torch.Size([48, 120, 1])

@@ -5,23 +5,30 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import torch.optim.lr_scheduler as sched
 
-def visualize(true_values, pred_values, label, color='red'):
+def visualize(values, labels, title, names, colors, plot_func):
     """
-    Visualize true vs predicted values.
+    Visualize multiple (x,y) data.
 
-    :param true_values: list
-    :param pred_values: list
-    :param label: str
-    :param color: str
+    :param values: list of tuples
+    :param labels: tuple
+    :param title: str
+    :param names: list of str
+    :param colors: list of str
+    :param plot_func: plotting function(e.g., plt.scatter, plt.plot)
     """
+    x_label, y_label = labels
+
     plt.figure(figsize=(10, 6))
-    plt.scatter(true_values, pred_values, color=color)
-    plt.xlabel("True Value")
-    plt.ylabel("Predicted Value")
-    plt.title(label)
+    for i, (x_values, y_values) in enumerate(values):
+        plot_func(x_values, y_values, color=colors[i], label=names[i])
+
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.title(title)
+    plt.legend(title="Parameters")
     plt.tight_layout()
 
-    filename = f"{label.lower()}.png"
+    filename = f"{title.lower().replace(' ', '_')}.png"
     plt.savefig(os.path.join('static/', filename))
     plt.close()
 
