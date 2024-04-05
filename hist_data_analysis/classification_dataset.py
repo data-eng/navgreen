@@ -27,6 +27,67 @@ def plot_metrics(df):
     plt.grid(axis='y', linestyle='--', alpha=0.7)
     plt.savefig("figures/binned_Q_PVT_hist.png", dpi=300)
 
+
+def train_test_split(data_path):
+    # Read the CSV file into a pandas DataFrame
+    df = pd.read_csv(data_path)
+
+    # Convert the datetime column to datetime type if it's not already
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+
+    init_columns = sorted(df.columns)
+
+    # Calculate the day position relative to the end of the month
+    df['days_from_end'] = df['DATETIME'].dt.days_in_month - df['DATETIME'].dt.day
+
+    # Define a function to categorize the days
+    def categorize_days(days):
+        if days == 0:
+            return 'last'
+        elif days == 1:
+            return 'penultimate'
+        elif days == 2:
+            return 'antepenultimate'
+        else:
+            return 'other'
+
+    # Categorize the days
+    df['day_category'] = df['days_from_end'].apply(lambda x: categorize_days(x))
+
+    # Split the DataFrame into three separate DataFrames based on day category
+    test_set = df[df['day_category'].isin(['last', 'penultimate', 'antepenultimate'])]
+    training_set = df[df['day_category'] == 'other']
+
+    # Print the length of each DataFrame
+    logger.info(f"Length of Test Set: {len(test_set)}")
+    logger.info(f"Length of Training Set: {len(training_set)}")
+
+    # Assert that the sum of lengths matches the length of the original DataFrame
+    assert (len(test_set) + len(training_set)) == len(df)
+
+    # Print the number of different days within each dataset
+    logger.info(f"Number of different days in Test Set: {test_set['DATETIME'].dt.day.nunique()}" )
+    logger.info(f"Number of different days in Training Set: {training_set['DATETIME'].dt.day.nunique()}")
+
+    # Print the number of unique days within each dataset
+    logger.info(f"Number of different days in Test Set: {test_set['DATETIME'].dt.date.nunique()}")
+    logger.info(f"Number of different days in Training Set: {training_set['DATETIME'].dt.date.nunique()}")
+
+    # Assert that the sum of unique days matches the one of the original DataFrame
+    assert df['DATETIME'].dt.date.nunique() == (test_set['DATETIME'].dt.date.nunique() +
+                                                training_set['DATETIME'].dt.date.nunique())
+
+    # Drop unwanted columns
+    test_set = test_set.drop(['days_from_end', 'day_category'], axis=1)
+    training_set = training_set.drop(['days_from_end', 'day_category'], axis=1)
+
+    assert (init_columns == sorted(training_set.columns)) and (init_columns == sorted(test_set.columns))
+
+    # Save each DataFrame to a separate CSV file in the specified path
+    test_set.to_csv('data/test_set_classif.csv', index=False)
+    training_set.to_csv('data/training_set_classif.csv', index=False)
+
+
 def create_data_dataframe(data_file, keep_columns, grp, aggregators):
 
     df = pd.read_csv(data_file, parse_dates=["Date&time"], low_memory=False)
@@ -104,15 +165,15 @@ def main():
     data_df = create_data_dataframe(data_file="data/DATA_FROM_PLC.csv", keep_columns=data_columns_to_keep, grp=group,
                                     aggregators=aggregators_data)
 
-    weather_df.to_csv('weather_df.csv', index=False)
-    data_df.to_csv('data_df.csv', index=False)
+    weather_df.to_csv('data/weather_df.csv', index=False)
+    data_df.to_csv('data/data_df.csv', index=False)
 
-    weather_df = pd.read_csv('weather_df.csv')
-    data_df = pd.read_csv('data_df.csv')
+    weather_df = pd.read_csv('data/weather_df.csv')
+    data_df = pd.read_csv('data/data_df.csv')
 
     # Create the combined DataFrame
     combined_df = combine_dataframes(weather_df=weather_df, data_df=data_df)
-    combined_df.to_csv('data/Q_PVT_classification_dataset.csv', index=False)
+    combined_df.to_csv('data/Q_PVT_classification_dataset.csv', index=True)
 
     # Plot some metrics
     plot_metrics(df=combined_df)
@@ -120,3 +181,5 @@ def main():
     # Show the remaining values after removing NaN rows
     combined_df.dropna(inplace=True)
     logger.info(combined_df)
+
+    train_test_split('data/Q_PVT_classification_dataset.csv')
