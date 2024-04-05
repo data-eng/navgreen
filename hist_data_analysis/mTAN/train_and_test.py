@@ -34,9 +34,8 @@ def evaluate(model, dataloader, criterion, plot=False, pred_values=None):
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
-            y_ = y[:, -1, :]
-            total_loss += criterion(out, y_)
-            true_values.append(y_.cpu().numpy())
+            total_loss += criterion(out, y)
+            true_values.append(y.cpu().numpy())
             predicted_values.append(out.cpu().numpy())
 
     true_values = np.concatenate(true_values, axis=0)
@@ -87,8 +86,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         for (X, masks_X, observed_tp), y in train_loader:
             X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
             out = model(X, observed_tp, masks_X)
-            y_ = y[:, -1, :]
-            loss = criterion(out, y_)
+            loss = criterion(out, y)
 
             optimizer.zero_grad()
             loss.backward()
@@ -132,8 +130,8 @@ def main_loop():
 
     validation_set_percentage = 0.2
 
-    epochs = 30
-    patience = 8
+    epochs = 60
+    patience = 10
 
     print("\nTASK 2 | Train and evaluate on PVT related prediction")
     task = "pvt"

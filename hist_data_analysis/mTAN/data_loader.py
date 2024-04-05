@@ -135,13 +135,13 @@ class TimeSeriesDataset(Dataset):
                 print( f"Column {col} : mean is {self.y[col].dropna().mean():.4f} and std is {self.y[col].dropna().std():.4f}")
 
     def __len__(self):
-        return self.X.shape[0] - self.sequence_length + 1
+        return self.X.shape[0] - self.sequence_length #+ 1
 
     def __getitem__(self, idx):
         start_idx = idx
         end_idx = idx + self.sequence_length
         X = self.X.iloc[start_idx:end_idx].values
-        y = self.y.iloc[start_idx:end_idx].values
+        y = self.y.iloc[end_idx].values
         time = self.time.iloc[start_idx:end_idx].values
         time = np.nan_to_num(time, nan=0)
 
