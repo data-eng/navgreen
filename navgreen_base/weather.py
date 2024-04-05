@@ -5,6 +5,8 @@ import dateparser
 from bs4 import BeautifulSoup
 from datetime import datetime
 import logging
+import re
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -47,6 +49,69 @@ mappings = {
     'Μέση βροχόπτωση:': 'MEAN_RAINFALL',
     'Υψηλότερη ημερήσια βροχόπτωση:': 'MAX_DAILY_RAINFALL'
 }
+
+
+def concatenate_dicts(list_of_dicts):
+    concatenated_dict = {}
+    for d in list_of_dicts:
+        for key, value in d.items():
+            if key in concatenated_dict:
+                raise ValueError(f'Duplicate key found: {key}')
+            else:
+                concatenated_dict[key] = value
+    return concatenated_dict
+
+def weather_parser_lp(weather_file):
+    parsed_data = {}
+    with (open(weather_file, 'r') as file):
+        for line in file:
+            match = re.match(r'^\./\d{4}-\d{2}_queries\.lp:(\w+)(?:,provider=\w+)?\s(.+?)\s(\d+)$', line)
+            if match:
+                query_type = match.group(1)
+                data_string = match.group(2)
+                unix_time = int(match.group(3))
+                data = {}
+                for entry in data_string.split(','):
+                    key, value = entry.split('=')
+                    data[key] = value
+                # Combine the data for the unique timestamps
+                if unix_time not in parsed_data:
+                    parsed_data[unix_time] = []
+
+                # 'Weather' data have a different syntax than the other, no biggie
+                if query_type == 'weather': parsed_data[unix_time].append(data)
+                else: parsed_data[unix_time].append({query_type: data['value']})
+
+    # Sort the dictionary based on keys to get sorted dates
+    parsed_data = {key: parsed_data[key] for key in sorted(parsed_data)}
+
+    final_data = {}
+    # Create a non nested dictionary with the time as a column
+    for idx, unix_timepoint in enumerate(parsed_data):
+        final_data[idx]  = concatenate_dicts(parsed_data[unix_timepoint]+[{'unix_time':unix_timepoint}])
+
+    return final_data
+
+
+def create_weather_dataframe(parsed_weather_dict, grp, aggregators):
+    df = pd.DataFrame.from_dict(parsed_weather_dict, orient='index')
+    df['DATETIME'] = pd.to_datetime(df['unix_time'] / 1e9, unit='s')
+    df.drop(["wind_deg", "wind_gust", 'unix_time'], axis="columns", inplace=True)
+    df.dropna(inplace=True)
+
+    logger.info(f"Weather df before {grp} aggregation: {len(df)} rows")
+    # After removing the NaNs, there is no need for the columns to be of 'object' type, so make them numeric again
+    numeric_columns = [c for c in df.columns if c != "DATETIME"]
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric)
+
+    # Group by grp intervals and apply different aggregations to each column
+    df = df.groupby(pd.Grouper(key='DATETIME', freq=grp)).agg(aggregators)
+
+    logger.info(f"Weather df after {grp} aggregation: {len(df)} rows")
+    # Make DATETIME a regular column and not index
+    df = df.reset_index()
+
+    return df
 
 def get_date(name, format='%d/%m', lang='el'):
     """
