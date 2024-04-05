@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from .train_and_test_mTAN import train
+from .train_and_test import train
 from .model import MtanGruRegr
 from .data_loader import load_df, TimeSeriesDataset
 
@@ -26,7 +26,6 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.info(f'Device is {device}')
 
 # Set fixed seed for reproducibility
 torch.manual_seed(1505)

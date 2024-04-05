@@ -1,4 +1,5 @@
 import time
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -129,34 +130,41 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
 def main_loop():
 
-    # Parameters:
-    num_heads = 4
-    rec_hidden = 32
-    embed_time = 128
-    dim = 2
-
-    sequence_length = 10
-    batch_size = 32
     validation_set_percentage = 0.2
-
-    grp = "30min"
-
-    df_path_train = "data/training_set_before_conv.csv"
-    (df_train, df_hp_train, df_pvt_train), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
-                                             parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
-
-    df_path_test = "data/test_set_before_conv.csv"
-    (df_test, df_hp_test, df_pvt_test), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols,
-                                                    parse_dates=["Date&time"], normalize=True, grp=grp,
-                                                    hist_data=True, stats=mean_stds)
-    df_hp_train.to_csv("hp_df_train.csv")
-    df_hp_test.to_csv("hp_df_test.csv")
-
-    df_pvt_train.to_csv("pvt_df_train.csv")
-    df_pvt_test.to_csv("pvt_df_test.csv")
 
     print("TASK 1 | Train and evaluate on HP related prediction")
     task = "hp"
+
+    with open("./best_model_params_hp.json", 'r') as file:
+        params = json.load(file)
+
+    dim = 2
+    # Parameters:
+    num_heads = params["num_heads"]
+    rec_hidden = params["rec_hidden"]
+    embed_time = params["embed_time"]
+
+    sequence_length = params["sequence_length"]
+    batch_size = params["batch_size"]
+    grp = params["grp"]
+
+    lr = params["lr"]
+    epochs = 30
+    patience = 8
+
+    print(f"Parameters : num_heads = {num_heads}, rec_hidden = {rec_hidden}, embed_time = {embed_time}, "
+          f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
+
+    df_path_train = "data/training_set_before_conv.csv"
+    (_, df_hp_train, _), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
+                                             parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
+
+    df_path_test = "data/test_set_before_conv.csv"
+    (_, df_hp_test, _), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols, parse_dates=["Date&time"],
+                                    normalize=True, grp=grp, hist_data=True, stats=mean_stds)
+
+    df_hp_train.to_csv("hp_df_train.csv")
+    df_hp_test.to_csv("hp_df_test.csv")
 
     train_df = pd.read_csv("hp_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
     test_df = pd.read_csv("hp_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
@@ -189,7 +197,8 @@ def main_loop():
     criterion = nn.MSELoss()
     # Train the model
     training_loss, validation_loss =  train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                            checkpoint_pth=None, criterion=criterion, task=task)
+                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
+                                            epochs=epochs, patience=patience)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
@@ -212,8 +221,34 @@ def main_loop():
 
 
     print("\nTASK 2 | Train and evaluate on PVT related prediction")
-    dim = 3
     task = "pvt"
+
+    with open("./best_model_params_pvt.json", 'r') as file:
+        params = json.load(file)
+
+    dim = 3
+    # Parameters:
+    num_heads = params["num_heads"]
+    rec_hidden = params["rec_hidden"]
+    embed_time = params["embed_time"]
+    sequence_length = params["sequence_length"]
+    batch_size = params["batch_size"]
+    lr = params["lr"]
+    grp = params["grp"]
+
+    print(f"Parameters : num_heads = {num_heads}, rec_hidden = {rec_hidden}, embed_time = {embed_time}, "
+          f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
+
+    df_path_train = "data/training_set_before_conv.csv"
+    (_, _, df_pvt_train), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
+                                              parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
+
+    df_path_test = "data/test_set_before_conv.csv"
+    (_, _, df_pvt_test), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols, parse_dates=["Date&time"],
+                                     normalize=True, grp=grp, hist_data=True, stats=mean_stds)
+
+    df_pvt_train.to_csv("pvt_df_train.csv")
+    df_pvt_test.to_csv("pvt_df_test.csv")
 
     train_df = pd.read_csv("pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
     test_df = pd.read_csv("pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
@@ -246,7 +281,8 @@ def main_loop():
     criterion = nn.MSELoss()
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                           checkpoint_pth=None, criterion=criterion, task=task)
+                                           checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
+                                           epochs=epochs, patience=patience)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
