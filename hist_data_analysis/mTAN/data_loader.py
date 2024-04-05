@@ -20,7 +20,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, grp=None, stats=None):
+'''def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, grp=None, stats=None):
     """
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
@@ -80,7 +80,33 @@ def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, 
     logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
 
     if stats is not None: mean_stds = None
-    return (df, df_hp, df_pvt), mean_stds
+    return (df, df_hp, df_pvt), mean_stds'''
+
+def load_df(df_path, pvt_cols, parse_dates, normalize=True, stats=None):
+    """
+    Loads the data from the historical data DataFrame
+    :return: whole dataframe, dataframe for hp, dataframe for solar
+    """
+    df = pd.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
+
+    # Drop unneeded columns
+    for c in df.columns:
+        if c not in pvt_cols:
+            df.drop(c, axis="columns", inplace=True)
+
+    mean_stds = {} if stats is None else stats
+
+    # Normalize each column
+    if normalize:
+        for c in [c for c in df.columns if c != "DATETIME"]:
+            series = df[c]
+            #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+            if stats is None: mean_stds[c] = (series.mean(), series.std())
+            df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
+            #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+
+    if stats is not None: mean_stds = None
+    return df, mean_stds
 
 
 class TimeSeriesDataset(Dataset):
@@ -92,6 +118,7 @@ class TimeSeriesDataset(Dataset):
         # Normalize Unix time between 0 and 1
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
         epsilon = 1e12 # Small epsilon value to prevent reaching exactly 1
+        #epsilon = 0
         df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time + epsilon)
 
         # Check if any column in y_cols contains NaN values for each row
@@ -105,6 +132,7 @@ class TimeSeriesDataset(Dataset):
         if final_train:
             for col in y_cols:
                 print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
+                print( f"Column {col} : mean is {self.y[col].dropna().mean():.4f} and std is {self.y[col].dropna().std():.4f}")
 
     def __len__(self):
         return self.X.shape[0] - self.sequence_length + 1
@@ -130,5 +158,25 @@ class TimeSeriesDataset(Dataset):
 
         X = X.masked_fill(masks_X == 0, 0)
         y = y.masked_fill(masks_y == 0, 0)
+        """
+        mean_value_X = torch.nanmean(X)
+        X = X.masked_fill(masks_X == 0, mean_value_X)
+        #X = np.nan_to_num(X, nan=mean_value_X)
+        mean_value_y = torch.nanmean(y)
+        y = y.masked_fill(masks_y == 0, mean_value_y)
 
+        X = np.nan_to_num(X, nan=0)
+        y = np.nan_to_num(y, nan=0)
+
+        # Calculate mean and standard deviation for each tensor
+        mean1 = X.mean().item()
+        std1 = X.std().item()
+
+        mean2 = y.mean().item()
+        std2 = y.std().item()
+
+        # Print mean and standard deviation for each tensor
+        print("Tensor 1 - Mean: {:.4f}, Std: {:.4f}".format(mean1, std1))
+        print("Tensor 2 - Mean: {:.4f}, Std: {:.4f}".format(mean2, std2))
+        """
         return (X, masks_X, time), y

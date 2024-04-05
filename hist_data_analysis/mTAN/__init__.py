@@ -1,4 +1,4 @@
 from hist_data_analysis.mTAN.data_loader import load_df, TimeSeriesDataset
-from hist_data_analysis.mTAN.train_and_test_enc_dec import main_loop
+from hist_data_analysis.mTAN.train_and_test import main_loop
 from hist_data_analysis.mTAN.model import MtanGruRegr
 from hist_data_analysis.mTAN.hyperparameter_tuning import hyper_tuning

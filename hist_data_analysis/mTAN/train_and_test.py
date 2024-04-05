@@ -132,99 +132,16 @@ def main_loop():
 
     validation_set_percentage = 0.2
 
-    print("TASK 1 | Train and evaluate on HP related prediction")
-    task = "hp"
-
-    with open("./best_model_params_hp.json", 'r') as file:
-        params = json.load(file)
-
-    dim = 2
-    # Parameters:
-    num_heads = params["num_heads"]
-    rec_hidden = params["rec_hidden"]
-    embed_time = params["embed_time"]
-
-    sequence_length = params["sequence_length"]
-    batch_size = params["batch_size"]
-    grp = params["grp"]
-
-    lr = params["lr"]
     epochs = 30
     patience = 8
-
-    print(f"Parameters : num_heads = {num_heads}, rec_hidden = {rec_hidden}, embed_time = {embed_time}, "
-          f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
-
-    df_path_train = "data/training_set_before_conv.csv"
-    (_, df_hp_train, _), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
-                                             parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
-
-    df_path_test = "data/test_set_before_conv.csv"
-    (_, df_hp_test, _), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols, parse_dates=["Date&time"],
-                                    normalize=True, grp=grp, hist_data=True, stats=mean_stds)
-
-    df_hp_train.to_csv("hp_df_train.csv")
-    df_hp_test.to_csv("hp_df_test.csv")
-
-    train_df = pd.read_csv("hp_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
-    test_df = pd.read_csv("hp_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
-
-    X_cols = ["BTES_TANK", "DHW_BUFFER"]
-    y_cols = ["POWER_HP", "Q_CON_HEAT"]
-
-    # Create a dataset and dataloader
-    training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_cols, y_cols=y_cols, final_train=True)
-
-    # Get the total number of samples and compute size of each corresponding set
-    total_samples = len(training_dataset)
-    validation_size = int(validation_set_percentage * total_samples)
-    train_size = total_samples - validation_size
-
-    # Use random_split to create training and validation datasets
-    train_dataset, val_dataset = random_split(training_dataset, [train_size, validation_size])
-
-    # Create dataloaders for training and validation sets
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    print("Train dataloader loaded")
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    print("Validation dataloader loaded")
-
-    # Configure model
-    model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden, embed_time=embed_time,
-                        num_heads=num_heads, device=device).to(device)
-    # MSE loss
-    criterion = nn.MSELoss()
-    # Train the model
-    training_loss, validation_loss =  train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
-                                            epochs=epochs, patience=patience)
-
-    print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-
-    # Create a dataset and dataloader
-    testing_dataset = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                         X_cols=y_cols, y_cols=y_cols)
-
-    test_loader = DataLoader(testing_dataset, batch_size=batch_size, shuffle=False)
-    print("Test dataloader loaded")
-
-    trained_model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                                embed_time=embed_time, num_heads=num_heads, device=device).to(device)
-    checkpoint = torch.load(f'best_model_{task}.pth')
-    trained_model.load_state_dict(checkpoint['mod_state_dict'])
-
-    # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader, criterion, plot=True, pred_values=y_cols)
-
-    print(f'Testing Loss (MSE) : {testing_loss:.6f}')
-
 
     print("\nTASK 2 | Train and evaluate on PVT related prediction")
     task = "pvt"
 
-    with open("./best_model_params_pvt.json", 'r') as file:
+    with open("hist_data_analysis/mTAN/best_model_params_pvt.json", 'r') as file:
         params = json.load(file)
+
+    params ={'batch_size': 8, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 8, 'embed_time': 32, 'sequence_length': 5}
 
     dim = 3
     # Parameters:
@@ -234,18 +151,19 @@ def main_loop():
     sequence_length = params["sequence_length"]
     batch_size = params["batch_size"]
     lr = params["lr"]
-    grp = params["grp"]
 
+    '''
     print(f"Parameters : num_heads = {num_heads}, rec_hidden = {rec_hidden}, embed_time = {embed_time}, "
           f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
+    '''
 
-    df_path_train = "data/training_set_before_conv.csv"
-    (_, _, df_pvt_train), mean_stds = load_df(df_path=df_path_train, hp_cols=hp_cols, pvt_cols=pvt_cols,
-                                              parse_dates=["Date&time"], normalize=True, grp=grp, hist_data=True)
+    df_path_train = "data/training_set_classif.csv"
+    df_pvt_train, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+                                     normalize=True)
 
-    df_path_test = "data/test_set_before_conv.csv"
-    (_, _, df_pvt_test), _ = load_df(df_path=df_path_test, hp_cols=hp_cols, pvt_cols=pvt_cols, parse_dates=["Date&time"],
-                                     normalize=True, grp=grp, hist_data=True, stats=mean_stds)
+    df_path_test = "data/test_set_classif.csv"
+    df_pvt_test, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
+                            stats=mean_stds)
 
     df_pvt_train.to_csv("pvt_df_train.csv")
     df_pvt_test.to_csv("pvt_df_test.csv")
@@ -283,12 +201,12 @@ def main_loop():
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
-
+    
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
     # Create a dataset and dataloader
     testing_dataset = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                        X_cols=X_cols, y_cols=y_cols)
+                                        X_cols=X_cols, y_cols=y_cols, final_train=True)
 
     test_loader = DataLoader(testing_dataset, batch_size=batch_size, shuffle=False)
     print("Test dataloader loaded")
