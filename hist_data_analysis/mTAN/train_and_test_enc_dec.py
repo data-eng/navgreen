@@ -320,12 +320,12 @@ def main_loop():
                                       criterion=criterion, plot=True, pred_values=y_cols)
 
     print(f'Testing Loss (MSE) : {testing_loss:.6f}')
-    '''
+
 
     print("\nTASK 2 | Train and evaluate on PVT related prediction")
     task = "pvt"
 
-    with open("./best_model_params_pvt.json", 'r') as file:
+    with open("hist_data_analysis/mTAN/best_model_params_pvt.json", 'r') as file:
         params = json.load(file)
 
     dim = 3
@@ -376,33 +376,51 @@ def main_loop():
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     print("Validation dataloader loaded")
 
-    # Configure model
-    model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device).to(device)
+    # Configure models
+    enc = enc_mtan_rnn(input_dim=dim, query=torch.linspace(0, 1., embed_time), latent_dim=latent_dim, nhidden=rec_hidden,
+                              embed_time=embed_time, num_heads=num_heads, device=device).to(device)
+
+    dec = dec_mtan_rnn(input_dim=dim, query=torch.linspace(0, 1., embed_time), latent_dim=latent_dim, nhidden=dec_hidden,
+        embed_time=embed_time, num_heads=num_heads, device=device).to(device)
+
+    regressor = create_regressor(latent_dim, rec_hidden).to(device)
+
     # MSE loss
     criterion = nn.MSELoss()
     # Train the model
-    training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                           checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
-                                           epochs=epochs, patience=patience)
+    training_rec_loss, training_classif_loss, validation_loss =  train(enc=enc, dec=dec, regr=regressor,
+                                                                       train_loader=train_loader, val_loader=val_loader,
+                                                                       checkpoint_pth=None, criterion=criterion, task=task,
+                                                                       learning_rate=lr, epochs=epochs,  patience=patience,
+                                                                       k_iwae=k_iwae, latent_dim=latent_dim)
 
-    print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
+    print(f'Final reconstruction training Loss : {training_rec_loss:.6f} & '
+          f'classification training Loss : {training_classif_loss:.6f} &  '
+          f'Validation Loss : {validation_loss:.6f}\n')
 
     # Create a dataset and dataloader
     testing_dataset = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                        X_cols=X_cols, y_cols=y_cols)
+                                         X_cols=y_cols, y_cols=y_cols)
 
     test_loader = DataLoader(testing_dataset, batch_size=batch_size, shuffle=False)
     print("Test dataloader loaded")
 
-    trained_model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device).to(device)
-    checkpoint = torch.load(f'best_model_{task}.pth')
-    trained_model.load_state_dict(checkpoint['mod_state_dict'])
+    # Configure models
+    enc_trained_model = enc_mtan_rnn(input_dim=dim, query=torch.linspace(0, 1., embed_time), latent_dim=latent_dim,
+                       nhidden=rec_hidden,
+                       embed_time=embed_time, num_heads=num_heads, device=device).to(device)
+
+    regressor_trained_model = create_regressor(latent_dim, rec_hidden).to(device)
+
+    checkpoint = torch.load(f'best_model_{task}_dec.pth')
+    enc_trained_model.load_state_dict(checkpoint['enc_state_dict'])
+    regressor_trained_model.load_state_dict(checkpoint['regressor_dict'])
 
     # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader, criterion, plot=True, pred_values=y_cols)
+    testing_loss = evaluate_regressor(model=enc_trained_model, dataloader=val_loader, latent_dim=latent_dim,
+                                      regressor=regressor_trained_model, num_sample=1, device=device,
+                                      criterion=criterion, plot=True, pred_values=y_cols)
 
     print(f'Testing Loss (MSE) : {testing_loss:.6f}')
-    '''
+
 
