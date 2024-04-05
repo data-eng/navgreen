@@ -82,7 +82,7 @@ logger.addHandler(stream_handler)
     if stats is not None: mean_stds = None
     return (df, df_hp, df_pvt), mean_stds'''
 
-def load_df(df_path, pvt_cols, parse_dates, normalize=True, stats=None):
+def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     """
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
@@ -99,11 +99,12 @@ def load_df(df_path, pvt_cols, parse_dates, normalize=True, stats=None):
     # Normalize each column
     if normalize:
         for c in [c for c in df.columns if c != "DATETIME"]:
-            series = df[c]
-            #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
-            if stats is None: mean_stds[c] = (series.mean(), series.std())
-            df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
-            #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+            if c not in y_cols:
+                series = df[c]
+                #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
+                if stats is None: mean_stds[c] = (series.mean(), series.std())
+                df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
+                #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
 
     if stats is not None: mean_stds = None
     return df, mean_stds
@@ -142,6 +143,7 @@ class TimeSeriesDataset(Dataset):
         end_idx = idx + self.sequence_length
         X = self.X.iloc[start_idx:end_idx].values
         y = self.y.iloc[end_idx].values
+        #y = self.y.iloc[start_idx:end_idx].values
         time = self.time.iloc[start_idx:end_idx].values
         time = np.nan_to_num(time, nan=0)
 

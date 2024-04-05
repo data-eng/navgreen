@@ -31,6 +31,7 @@ def evaluate(model, dataloader, criterion, plot=False, pred_values=None):
     predicted_values = []
     for (X, masks_X, observed_tp), y in dataloader:
         X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
+        # y = y[:, -1, :]
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
@@ -86,6 +87,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         for (X, masks_X, observed_tp), y in train_loader:
             X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
             out = model(X, observed_tp, masks_X)
+            # y = y[:, -1, :]
             loss = criterion(out, y)
 
             optimizer.zero_grad()
@@ -155,13 +157,16 @@ def main_loop():
           f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
     '''
 
+    X_cols = ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"]
+    y_cols = ["POWER_PVT", "Q_PVT"]
+
     df_path_train = "data/training_set_classif.csv"
     df_pvt_train, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
-                                     normalize=True)
+                                     normalize=True, y_cols=y_cols)
 
     df_path_test = "data/test_set_classif.csv"
     df_pvt_test, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
-                            stats=mean_stds)
+                            stats=mean_stds, y_cols=y_cols)
 
     df_pvt_train.to_csv("pvt_df_train.csv")
     df_pvt_test.to_csv("pvt_df_test.csv")
@@ -169,8 +174,6 @@ def main_loop():
     train_df = pd.read_csv("pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
     test_df = pd.read_csv("pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
-    X_cols = ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"]
-    y_cols = ["POWER_PVT", "Q_PVT"]
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
