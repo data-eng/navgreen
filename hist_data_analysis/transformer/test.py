@@ -19,20 +19,22 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def test(data, labels, criterion, model, path):
+def test(data, num_classes, criterion, model, path):
     model.load_state_dict(torch.load(path))
     model.to(device)
     batches = len(data)
     total_loss = 0.0
-    ylabels = labels["y"]
+    ylabels = data["y"]
     true_values, pred_values = [], []
 
     progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
 
     with torch.no_grad():
-        for _, (X, y) in progress_bar:
-            X, y = X.to(device), y.to(device)
-            y_pred = model(X)
+        for _, (X, y, mask) in progress_bar:
+            X, y, mask = X.to(device), y.to(device), mask.to(device)
+
+            y_pred = model(X, mask)
+            y = utils.one_hot(y, k=num_classes)
         
             loss = criterion(y_pred, y)
             total_loss += loss.item()
@@ -61,36 +63,21 @@ def test(data, labels, criterion, model, path):
     return avg_loss
 
 def main():
-    path = "data/test_set_before_conv.csv"
-    hp, pv = data["hp"], data["pv"]
-
+    path = "data/owm+plc/test_set_classif.csv"
+    num_pairs = 1440 // 180
+    num_classes = 5
     batch_size=1
-    day_dur, group_dur = 1440, 30
-    num_pairs = day_dur // group_dur
-    func = lambda x: x.mean()
 
-    df = load(path=path, parse_dates=["Date&time"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
-    
-    df_hp = prepare(df, phase="test", system="hp")
-    ds_test_hp = TSDataset(dataframe=df_hp, seq_len=num_pairs, X=hp["X"], y=hp["y"])
-    dl_test_hp = DataLoader(ds_test_hp, batch_size, shuffle=False)
+    df = load(path=path, parse_dates=["DATETIME"], normalize=True)
+    df_prep = prepare(df, phase="test")
 
-    test_loss_hp = test(data=dl_test_hp,
-                        labels=hp,
-                        criterion=MSELoss(),
-                        model=Transformer(in_size=len(hp["X"]), out_size=len(hp["y"])),
-                        path="models/transformer_hp.pth"
-                        )
-    logger.info(f'HP | Evaluation Loss : {test_loss_hp:.6f}\n')
+    ds_test = TSDataset(df=df_prep, seq_len=num_pairs, X=data["X"], t=data["t"], y=data["y"])
+    dl_test = DataLoader(ds_test, batch_size, shuffle=False)
 
-    df_pv = prepare(df, phase="test", system="pv")
-    ds_test_pv = TSDataset(dataframe=df_pv, seq_len=num_pairs, X=pv["X"], y=pv["y"])
-    dl_test_pv = DataLoader(ds_test_pv, batch_size, shuffle=False)
-
-    test_loss_pv = test(data=dl_test_pv,
-                        labels=pv,
-                        criterion=MSELoss(),
-                        model=Transformer(in_size=len(pv["X"]), out_size=len(pv["y"])),
-                        path="models/transformer_pv.pth"
-                        )
-    logger.info(f'PV | Evaluation Loss : {test_loss_pv:.6f}')
+    test_loss = test(data=dl_test,
+                     num_classes=num_classes,
+                     criterion=MSELoss(),
+                     model=Transformer(in_size=len(data["X"]), out_size=num_classes),
+                     path="models/transformer.pth"
+                     )
+    logger.info(f'Evaluation Loss : {test_loss:.6f}\n')

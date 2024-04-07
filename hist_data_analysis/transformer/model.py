@@ -11,7 +11,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 class PosEncoding(nn.Module):
-    def __init__(self, d_model, max_seq_len=5000, scaling=10000.0, increment=2):
+    def __init__(self, d_model, max_seq_len=5000, scaling=10000.0, increment=2, dropout=0.2):
         """
         Initializes the positional encoding module:
 
@@ -28,6 +28,7 @@ class PosEncoding(nn.Module):
         self.max_seq_len = max_seq_len
         self.scaling = scaling
         self.increment = increment
+        self.dropout = nn.Dropout(p=dropout)
 
     @property
     def div_term(self):
@@ -74,8 +75,9 @@ class PosEncoding(nn.Module):
         :return: encoded tensor
         """
         pe = self.encoding  
-        enc_x = x + pe[:x.size(0), :]
-        return enc_x
+        x = x + pe[:x.size(0), :]
+        x = self.dropout(x)
+        return x
 
 class FeatureFuser(nn.Module):
     def __init__(self, num_feats):
@@ -99,8 +101,8 @@ class FeatureFuser(nn.Module):
         x = self.relu(x)
         return x
     
-class Transformer(nn.Module):
-    def __init__(self, in_size=2, out_size=2, d_model=250, nhead=8, num_layers=3, dim_feedforward=2048, dropout=0.1):
+class OldTransformer(nn.Module):
+    def __init__(self, in_size=12, out_size=5, d_model=120, nhead=12, num_layers=4, dim_feedforward=256, dropout=0.1):
         """
         Initializes a transformer model architecture: [Positional Encoder, Feature Fuser, Transformer Encoder, Linear Decoder]
 
@@ -112,13 +114,14 @@ class Transformer(nn.Module):
         :param dim_feedforward: dimension of the feedforward network model
         :param dropout: dropout rate
         """
-        super(Transformer, self).__init__()
+        super(OldTransformer, self).__init__()
 
         self.pos_encoder = PosEncoding(d_model)
         self.fuser = FeatureFuser(num_feats=in_size)
         self.layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
         self.encoder = nn.TransformerEncoder(self.layer, num_layers=num_layers)
         self.decoder = nn.Linear(d_model, out_size)
+        self.softmax = nn.Softmax(dim=-1)
         self.init_weights()
 
     def init_weights(self):
@@ -132,7 +135,7 @@ class Transformer(nn.Module):
         self.decoder.bias.data.zero_()
         self.decoder.weight.data.uniform_(-initrange, initrange)
         
-    def forward(self, x):
+    def forward(self, x, mask=None):
         """
         Forward pass of the transformer model:
 
@@ -147,7 +150,86 @@ class Transformer(nn.Module):
         x = x.permute(1, 0, 2)
         x = self.fuser(x)
         x = self.pos_encoder(x)
-        x = self.encoder(src=x)
-        x = self.decoder(input=x)
+        
+        if mask is not None:
+            x = self.encoder(src=x, mask=mask)
+        else:
+            x = self.encoder(src=x)
+
+        x = self.decoder(input=x) # torch.Size([sequence length, batch size, num_classes])
+        x = self.softmax(x)
         x = x.permute(1, 0, 2)
         return x
+    
+class Transformer(nn.Module):
+    def __init__(self, in_size=15, out_size=5, nhead=5, num_layers=4, dim_feedforward=2048, dropout=0):
+        super(Transformer, self).__init__()
+
+        self.nhead = nhead
+        self.layer = nn.TransformerEncoderLayer(d_model=in_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.encoder = nn.TransformerEncoder(self.layer, num_layers=num_layers)
+        self.decoder = nn.Linear(in_size, out_size)
+        self.softmax = nn.Softmax(dim=-1)
+        self.init_weights()
+
+    def init_weights(self):
+        """
+        Initializes the weights and biases of the decoder linear layer:
+
+        - Sets the bias of the decoder linear layer to zero.
+        - Initializes the weights with values drawn from a uniform distribution centered around zero.
+        """
+        initrange = 0.1    
+        self.decoder.bias.data.zero_()
+        self.decoder.weight.data.uniform_(-initrange, initrange)
+        
+    def forward(self, x, mask=None):
+        """
+        Forward pass of the transformer model:
+
+        - Passes the encoded input through the transformer encoder layer.
+        - Passes the output of the encoder through the decoder linear layer.
+
+        :param x: input tensor
+        :return: output tensor after passing through the transformer model
+        """
+        x = x.permute(1, 0, 2)  # torch.Size([8, 120, 15])
+        
+        if mask is not None:
+            seq_len, batch_size, _ = x.size()
+            mask = mask.unsqueeze(1) # (batch_size, 1, seq_len)
+            mask = mask.repeat(1, seq_len, 1) # (batch_size, seq_len, seq_len)
+            mask = mask.unsqueeze(1)  # (batch_size, 1, seq_len, seq_len)
+            mask = mask.repeat(1, self.nhead, 1, 1) # (batch_size, num_heads, seq_len, seq_len)
+            mask = mask.view(batch_size * self.nhead, seq_len, seq_len)
+            x = self.encoder(src=x, mask=mask)
+        else:
+            x = self.encoder(src=x)
+
+        x = self.decoder(input=x) # torch.Size([sequence length, batch size, num_classes])
+        x = self.softmax(x)
+        x = x.permute(1, 0, 2)
+        return x
+    
+    # print("###################################", mask.size())
+    # initial x:  torch.Size([sequence length, batch size, feature size])
+    # fused:  torch.Size([sequence length, batch size, 1])
+    # pe: torch.Size([max_seq_len, d_model])
+    # pos: torch.Size([max_seq_len, 1])
+    # div_term: torch.Size([d_model/2])
+    # scaled_pos: torch.Size([max_seq_len, d_model/2])
+    # unsq pe: torch.Size([max_seq_len, 1, d_model])
+    # pos_encoded:  torch.Size([sequence length, batch size, d_model])
+    # encoded:  torch.Size([sequence length, batch size, d_model])
+    # decoded:  torch.Size([sequence length, batch size, feature size])
+
+    # initial x:  torch.Size([48, 120, 2])   
+    # fused:  torch.Size([48, 120, 1])
+    # pe: torch.Size([5000, 250])
+    # pos: torch.Size([5000, 1])
+    # div_term: torch.Size([125])
+    # scaled_pos: torch.Size([5000, 125])
+    # unsq pe: torch.Size([5000, 1, 250])
+    # pos_encoded:  torch.Size([48, 120, 250])
+    # encoded:  torch.Size([48, 120, 250])
+    # decoded:  torch.Size([48, 120, 1])

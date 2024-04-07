@@ -1,9 +1,9 @@
 import os
 import pandas as pd
+import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
 import logging
-from navgreen_base import process_data
 from hist_data_analysis import utils
 
 logger = logging.getLogger(__name__)
@@ -14,104 +14,77 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 data = {
-    "hp": {
-        "cols": ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"],
-        "X": ["BTES_TANK", "DHW_BUFFER"],
-        "y": ["POWER_HP", "Q_CON_HEAT"],
-        "ignore": [("DATETIME", None), ("POWER_HP", 1.0)]
-    },
-    "pv": {
-        "cols": ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"],
-        "X": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
-        "y": ["POWER_PVT", "Q_PVT"],
-        "ignore": [("DATETIME", None), ("PYRANOMETER", 0.15)]
-    }
+    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
+    "t": ['SIN_HOUR', 'COS_HOUR', 'SIN_DAY', 'COS_DAY', 'SIN_MONTH', 'COS_MONTH'],
+    "y": ["binned_Q_PVT"],
+    "ignore": [] 
 }
 
-def load(path, parse_dates, normalize=True, grp=None, agg=None, hist_data=True):
+def load(path, parse_dates, normalize=True):
     """
     Loads and preprocesses data from a CSV file.
 
     :param path: path to the CSV file
     :param parse_dates: columns to parse as dates in the dataframe
     :param normalize: normalization flag
-    :param grp: frequency to group data by
-    :param agg: aggregation function
-    :param hist_data: hist_data flag
     :return: dataframe
     """
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
-    df = process_data(df, hist_data=hist_data)
-
     logger.info("All data: {} rows".format(len(df)))
 
-    if not hist_data:
-        logger.info(f'DHW_BOTTOM min: {df["DHW_BOTTOM"].min()}, DHW_BOTTOM max: {df["DHW_BOTTOM"].max()}')
-        df.loc[df["FOUR_WAY_VALVE"] == "1.0"]
+    datetimes, periods = ['month', 'day', 'hour'], [12, 30, 24]
 
-    if hist_data:
-        df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
-        logger.info("12 months data: {} rows".format(len(df)))
-        df = df.loc[df["FOUR_WAY_VALVE"] == "HEATING"]
-        
-    logger.info("HEATING: {} rows".format(len(df)))
-
-    df["Q_CON_HEAT"] = 4.18 * (998.0 / 3600.0 * df["FLOW_CONDENSER"]) * (df["WATER_OUT_COND"] - df["WATER_IN_COND"])
-    df["Q_PVT"] = ((3.6014 + 0.004 * (df["PVT_IN"] + df["PVT_OUT"]) / 2.0 - 0.000002 *
-                    pow((df["PVT_IN"] + df["PVT_OUT"]) / 2.0, 2)) *
-                   ((1049.0 - 0.475 * (df["PVT_IN"] + df["PVT_OUT"]) / 2.0 - 0.0018 *
-                     pow((df["PVT_IN"] + df["PVT_OUT"]) / 2.0, 2)) / 3600.0 * df["FLOW_PVT"]) *
-                   (df["PVT_OUT"] - df["PVT_IN"]))
-    
-    for c in df.columns:
-        if (c not in data["hp"]["cols"]) and (c not in data["pv"]["cols"]):
-            df.drop(c, axis="columns", inplace=True)
-    df.dropna(inplace=True)
-    logger.info("No NaNs: {} rows".format(len(df)))
+    for i, dtime in enumerate(datetimes):
+        timestamps = df['DATETIME'].dt.__getattribute__(dtime)
+        df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
+        df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
 
     if os.path.exists('data/stats.json'):
         stats = utils.load_json(filename='data/stats.json')
     else:
         stats = utils.get_stats(df, path='data/')
-    
-    df = utils.normalize(df, stats) if normalize else df
-    df = utils.aggregate(df, grp, func=agg)
 
+    if normalize:
+        df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
+                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
     return df
 
-def prepare(df, phase, system):
+def prepare(df, phase):
     """
     Prepares the dataframe for training by filtering columns and saving to CSV.
 
     :param df: dataframe
     :param phase: str model phase (train or test)
-    :param system: str name of the system (HP or PV)
     :return: dataframe
     """
-    params = data[system]
-    name = "df_" + phase + "_" + system + ".csv"
+    name = "data/" + "df_" + phase + ".csv"
 
-    for column, threshold in params["ignore"]:
+    for column, threshold in data["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 
 
+    df.set_index('DATETIME', inplace=True)
     df.to_csv(name)
     df = pd.read_csv(name, parse_dates=['DATETIME'], index_col='DATETIME')
 
     return df
     
 class TSDataset(Dataset):
-    def __init__(self, dataframe, seq_len, X, y):
+    def __init__(self, df, seq_len, X, t, y):
         """
         Initializes a time series dataset.
 
-        :param dataframe: dataframe
+        :param df: dataframe
         :param seq_len: length of the input sequence
         :param X: input features names
         :param y: target variables names
         """
         self.seq_len = seq_len
-        self.X = dataframe[X][:-1]
-        self.y = dataframe[y][1:]
+
+        y_nan = df[y].isna().any(axis=1)
+        df.loc[y_nan, :] = float('nan')
+
+        self.X = pd.concat([df[X], df[t]], axis=1)
+        self.y = df[y]
 
     def __len__(self):
         """
@@ -129,11 +102,33 @@ class TSDataset(Dataset):
         start_idx = idx
         end_idx = start_idx + self.seq_len
     
-        X = self.X.iloc[start_idx:end_idx].values
-        y = self.y.iloc[start_idx:end_idx].values
-        X, y = torch.FloatTensor(X), torch.FloatTensor(y)
+        X, y = self.X.iloc[start_idx:end_idx].values, self.y.iloc[start_idx:end_idx].values
 
-        return X, y
+        mask_X, mask_y = 1 - pd.isnull(X).astype(int), 1 - pd.isnull(y).astype(int)
+
+        X, y = torch.FloatTensor(X), torch.FloatTensor(y)
+        mask_X, mask_y = torch.FloatTensor(mask_X), torch.FloatTensor(mask_y)
+
+        X, y = X.masked_fill(mask_X == 0, 0), y.masked_fill(mask_y == 0, 0)
+
+        """ # COLUMNS "rain_3h", "snow_1h", "snow_3h" HAVE ONLY NANS!
+        column_to_check = 0
+        column_name = self.X.columns[column_to_check]
+        column_has_nonzero = torch.any(X[:, column_to_check].flatten() != 0.)
+
+        if column_has_nonzero.item():
+           print("Feature:", column_name)
+           print("Column has non-zero values:", column_has_nonzero.item())
+        """
+
+        mask_X_2d = torch.zeros(mask_X.size(0))
+        for i in range(mask_X.size(0)):
+            if torch.any(mask_X[i] == 0):
+                mask_X_2d[i] = 0
+            else:
+                mask_X_2d[i] = 1
+
+        return X, y, mask_X_2d
     
     @property
     def max_seq_id(self):

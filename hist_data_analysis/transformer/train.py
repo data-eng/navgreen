@@ -19,7 +19,18 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, path):
+def y_hot(y, num_classes):
+    batch_size, seq_len, _ = y.size()
+    y_hot = torch.zeros(batch_size, seq_len, num_classes, device=device)
+
+    for batch in range(y.size(0)):
+        for seq in range(y.size(1)):
+            for feat in y[batch, seq]:
+                y_hot[batch, seq] = torch.tensor(utils.one_hot(feat.item(), k=num_classes))
+
+    return y_hot
+
+def train(data, num_classes, epochs, patience, lr, criterion, model, optimizer, scheduler, path):
     model.to(device)
     train_data, val_data = data
     batches = len(train_data)
@@ -37,11 +48,10 @@ def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, pa
 
         progress_bar = tqdm(enumerate(train_data), total=batches, desc=f"Epoch {epoch + 1}/{epochs}", leave=True)
 
-        for _, (X, y) in progress_bar:
-            X, y = X.to(device), y.to(device)
+        for _, (X, y, mask) in progress_bar:
+            X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
 
-            y_pred = model(X)
-            
+            y_pred = model(X, mask)
             loss = criterion(y_pred, y)
 
             optimizer.zero_grad()
@@ -61,9 +71,11 @@ def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, pa
         total_val_loss = 0.0
 
         with torch.no_grad():
-            for X, y in val_data:
-                X, y = X.to(device), y.to(device)
-                y_pred = model(X)
+            for X, y, mask in val_data:
+                X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
+
+                y_pred = model(X, mask)
+                y = utils.one_hot(y, k=num_classes)
             
                 val_loss = criterion(y_pred, y)
                 total_val_loss += val_loss.item()
@@ -98,52 +110,29 @@ def train(data, epochs, patience, lr, criterion, model, optimizer, scheduler, pa
     return avg_loss, best_val_loss
 
 def main():
-    path = "data/training_set_before_conv.csv"
-    hp, pv = data["hp"], data["pv"]
-
+    path = "data/owm+plc/training_set_classif.csv"
+    num_pairs = 1440 // 180
+    num_classes = 5
     batch_size=120
-    day_dur, group_dur = 1440, 120
-    num_pairs = day_dur // group_dur
-    func = lambda x: x.mean()
 
-    df = load(path=path, parse_dates=["Date&time"], normalize=True, grp=f"{group_dur}min", agg=func, hist_data=True)
-    
-    df_hp = prepare(df, phase="train", system="hp")
+    df = load(path=path, parse_dates=["DATETIME"], normalize=True)
+    df_prep = prepare(df, phase="train")
 
-    ds_hp = TSDataset(dataframe=df_hp, seq_len=num_pairs, X=hp["X"], y=hp["y"])
-    ds_train_hp, ds_val_hp = split(ds_hp, vperc=0.2)
+    ds = TSDataset(df=df_prep, seq_len=num_pairs, X=data["X"], t=data["t"], y=data["y"])
+    ds_train, ds_val = split(ds, vperc=0.2)
 
-    dl_train_hp = DataLoader(ds_train_hp, batch_size, shuffle=True)
-    dl_val_hp = DataLoader(ds_val_hp, batch_size, shuffle=False)
+    dl_train = DataLoader(ds_train, batch_size, shuffle=True)
+    dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
-    train_loss_hp, val_loss_hp = train(data=(dl_train_hp, dl_val_hp),
-                                       epochs=300,
-                                       patience=4,
-                                       lr=1e-3,
-                                       criterion=MSELoss(),
-                                       model=Transformer(in_size=len(hp["X"]), out_size=len(hp["y"])),
-                                       optimizer="AdamW",
-                                       scheduler=("StepLR", 1.0, 0.98),
-                                       path="models/transformer_hp.pth"
-                                       )
-    logger.info(f'HP | Final Training Loss : {train_loss_hp:.6f} & Validation Loss : {val_loss_hp:.6f}\n')
-
-    df_pv = prepare(df, phase="train", system="pv")
-
-    ds_pv = TSDataset(dataframe=df_pv, seq_len=num_pairs, X=pv["X"], y=pv["y"])
-    ds_train_pv, ds_val_pv = split(ds_pv, vperc=0.2)
-
-    dl_train_pv = DataLoader(ds_train_pv, batch_size, shuffle=True)
-    dl_val_pv = DataLoader(ds_val_pv, batch_size, shuffle=False)
-
-    train_loss_pv, val_loss_pv = train(data=(dl_train_pv, dl_val_pv),
-                                       epochs=300,
-                                       patience=4,
-                                       lr=1e-3,
-                                       criterion=MSELoss(),
-                                       model=Transformer(in_size=len(pv["X"]), out_size=len(pv["y"])),
-                                       optimizer="AdamW",
-                                       scheduler=("StepLR", 1.0, 0.98),
-                                       path="models/transformer_pv.pth"
-                                       )
-    logger.info(f'PV | Final Training Loss : {train_loss_pv:.6f} & Validation Loss : {val_loss_pv:.6f}')
+    train_loss, val_loss = train(data=(dl_train, dl_val),
+                                 num_classes=num_classes,
+                                 epochs=10,
+                                 patience=2,
+                                 lr=1e-4,
+                                 criterion=MSELoss(),
+                                 model=Transformer(in_size=len(data["X"])+len(data["t"]), out_size=num_classes),
+                                 optimizer="AdamW",
+                                 scheduler=("StepLR", 1.0, 0.98),
+                                 path="models/transformer.pth"
+                                 )
+    logger.info(f'Final Training Loss : {train_loss:.6f} & Validation Loss : {val_loss:.6f}\n')

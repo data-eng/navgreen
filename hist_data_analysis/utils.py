@@ -1,9 +1,27 @@
 import os
 import json
-import scipy.signal
+import math
 import torch.optim as optim
 import matplotlib.pyplot as plt
 import torch.optim.lr_scheduler as sched
+
+def one_hot(val, k):
+    """
+    Convert categorical value to one-hot encoded representation.
+
+    :param val: float
+    :param k: number of classes
+    :return: list
+    """
+    encoding = []
+
+    if math.isnan(val):
+        encoding = [val for _ in range(k)]
+    else:
+        encoding = [0 for _ in range(k)]
+        encoding[int(val)] = 1
+
+    return encoding
 
 def visualize(values, labels, title, names, colors, plot_func):
     """
@@ -32,22 +50,24 @@ def visualize(values, labels, title, names, colors, plot_func):
     plt.savefig(os.path.join('static/', filename))
     plt.close()
 
-def normalize(df, stats):
+def normalize(df, stats, exclude=[]):
     """
-    Normalize and de-trend data.
+    Normalize data.
 
     :param df: dataframe
     :param stats: tuple of mean and std
+    :param exclude: column to exclude from normalization
     :return: processed dataframe
     """
     newdf = df.copy()
+
     for col in df.columns:
-        if col != "DATETIME":
+        if col not in exclude:
             series = df[col]
             mean, std = stats[col]
             series = (series - mean) / std
-            series = scipy.signal.detrend(series)
             newdf[col] = series
+
     return newdf
 
 def get_stats(df, path='data/'):
@@ -81,6 +101,7 @@ def load_json(filename):
     """
     with open(filename, 'r') as f:
         data = json.load(f)
+
     return data
 
 def save_json(data, filename):
@@ -107,6 +128,7 @@ def filter(df, column, threshold):
             df = df[df[column] > threshold]
         else:
             df.drop(column, axis="columns", inplace=True)
+
     return df
 
 def aggregate(df, grp="1min", func=lambda x: x):
@@ -119,11 +141,14 @@ def aggregate(df, grp="1min", func=lambda x: x):
     :return: aggregated dataframe
     """
     df = df.set_index("DATETIME")
+
     if grp:
         df = df.resample(grp)
         df = df.apply(func)
         df = df.dropna()
+
     df = df.sort_index()
+
     return df
 
 def get_optim(name, model, lr):
@@ -137,6 +162,7 @@ def get_optim(name, model, lr):
     """
     optim_class = getattr(optim, name)
     optimizer = optim_class(model.parameters(), lr=lr)
+
     return optimizer
 
 def get_sched(name, step_size, gamma, optimizer):
@@ -151,4 +177,5 @@ def get_sched(name, step_size, gamma, optimizer):
     """
     sched_class = getattr(sched, name)
     scheduler = sched_class(optimizer, step_size, gamma)
+
     return scheduler
