@@ -207,14 +207,14 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
     # Loss
     #criterion = MaskedMSELoss()
     criterion = MaskedSmoothL1Loss()
-    '''
+
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
     
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-    '''
+
     # Create a dataset and dataloader
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
                                                 X_cols=X_cols, y_cols=y_cols, means_X=means_X)
@@ -275,3 +275,14 @@ def main_loop():
 
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                         characteristics="weather", limits = (-0.1, 1.1))
+
+    print("PYRANOMETER -> QPVT\n")
+
+    sequence_length = 24 // 3
+    X_cols = ["PYRANOMETER"]
+    y_cols = ["Q_PVT"]
+    params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 8, 'embed_time': 32}
+    task = "day_pyran_to_day_qpvt"
+
+    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                        characteristics="PYRANOMETER", limits = (-1., 8.5))
