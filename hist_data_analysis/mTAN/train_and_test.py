@@ -142,7 +142,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
 
 
-def main_loop():
+def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, characteristics, limits):
     torch.manual_seed(1505)
     np.random.seed(1505)
     torch.cuda.manual_seed(1505)
@@ -151,13 +151,6 @@ def main_loop():
 
     epochs = 200
     patience = 20
-
-    print("\nTrain and evaluate on PVT related prediction")
-    task = "day_weather_to_day_qpvt"
-
-    sequence_length = 24 // 3
-
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -168,9 +161,6 @@ def main_loop():
 
     params_print = (f"num_heads={num_heads}, rec_hidden={rec_hidden}, embed_time={embed_time}, "
                     f"sequence_length={sequence_length}, batch_size={batch_size}")
-
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
-    y_cols = ["Q_PVT"]
 
     pvt_cols = ["DATETIME"] + X_cols + y_cols
 
@@ -217,14 +207,14 @@ def main_loop():
     # Loss
     #criterion = MaskedMSELoss()
     criterion = MaskedSmoothL1Loss()
-
+    '''
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
     
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-
+    '''
     # Create a dataset and dataloader
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
                                                 X_cols=X_cols, y_cols=y_cols, means_X=means_X)
@@ -246,19 +236,42 @@ def main_loop():
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
     # Test model's performance on unseen data
-    limits = (-1., 8.5)
     testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics="weather", params=params_print, name="test_sliding_win")
+                            characteristics=characteristics, params=params_print, name="test_sliding_win")
     print(f'Testing Loss (SmoothL1Loss) for sliding window : {testing_loss:.6f}')
 
     testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics="weather", params=params_print, name="test_daily")
+                            characteristics=characteristics, params=params_print, name="test_daily")
     print(f'Testing Loss (SmoothL1Loss) daily : {testing_loss:.6f}')
 
     training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics="weather", params=params_print, name="train_sliding_win")
+                            characteristics=characteristics, params=params_print, name="train_sliding_win")
     print(f'Training Loss (SmoothL1Loss) for sliding window : {training_loss:.6f}')
 
     training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics="weather", params=params_print, name="train_daily")
+                            characteristics=characteristics, params=params_print, name="train_daily")
     print(f'Training Loss (SmoothL1Loss) daily : {training_loss:.6f}')
+
+
+def main_loop():
+    print("Weather -> QPVT\n")
+
+    sequence_length = 24 // 3
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
+    y_cols = ["Q_PVT"]
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
+    task = "day_weather_to_day_qpvt"
+
+    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                   characteristics="weather", limits = (-1., 8.5))
+
+    print("Weather -> PYRANOMETER\n")
+
+    sequence_length = 24 // 3
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
+    y_cols = ["PYRANOMETER"]
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
+    task = "day_weather_to_day_pyran"
+
+    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                        characteristics="weather", limits = (-0.1, 1.1))
