@@ -33,12 +33,10 @@ class MultiTimeAttention(nn.Module):
             p_attn = dropout(p_attn)
         return torch.sum(p_attn * value.unsqueeze(-3), -2), p_attn
 
-    def forward(self, query, key, value, mask=None, dropout=None):
+    def forward(self, query, key, value, mask, dropout=None):
         # Compute 'Scaled Dot Product Attention'
         batch, seq_len, dim = value.size()
-        if mask is not None:
-            # Same mask applied to all h heads.
-            mask = mask.unsqueeze(1)
+        mask = mask.unsqueeze(1)
         value = value.unsqueeze(1)
         query, key = [l(x).view(x.size(0), -1, self.h, self.embed_time_k).transpose(1, 2)
                       for l, x in zip(self.linears, (query, key))]
@@ -51,7 +49,7 @@ class MultiTimeAttention(nn.Module):
 
 class MtanGruRegr(nn.Module):
 
-    def __init__(self, input_dim, query, device, nhidden, embed_time, num_heads ):
+    def __init__(self, input_dim, query, device, nhidden, embed_time, num_heads, output_len=2 ):
         super(MtanGruRegr, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device
@@ -60,13 +58,11 @@ class MtanGruRegr(nn.Module):
         self.query = query
         self.att = MultiTimeAttention(2 * input_dim, nhidden, embed_time, num_heads)
         # self.att = MultiTimeAttention(input_dim, nhidden, embed_time, num_heads)
-        self.classifier = nn.Sequential(
-            nn.Linear(nhidden, 300),
-            nn.ReLU(),
-            nn.Linear(300, 300),
-            nn.ReLU(),
-            nn.Linear(300, 2))
-        self.enc = nn.GRU(nhidden, nhidden)
+        self.regressor = nn.Sequential(
+            nn.Linear(nhidden, 128),
+            nn.Linear(128, 128),
+            nn.Linear(128, output_len))
+        self.enc = nn.RNN(nhidden, nhidden, batch_first=True)
 
         self.periodic = nn.Linear(1, embed_time - 1)
         self.linear = nn.Linear(1, 1)
@@ -88,7 +84,6 @@ class MtanGruRegr(nn.Module):
         query = self.learn_time_embedding(self.query.unsqueeze(0)).to(self.device)
 
         out = self.att(query, key, x, mask)
-        #print(f'out: {out.shape}')
-        out = out.permute(1, 0, 2)
         _, out = self.enc(out)
-        return self.classifier(out.squeeze(0))
+        out = out.squeeze()
+        return self.regressor(out.squeeze(0))

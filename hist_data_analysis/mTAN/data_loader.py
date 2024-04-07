@@ -20,68 +20,6 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-'''def load_df(df_path, hp_cols, pvt_cols, parse_dates, hist_data, normalize=True, grp=None, stats=None):
-    """
-    Loads the data from the historical data DataFrame
-    :return: whole dataframe, dataframe for hp, dataframe for solar
-    """
-    df = pd.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
-    df = process_data(df, hist_data=hist_data)
-
-    if not hist_data:
-        logger.info(f'DHW_BOTTOM min: {df["DHW_BOTTOM"].min()}, DHW_BOTTOM max: {df["DHW_BOTTOM"].max()}')
-
-    logger.info("All data: {} rows".format(len(df)))
-
-    if hist_data:
-        df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
-        logger.info("12 months data: {} rows".format(len(df)))
-
-    df = df.loc[df["FOUR_WAY_VALVE"] == "HEATING"] if hist_data else df.loc[df["FOUR_WAY_VALVE"] == "1.0"]
-    logger.info("HEATING: {} rows".format(len(df)))
-
-    # Add calculated columns (thermal flows)
-    df["Q_CON_HEAT"] = 4.18 * (998.0 / 3600.0 * df["FLOW_CONDENSER"]) * (df["WATER_OUT_COND"] - df["WATER_IN_COND"])
-    df["Q_PVT"] = ((3.6014 + 0.004 * (df["PVT_IN"] + df["PVT_OUT"]) / 2.0 - 0.000002 *
-                    pow((df["PVT_IN"] + df["PVT_OUT"]) / 2.0, 2)) *
-                   ((1049.0 - 0.475 * (df["PVT_IN"] + df["PVT_OUT"]) / 2.0 - 0.0018 *
-                     pow((df["PVT_IN"] + df["PVT_OUT"]) / 2.0, 2)) / 3600.0 * df["FLOW_PVT"]) *
-                   (df["PVT_OUT"] - df["PVT_IN"]))
-
-    # Drop unneeded columns
-    for c in df.columns:
-        if (c not in hp_cols) and (c not in pvt_cols):
-            df.drop(c, axis="columns", inplace=True)
-
-    mean_stds = {} if stats is None else stats
-
-    # Normalize each column
-    if normalize:
-        for c in [c for c in df.columns if c != "DATETIME"]:
-            series = df[c]
-            # logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
-            if stats is None: mean_stds[c] = (series.mean(), series.std())
-            df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
-            # assert round(df[c].mean(), 1) == 0.0 and round(df[c].std(), 1) == 1.0
-
-    # If group data by time
-    df = df.set_index("DATETIME").resample(grp).mean().sort_index() if grp else df.set_index("DATETIME").sort_index()
-    logger.info("Grouped: {} rows".format(len(df)))
-
-    # Represent unwanted data as irregularly sampled
-    df_hp = df[[c for c in hp_cols if c != "DATETIME"]]
-    df_hp.loc[df_hp["POWER_HP"] > 1.0, :] = float('nan')
-    # df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
-    logger.info("HP, POWER > 1: {} rows".format(len(df_hp)))
-
-    df_pvt = df[[c for c in pvt_cols if c != "DATETIME"]]
-    df_pvt.loc[df_pvt["PYRANOMETER"] > 0.15, :] = float('nan')
-    # df_pvt = df_pvt[df_pvt["PYRANOMETER"] > 0.15]
-    logger.info("PV, PYRAN > 0.15: {} rows".format(len(df_pvt)))
-
-    if stats is not None: mean_stds = None
-    return (df, df_hp, df_pvt), mean_stds'''
-
 def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     """
     Loads the data from the historical data DataFrame
@@ -101,26 +39,23 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
         for c in [c for c in df.columns if c != "DATETIME"]:
             if c not in y_cols:
                 series = df[c]
-                #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
                 if stats is None: mean_stds[c] = (series.mean(), series.std())
                 df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
-                #logger.info(f'column {c} -> {round(df[c].mean(), 1)}, {round(df[c].std(), 1)}')
 
     if stats is not None: mean_stds = None
     return df, mean_stds
 
 
 class TimeSeriesDataset(Dataset):
-    def __init__(self, dataframe, sequence_length, X_cols, y_cols, final_train=False):
+    def __init__(self, dataframe, sequence_length, X_cols, y_cols, means_X, final_train=False, per_day=False):
         self.sequence_length = sequence_length
+        self.per_day = per_day
 
         df = dataframe
         df['Datetime'] = df.index.astype('int64')
         # Normalize Unix time between 0 and 1
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
-        epsilon = 1e12 # Small epsilon value to prevent reaching exactly 1
-        #epsilon = 0
-        df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time + epsilon)
+        df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time)
 
         # Check if any column in y_cols contains NaN values for each row
         has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
@@ -130,55 +65,43 @@ class TimeSeriesDataset(Dataset):
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
+        self.means_X = means_X
+        self.means_X = torch.tensor(self.means_X.values, dtype=torch.float32)
+
         if final_train:
             for col in y_cols:
                 print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
                 print( f"Column {col} : mean is {self.y[col].dropna().mean():.4f} and std is {self.y[col].dropna().std():.4f}")
 
     def __len__(self):
-        return self.X.shape[0] - self.sequence_length #+ 1
+        if not self.per_day: return self.X.shape[0] - self.sequence_length + 1
+        else:
+            assert self.X.shape[0] % self.sequence_length == 0
+            return self.X.shape[0] // self.sequence_length
 
     def __getitem__(self, idx):
-        start_idx = idx
-        end_idx = idx + self.sequence_length
+        if not self.per_day: start_idx = idx
+        else: start_idx = idx * self.sequence_length
+
+        end_idx = start_idx + self.sequence_length
         X = self.X.iloc[start_idx:end_idx].values
-        y = self.y.iloc[end_idx].values
-        #y = self.y.iloc[start_idx:end_idx].values
+        y = self.y.iloc[start_idx:end_idx].values.flatten()
         time = self.time.iloc[start_idx:end_idx].values
         time = np.nan_to_num(time, nan=0)
 
-        masks_X = np.isnan(X).astype(int)
-        masks_X = 1 - masks_X
-
-        masks_y = np.isnan(y).astype(int)
-        masks_y = 1 - masks_y
-
         # Convert the sequence to a PyTorch tensor
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
-        masks_X, masks_y = torch.tensor(masks_X), torch.tensor(masks_y)
         time = torch.FloatTensor(time)
 
-        X = X.masked_fill(masks_X == 0, 0)
-        y = y.masked_fill(masks_y == 0, 0)
-        """
-        mean_value_X = torch.nanmean(X)
-        X = X.masked_fill(masks_X == 0, mean_value_X)
-        #X = np.nan_to_num(X, nan=mean_value_X)
-        mean_value_y = torch.nanmean(y)
-        y = y.masked_fill(masks_y == 0, mean_value_y)
+        masks_X = torch.isnan(X).int()
+        masks_X = 1 - masks_X
+        masks_y = torch.isnan(y).int()
+        masks_y = 1 - masks_y
 
-        X = np.nan_to_num(X, nan=0)
-        y = np.nan_to_num(y, nan=0)
+        X = X.masked_fill(masks_X == 0, torch.nanmedian(X))
+        X = torch.where(torch.isnan(X), self.means_X, X)
 
-        # Calculate mean and standard deviation for each tensor
-        mean1 = X.mean().item()
-        std1 = X.std().item()
+        #X = X.masked_fill(masks_X == 0, 0)
+        y = y.masked_fill(masks_y == 0, -1e1) # This does not really matter as it is gonna be masked out in loss function
 
-        mean2 = y.mean().item()
-        std2 = y.std().item()
-
-        # Print mean and standard deviation for each tensor
-        print("Tensor 1 - Mean: {:.4f}, Std: {:.4f}".format(mean1, std1))
-        print("Tensor 2 - Mean: {:.4f}, Std: {:.4f}".format(mean2, std2))
-        """
-        return (X, masks_X, time), y
+        return (X, masks_X, time), (y, masks_y)

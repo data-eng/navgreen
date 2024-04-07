@@ -4,67 +4,82 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import MtanGruRegr
 from .data_loader import load_df, TimeSeriesDataset
-
+from .utils import MaskedMSELoss, MaskedSmoothL1Loss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f'Device is {device}')
 
 
-torch.manual_seed(1505)
-np.random.seed(1505)
-torch.cuda.manual_seed(1505)
-
-hp_cols = ["DATETIME", "BTES_TANK", "DHW_BUFFER", "POWER_HP", "Q_CON_HEAT"]
-pvt_cols = ["DATETIME", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM", "POWER_PVT", "Q_PVT"]
-
-
-def evaluate(model, dataloader, criterion, plot=False, pred_values=None):
+def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None, params=None):
     model.eval()
     total_loss = 0
     true_values = []
     predicted_values = []
-    for (X, masks_X, observed_tp), y in dataloader:
-        X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
-        # y = y[:, -1, :]
+    masked_values = []
+
+    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
+        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
-            total_loss += criterion(out, y)
+            total_loss += criterion(out, y, mask_y)
+
+            if out.shape[0] != X.shape[0]:
+                out = out.unsqueeze(0)
+
+            # Append masked true and predicted values
             true_values.append(y.cpu().numpy())
             predicted_values.append(out.cpu().numpy())
+            masked_values.append(mask_y.cpu().numpy())
 
     true_values = np.concatenate(true_values, axis=0)
     predicted_values = np.concatenate(predicted_values, axis=0)
+    masked_values = np.concatenate(masked_values, axis=0)
 
     if plot:
-        assert pred_values is not None
+        assert pred_value is not None
+        assert characteristics is not None
+        assert limits is not None
+        assert name is not None
+        assert params is not None
 
-        plt.figure(figsize=(10, 6))
-        plt.subplot(1, 2, 1)
-        plt.scatter(true_values[:, 0], predicted_values[:, 0], color='lightblue')
-        plt.xlabel("True Value")
-        plt.ylabel("Predicted Value")
-        plt.title(pred_values[0])
+        plt.figure(figsize=(16, 8))  # Adjust the figure size as needed
 
-        plt.subplot(1, 2, 2)
-        plt.scatter(true_values[:, 1], predicted_values[:, 1], color='lightcoral')
-        plt.xlabel("True Value")
-        plt.ylabel("Predicted Value")
-        plt.title(pred_values[1])
+        for i in range(8):
+            # Filter out masked values
+            non_mask_indices = masked_values[:, i] == 1
+            non_mask_true_values = true_values[non_mask_indices, i]
+            non_mask_predicted_values = predicted_values[non_mask_indices, i]
+
+            plt.subplot(2, 4, i + 1)  # 2 rows, 4 columns, i+1 subplot index
+            plt.scatter(non_mask_true_values, non_mask_predicted_values)
+            plt.xlabel("True Value")
+            plt.ylabel("Predicted Value")
+            plt.title(f"{i + 1}'th 3hrs of the day ({characteristics} to {pred_value})")
+
+            min_value, max_value = limits[0], limits[1]
+
+            # Adjust the limits based on the threshold
+            range_value = max_value - min_value
+            threshold = 0.05
+            min_value -= threshold * range_value
+            max_value += threshold * range_value
+
+            # Set limits of both x-axis and y-axis based on the adjusted minimum and maximum values
+            plt.xlim(min_value, max_value)
+            plt.ylim(min_value, max_value)
 
         plt.tight_layout()
-        plt.show()
+        plt.savefig(f"figures/{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
 
     return total_loss / len(dataloader)
 
 
-def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate = 0.01, epochs = 5, patience=3):
+def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate, epochs, patience):
 
     # Early stopping variables
     best_val_loss = float('inf')
@@ -84,11 +99,10 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         total_loss = 0
 
         start_time = time.time()
-        for (X, masks_X, observed_tp), y in train_loader:
+        for (X, masks_X, observed_tp), (y, mask_y) in train_loader:
             X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
             out = model(X, observed_tp, masks_X)
-            # y = y[:, -1, :]
-            loss = criterion(out, y)
+            loss = criterion(out, y, mask_y)
 
             optimizer.zero_grad()
             loss.backward()
@@ -129,36 +143,38 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
 
 def main_loop():
+    torch.manual_seed(1505)
+    np.random.seed(1505)
+    torch.cuda.manual_seed(1505)
 
-    validation_set_percentage = 0.2
+    validation_set_percentage = 0.3
 
-    epochs = 60
-    patience = 10
+    epochs = 200
+    patience = 20
 
-    print("\nTASK 2 | Train and evaluate on PVT related prediction")
-    task = "pvt"
+    print("\nTrain and evaluate on PVT related prediction")
+    task = "day_weather_to_day_qpvt"
 
-    with open("hist_data_analysis/mTAN/best_model_params_pvt.json", 'r') as file:
-        params = json.load(file)
+    sequence_length = 24 // 3
 
-    params ={'batch_size': 8, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 8, 'embed_time': 32, 'sequence_length': 5}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
 
-    dim = 3
     # Parameters:
     num_heads = params["num_heads"]
     rec_hidden = params["rec_hidden"]
     embed_time = params["embed_time"]
-    sequence_length = params["sequence_length"]
     batch_size = params["batch_size"]
     lr = params["lr"]
 
-    '''
-    print(f"Parameters : num_heads = {num_heads}, rec_hidden = {rec_hidden}, embed_time = {embed_time}, "
-          f"sequence_length = {sequence_length}, batch_size = {batch_size}, grp = {grp}")
-    '''
+    params_print = (f"num_heads={num_heads}, rec_hidden={rec_hidden}, embed_time={embed_time}, "
+                    f"sequence_length={sequence_length}, batch_size={batch_size}")
 
-    X_cols = ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"]
-    y_cols = ["POWER_PVT", "Q_PVT"]
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
+    y_cols = ["Q_PVT"]
+
+    pvt_cols = ["DATETIME"] + X_cols + y_cols
+
+    dim = len(X_cols)
 
     df_path_train = "data/training_set_classif.csv"
     df_pvt_train, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
@@ -168,16 +184,18 @@ def main_loop():
     df_pvt_test, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
                             stats=mean_stds, y_cols=y_cols)
 
-    df_pvt_train.to_csv("pvt_df_train.csv")
-    df_pvt_test.to_csv("pvt_df_test.csv")
+    df_pvt_train.to_csv("data/pvt_df_train.csv")
+    df_pvt_test.to_csv("data/pvt_df_test.csv")
 
-    train_df = pd.read_csv("pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
-    test_df = pd.read_csv("pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    train_df = pd.read_csv("data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
+    trainX = train_df[X_cols]
+    means_X = trainX.mean(skipna=True)
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_cols, y_cols=y_cols, final_train=True)
+                                         X_cols=X_cols, y_cols=y_cols, final_train=True, means_X=means_X)
 
     # Get the total number of samples and compute size of each corresponding set
     total_samples = len(training_dataset)
@@ -195,9 +213,11 @@ def main_loop():
 
     # Configure model
     model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device).to(device)
-    # MSE loss
-    criterion = nn.MSELoss()
+                        embed_time=embed_time, num_heads=num_heads, device=device, output_len=sequence_length).to(device)
+    # Loss
+    #criterion = MaskedMSELoss()
+    criterion = MaskedSmoothL1Loss()
+
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
@@ -206,18 +226,39 @@ def main_loop():
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
     # Create a dataset and dataloader
-    testing_dataset = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                        X_cols=X_cols, y_cols=y_cols, final_train=True)
+    testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
+                                                X_cols=X_cols, y_cols=y_cols, means_X=means_X)
+    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
+                                                X_cols=X_cols, y_cols=y_cols, final_train=True, per_day=True,
+                                                means_X=means_X)
+    training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
+                                                 X_cols=X_cols, y_cols=y_cols, per_day=True, means_X=means_X)
 
-    test_loader = DataLoader(testing_dataset, batch_size=batch_size, shuffle=False)
-    print("Test dataloader loaded")
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
+    train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
+
+    print("Test dataloaders loaded")
 
     trained_model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device).to(device)
+                        embed_time=embed_time, num_heads=num_heads, device=device, output_len=sequence_length).to(device)
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
     # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader, criterion, plot=True, pred_values=y_cols)
+    limits = (-1., 8.5)
+    testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0], limits=limits,
+                            characteristics="weather", params=params_print, name="test_sliding_win")
+    print(f'Testing Loss (SmoothL1Loss) for sliding window : {testing_loss:.6f}')
 
-    print(f'Testing Loss (MSE) : {testing_loss:.6f}')
+    testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
+                            characteristics="weather", params=params_print, name="test_daily")
+    print(f'Testing Loss (SmoothL1Loss) daily : {testing_loss:.6f}')
+
+    training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], limits=limits,
+                            characteristics="weather", params=params_print, name="train_sliding_win")
+    print(f'Training Loss (SmoothL1Loss) for sliding window : {training_loss:.6f}')
+
+    training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
+                            characteristics="weather", params=params_print, name="train_daily")
+    print(f'Training Loss (SmoothL1Loss) daily : {training_loss:.6f}')
