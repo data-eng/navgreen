@@ -5,6 +5,10 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
+
 
 import logging
 
@@ -58,6 +62,13 @@ class TimeSeriesDataset(Dataset):
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
         df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time)
 
+        # Check if any column in y_cols contains NaN values for each row
+        has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
+        # Replace rows with NaN values in any of the y_cols with NaN values
+        df.loc[has_nan_in_y_cols, 'Datetime'] = float('nan')
+
+        # df.dropna(inplace=True)
+
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
@@ -98,7 +109,7 @@ class TimeSeriesDataset(Dataset):
         X = X.masked_fill(masks_X == 0, torch.nanmedian(X))
         X = torch.where(torch.isnan(X), self.means_X, X)
         '''
-        X = X.masked_fill(masks_X == 0, -1e9)
+        X = X.masked_fill(masks_X == 0, 0)
         y = y.masked_fill(masks_y == 0, -1e1) # This does not really matter as it is gonna be masked out in loss function
 
         return (X, masks_X, time), (y, masks_y)
