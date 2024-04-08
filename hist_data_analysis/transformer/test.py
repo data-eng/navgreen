@@ -1,10 +1,8 @@
-import numpy as np
 import logging
 import torch
-from torch.nn import MSELoss
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 from hist_data_analysis import utils
 from .model import Transformer
 from .loader import *
@@ -19,43 +17,52 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
+def y_hot(y, num_classes):
+    batch_size, seq_len, _ = y.size()
+    y_hot = torch.zeros(batch_size, seq_len, num_classes, device=device)
+
+    for batch in range(y.size(0)):
+        for seq in range(y.size(1)):
+            for feat in y[batch, seq]:
+                y_hot[batch, seq] = torch.tensor(utils.one_hot(feat.item(), k=num_classes))
+
+    return y_hot
+
 def test(data, num_classes, criterion, model, path):
     model.load_state_dict(torch.load(path))
     model.to(device)
     batches = len(data)
     total_loss = 0.0
-    ylabels = data["y"]
+    ylabels = params["y"]
     true_values, pred_values = [], []
 
     progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
 
     with torch.no_grad():
         for _, (X, y, mask) in progress_bar:
-            X, y, mask = X.to(device), y.to(device), mask.to(device)
-
+            X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
             y_pred = model(X, mask)
-            y = utils.one_hot(y, k=num_classes)
         
             loss = criterion(y_pred, y)
             total_loss += loss.item()
 
-            batch_size, seq_len, features_size = y.size()
-            y = y.reshape(batch_size * seq_len, features_size)
-            y_pred = y_pred.reshape(batch_size * seq_len, features_size)
+            #batch_size, seq_len, features_size = y.size()
+            #y = y.reshape(batch_size * seq_len, features_size)
+            #y_pred = y_pred.reshape(batch_size * seq_len, features_size)
 
-            true_values.append(y.cpu().numpy())
-            pred_values.append(y_pred.cpu().numpy())
+            #true_values.append(y.cpu().numpy())
+            #pred_values.append(y_pred.cpu().numpy())
     
-    true_values = np.concatenate(true_values)
-    pred_values = np.concatenate(pred_values)
+    #true_values = np.concatenate(true_values)
+    #pred_values = np.concatenate(pred_values)
 
-    for i, feature in enumerate(ylabels):
-        utils.visualize(values=[(true_values[:, i], pred_values[:, i])], 
-                        labels=("True Values", "Predicted Values"), 
-                        title=feature, 
-                        names=[feature], 
-                        colors=[['rebeccapurple', 'brown'][i % 2]],
-                        plot_func=plt.scatter)
+    #for i, feature in enumerate(ylabels):
+        #utils.visualize(values=[(true_values[:, i], pred_values[:, i])], 
+                        #labels=("True Values", "Predicted Values"), 
+                        #title=feature, 
+                        #names=[feature], 
+                        #colors=[['rebeccapurple', 'brown'][i % 2]],
+                        #plot_func=plt.scatter)
 
     avg_loss = total_loss / batches
     logger.info("Evaluation complete!")
@@ -71,13 +78,13 @@ def main():
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="test")
 
-    ds_test = TSDataset(df=df_prep, seq_len=num_pairs, X=data["X"], t=data["t"], y=data["y"])
+    ds_test = TSDataset(df=df_prep, seq_len=num_pairs, X=params["X"], t=params["t"], y=params["y"])
     dl_test = DataLoader(ds_test, batch_size, shuffle=False)
 
     test_loss = test(data=dl_test,
                      num_classes=num_classes,
-                     criterion=MSELoss(),
-                     model=Transformer(in_size=len(data["X"]), out_size=num_classes),
+                     criterion=nn.CrossEntropyLoss(),
+                     model=Transformer(in_size=len(params["X"])+len(params["t"]), out_size=num_classes),
                      path="models/transformer.pth"
                      )
     logger.info(f'Evaluation Loss : {test_loss:.6f}\n')

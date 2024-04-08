@@ -13,7 +13,7 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-data = {
+params = {
     "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
     #"X": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
@@ -36,7 +36,7 @@ def load(path, parse_dates, normalize=True):
 
     logger.info("All data: {} rows".format(len(df)))
 
-    empty_days = df.groupby(df['DATETIME'].dt.date).apply(lambda x: x.dropna(subset=data["X"], how='all').empty)
+    empty_days = df.groupby(df['DATETIME'].dt.date).apply(lambda x: x.dropna(subset=params["X"], how='all').empty)
     df = df[~df['DATETIME'].dt.date.isin(empty_days[empty_days].index)]
 
     logger.info("Number of empty days: %d", empty_days.sum())
@@ -60,7 +60,7 @@ def load(path, parse_dates, normalize=True):
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
 
     nan_counts = df.isna().sum() / len(df) * 100
-    logger.info("NaN counts for columns in X: %s", nan_counts)
+    #logger.info("NaN counts for columns in X: %s", nan_counts)
 
     return df
 
@@ -74,7 +74,7 @@ def prepare(df, phase):
     """
     name = "data/" + "df_" + phase + ".csv"
 
-    for column, threshold in data["ignore"]:
+    for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 
 
     df.set_index('DATETIME', inplace=True)

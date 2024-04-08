@@ -116,7 +116,7 @@ def main():
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="train")
 
-    ds = TSDataset(df=df_prep, seq_len=num_pairs, X=data["X"], t=data["t"], y=data["y"])
+    ds = TSDataset(df=df_prep, seq_len=num_pairs, X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
@@ -135,7 +135,7 @@ def main():
                                  patience=2,
                                  lr=1e-4,
                                  criterion=nn.CrossEntropyLoss(),
-                                 model=Transformer(in_size=len(data["X"])+len(data["t"]), out_size=num_classes),
+                                 model=Transformer(in_size=len(params["X"])+len(params["t"]), out_size=num_classes),
                                  optimizer="AdamW",
                                  scheduler=("StepLR", 1.0, 0.98),
                                  path="models/transformer.pth"
