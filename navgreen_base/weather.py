@@ -56,20 +56,25 @@ def concatenate_dicts(list_of_dicts):
     for d in list_of_dicts:
         for key, value in d.items():
             if key in concatenated_dict:
-                raise ValueError(f'Duplicate key found: {key}')
+                #print(f'Duplicate key found: {key}')
+                continue
             else:
                 concatenated_dict[key] = value
     return concatenated_dict
 
 def weather_parser_lp(weather_file):
+    pattern = r'([^:]+):([^ ]+)(.*) (\d+)$'
     parsed_data = {}
     with (open(weather_file, 'r') as file):
         for line in file:
-            match = re.match(r'^\./\d{4}-\d{2}_queries\.lp:(\w+)(?:,provider=\w+)?\s(.+?)\s(\d+)$', line)
+            match = re.match(pattern, line)
             if match:
-                query_type = match.group(1)
-                data_string = match.group(2)
-                unix_time = int(match.group(3))
+                query_type = match.group(2)
+                if query_type[len(query_type) - len(",provider=open_weather_map"):] == ",provider=open_weather_map":
+                    query_type = query_type[:len(query_type) - len(",provider=open_weather_map")]
+                data_string = match.group(3)
+                if data_string[0] == " " : data_string = data_string[1:]
+                unix_time = int(match.group(4))
                 data = {}
                 for entry in data_string.split(','):
                     key, value = entry.split('=')
@@ -78,8 +83,27 @@ def weather_parser_lp(weather_file):
                 if unix_time not in parsed_data:
                     parsed_data[unix_time] = []
 
-                # 'Weather' data have a different syntax than the other, no biggie
+                # Some rains etc. are stored inversely
+                found=False
+                patterns = ['rain_1h,value=', 'rain_3h,value=', 'snow_1h,value=', 'snow_3h,value=']
+                for p in patterns:
+                    if query_type.startswith(p):
+                        value = query_type[len(p):]
+                        query_type_without_value = p[:-(len(",value="))]
+                        parsed_data[unix_time].append({query_type_without_value: value})
+                        # Break the loop if a match is found
+                        found = True
+                        break
+
+                if found: continue
+
+                # 'Weather' and rain_1h data have a different syntax than the other, no biggie
                 if query_type == 'weather': parsed_data[unix_time].append(data)
+                elif query_type == 'rain_1h':
+                    try:
+                        parsed_data[unix_time].append({query_type: data['value']})
+                    except KeyError:
+                        parsed_data[unix_time].append({query_type: data['rs_1h']})
                 else: parsed_data[unix_time].append({query_type: data['value']})
 
     # Sort the dictionary based on keys to get sorted dates
@@ -91,7 +115,6 @@ def weather_parser_lp(weather_file):
         final_data[idx]  = concatenate_dicts(parsed_data[unix_timepoint]+[{'unix_time':unix_timepoint}])
 
     return final_data
-
 
 def create_weather_dataframe(parsed_weather_dict, grp, aggregators):
     df = pd.DataFrame.from_dict(parsed_weather_dict, orient='index')
