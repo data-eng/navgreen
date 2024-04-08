@@ -57,11 +57,6 @@ class TimeSeriesDataset(Dataset):
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
         df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time)
 
-        # Check if any column in y_cols contains NaN values for each row
-        has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
-        # Replace rows with NaN values in any of the y_cols with NaN values
-        df.loc[has_nan_in_y_cols, :] = float('nan')
-
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
