@@ -6,4 +6,6 @@ dist/
 
 data/
 figures/
+static/
+meteo/
 exports.sh
