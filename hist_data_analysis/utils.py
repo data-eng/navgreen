@@ -1,9 +1,25 @@
 import os
 import json
 import math
+import numpy as np
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from collections import namedtuple
 import torch.optim.lr_scheduler as sched
+
+def get_max(arr):
+    """
+    Get the maximum value and its index from an array.
+
+    :param arr: numpy array
+    :return: namedtuple
+    """
+    Info = namedtuple('Info', ['value', 'index'])
+    
+    max_index = np.argmax(arr)
+    max_value = arr[max_index]
+    
+    return Info(value=max_value, index=max_index)
 
 def one_hot(val, k):
     """
@@ -23,27 +39,25 @@ def one_hot(val, k):
 
     return encoding
 
-def visualize(values, labels, title, names, colors, plot_func):
+def visualize(values, labels, title, color, plot_func):
     """
-    Visualize multiple (x,y) data.
+    Visualize (x,y) data points.
 
-    :param values: list of tuples
-    :param labels: tuple
+    :param values: tuple of lists
+    :param labels: tuple of str
     :param title: str
-    :param names: list of str
-    :param colors: list of str
-    :param plot_func: plotting function(e.g., plt.scatter, plt.plot)
+    :param color: str
+    :param plot_func: plotting function
     """
+    x_values, y_values = values
     x_label, y_label = labels
 
     plt.figure(figsize=(10, 6))
-    for i, (x_values, y_values) in enumerate(values):
-        plot_func(x_values, y_values, color=colors[i], label=names[i])
+    plot_func(x_values, y_values, color=color)
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.title(title)
-    plt.legend(title="Parameters")
     plt.tight_layout()
 
     filename = f"{title.lower().replace(' ', '_')}.png"
