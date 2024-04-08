@@ -10,8 +10,7 @@ in this directory:
 
   ``curl -s https://meteo.gr/cf.cfm?city_id=88 -o /home/user/meteo/$(date +%Y%m%d)``
 
-* `obs_weather.txt`: actual weather, obtained by filtering
-  for `provider=open_weather_map` the influxDB lp lines
-  obtained from the OpenWeatherMap API
+* `obs_weather.txt`: actual weather, obtained by filtering for
+  `provider=open_weather_map` or `provider=rain` or `provider=snow`
+  the influxDB lp lines obtained from the OpenWeatherMap API
   (cf. `https://gitlab.com/dataeng/gigacampus`)
-
