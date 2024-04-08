@@ -16,8 +16,16 @@ numpy = "^1.26"
 scipy = "^1.11"
 scikit-learn = "^1.4"
 matplotlib = "^3.8"
+
+# Live data
 influxdb-client = "^1.38"
 pymodbus = "^3.5.4"
+
+# Parsing weather forecast HTML
+beautifulsoup4 = "^4.12"
+dateparser = "^1.2"
+tzlocal = "^5"
+
 
 [build-system]
 requires = ["poetry-core"]
