@@ -14,21 +14,16 @@ class MaskedMSELoss(nn.Module):
         super(MaskedMSELoss, self).__init__()
         self.mask_value = mask_value
 
-    def forward(self, input, target, mask=None):
+    def forward(self, input, target, mask):
         # Compute element-wise squared difference
         squared_diff = (input - target) ** 2
-
-        if mask is not None:
-            # Apply mask to ignore certain elements
-            mask = mask.float()
-            squared_diff = squared_diff * mask
-
+        # Apply mask to ignore certain elements
+        mask = mask.float()
+        squared_diff = squared_diff * mask
         # Compute loss
         loss = squared_diff
-
-        # Optionally, compute the mean loss only over non-masked elements
-        if mask is not None:
-            loss = loss.sum() / (mask.sum() + 1e-8)  # Add epsilon to avoid division by zero
+        # Compute the mean loss only over non-masked elements
+        loss = loss.sum() / (mask.sum() + 1e-8)
 
         return loss
 
