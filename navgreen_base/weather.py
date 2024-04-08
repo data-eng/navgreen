@@ -388,8 +388,8 @@ def write_csv(filename, fieldnames, data):
             writer.writerow(row)
 
 def main():
-    in_path = "meteo"
-    out_path = "static"
+    in_path = "data/meteo"
+    out_path = "data/static"
 
     prefix_to_func = {
         "C": current,
