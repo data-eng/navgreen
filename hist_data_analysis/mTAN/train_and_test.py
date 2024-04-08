@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
+from collections import Counter
 
 from .model import MtanGruRegr
 from .data_loader import load_df, TimeSeriesDataset
@@ -14,7 +15,7 @@ from .utils import MaskedMSELoss, MaskedSmoothL1Loss
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None, params=None):
+def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None, params=None, pvt=False):
     model.eval()
     total_loss = 0
     true_values = []
@@ -28,19 +29,37 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
             out = model(X, observed_tp, masks_X)
             total_loss += criterion(out, y, mask_y)
 
-            if out.shape[0] != X.shape[0]:
-                out = out.unsqueeze(0)
+            if plot:
+                if not pvt:
+                    split_masks_X = [tensor.squeeze(dim=0) for tensor in torch.split(masks_X, 1)]
+                    split_masks_y = [tensor.squeeze(dim=0) for tensor in torch.split(mask_y, 1)]
+                    split_y = [tensor.squeeze(dim=0) for tensor in torch.split(y, 1)]
+                    split_out = [tensor.squeeze(dim=0) for tensor in torch.split(out, 1)]
 
-            # Append masked true and predicted values
-            true_values.append(y.cpu().numpy())
-            predicted_values.append(out.cpu().numpy())
-            masked_values.append(mask_y.cpu().numpy())
+                    for i, mask in enumerate(split_masks_X):
+                        if not (mask == 0).all().item():
+                            split_masks_y[i] = split_masks_y[i].unsqueeze(0)
+                            split_y[i] = split_y[i].unsqueeze(0)
+                            split_out[i] = split_out[i].unsqueeze(0)
 
-    true_values = np.concatenate(true_values, axis=0)
-    predicted_values = np.concatenate(predicted_values, axis=0)
-    masked_values = np.concatenate(masked_values, axis=0)
+                            # Append masked true and predicted values
+                            true_values.append(split_y[i].cpu().numpy())
+                            predicted_values.append(split_out[i].cpu().numpy())
+                            masked_values.append(split_masks_y[i].cpu().numpy())
+                else:
+                    if out.shape[0] != X.shape[0]:
+                        out = out.unsqueeze(0)
+
+                    # Append masked true and predicted values
+                    true_values.append(y.cpu().numpy())
+                    predicted_values.append(out.cpu().numpy())
+                    masked_values.append(mask_y.cpu().numpy())
 
     if plot:
+        true_values = np.concatenate(true_values, axis=0)
+        predicted_values = np.concatenate(predicted_values, axis=0)
+        masked_values = np.concatenate(masked_values, axis=0)
+
         assert pred_value is not None
         assert characteristics is not None
         assert limits is not None
@@ -54,6 +73,12 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
             non_mask_indices = masked_values[:, i] == 1
             non_mask_true_values = true_values[non_mask_indices, i]
             non_mask_predicted_values = predicted_values[non_mask_indices, i]
+
+
+            number_counts = Counter(non_mask_predicted_values)
+            # Find the most common number
+            most_common_number, occurrences = number_counts.most_common(1)[0]
+            print(f"The most common floating-point number is {most_common_number} with {occurrences} occurrences.")
 
             plt.subplot(2, 4, i + 1)  # 2 rows, 4 columns, i+1 subplot index
             plt.scatter(non_mask_true_values, non_mask_predicted_values)
@@ -142,7 +167,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
 
 
-def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, characteristics, limits):
+def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, characteristics, limits, pvt=False):
     torch.manual_seed(1505)
     np.random.seed(1505)
     torch.cuda.manual_seed(1505)
@@ -227,6 +252,7 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
     test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
     test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
     train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
 
     print("Test dataloaders loaded")
 
@@ -237,37 +263,38 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
 
     # Test model's performance on unseen data
     testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics=characteristics, params=params_print, name="test_sliding_win")
+                            characteristics=characteristics, params=params_print, name="test_sliding_win", pvt=pvt)
     print(f'Testing Loss (SmoothL1Loss) for sliding window : {testing_loss:.6f}')
 
     testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics=characteristics, params=params_print, name="test_daily")
+                            characteristics=characteristics, params=params_print, name="test_daily", pvt=pvt)
     print(f'Testing Loss (SmoothL1Loss) daily : {testing_loss:.6f}')
 
     training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics=characteristics, params=params_print, name="train_sliding_win")
+                            characteristics=characteristics, params=params_print, name="train_sliding_win", pvt=pvt)
     print(f'Training Loss (SmoothL1Loss) for sliding window : {training_loss:.6f}')
 
     training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
-                            characteristics=characteristics, params=params_print, name="train_daily")
+                            characteristics=characteristics, params=params_print, name="train_daily", pvt=pvt)
     print(f'Training Loss (SmoothL1Loss) daily : {training_loss:.6f}')
 
 
 def main_loop():
-    print("Weather -> QPVT\n")
 
     sequence_length = 24 // 3
+
+    print("Weather -> QPVT\n")
+    
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'rec_hidden': 64, 'embed_time': 32}
     task = "day_weather_to_day_qpvt"
 
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", limits = (-1., 8.5))
-
+    
     print("\nWeather -> PYRANOMETER\n")
-
-    sequence_length = 24 // 3
+    
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h"]
     y_cols = ["PYRANOMETER"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
@@ -278,11 +305,10 @@ def main_loop():
 
     print("\nPYRANOMETER -> QPVT\n")
 
-    sequence_length = 24 // 3
     X_cols = ["PYRANOMETER"]
     y_cols = ["Q_PVT"]
     params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 8, 'rec_hidden': 8, 'embed_time': 32}
     task = "day_pyran_to_day_qpvt"
 
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                        characteristics="PYRANOMETER", limits = (-1., 8.5))
+                        characteristics="PYRANOMETER", limits = (-1., 8.5), pvt=True)
