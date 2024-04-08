@@ -257,7 +257,7 @@ def main_loop():
     print("Weather -> QPVT\n")
 
     sequence_length = 24 // 3
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["Q_PVT"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
     task = "day_weather_to_day_qpvt"
@@ -268,7 +268,7 @@ def main_loop():
     print("Weather -> PYRANOMETER\n")
 
     sequence_length = 24 // 3
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["PYRANOMETER"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
     task = "day_weather_to_day_pyran"
@@ -281,7 +281,7 @@ def main_loop():
     sequence_length = 24 // 3
     X_cols = ["PYRANOMETER"]
     y_cols = ["Q_PVT"]
-    params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 8, 'embed_time': 32}
+    params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 8, 'rec_hidden': 8, 'embed_time': 32}
     task = "day_pyran_to_day_qpvt"
 
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
