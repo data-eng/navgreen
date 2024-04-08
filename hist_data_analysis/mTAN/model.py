@@ -87,3 +87,44 @@ class MtanGruRegr(nn.Module):
         _, out = self.enc(out)
         out = out.squeeze()
         return self.regressor(out.squeeze(0))
+
+
+class MtanGruClassif(nn.Module):
+
+    def __init__(self, input_dim, query, device, nhidden, embed_time, num_heads, output_len=2 ):
+        super(MtanGruClassif, self).__init__()
+        assert embed_time % num_heads == 0
+        self.device = device
+        self.embed_time = embed_time
+        self.nhidden = nhidden
+        self.query = query
+        self.att = MultiTimeAttention(2 * input_dim, nhidden, embed_time, num_heads)
+        self.classifier = nn.Sequential(
+            nn.Linear(nhidden, 128),
+            nn.Linear(128, 128),
+            nn.Linear(128, output_len))
+        self.enc = nn.RNN(nhidden, nhidden, batch_first=True)
+
+        self.periodic = nn.Linear(1, embed_time - 1)
+        self.linear = nn.Linear(1, 1)
+
+    def learn_time_embedding(self, tt):
+        tt = tt.to(self.device)
+        tt = tt.unsqueeze(-1)
+        out2 = torch.sin(self.periodic(tt))
+        out1 = self.linear(tt)
+        return torch.cat([out1, out2], -1)
+
+    def forward(self, x, time_steps, mask):
+        # x is: [batch_size, sequence_length, input_size]
+        x = torch.cat((x, mask), 2)
+        mask = torch.cat((mask, mask), 2)
+        time_steps = time_steps.to(self.device)
+
+        key = self.learn_time_embedding(time_steps).to(self.device)
+        query = self.learn_time_embedding(self.query.unsqueeze(0)).to(self.device)
+
+        out = self.att(query, key, x, mask)
+        _, out = self.enc(out)
+        out = out.squeeze()
+        return self.regressor(out.squeeze(0))
