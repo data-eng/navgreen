@@ -265,10 +265,10 @@ def main_loop():
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", limits = (-1., 8.5))
 
-    print("Weather -> PYRANOMETER\n")
+    print("\nWeather -> PYRANOMETER\n")
 
     sequence_length = 24 // 3
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h"]
     y_cols = ["PYRANOMETER"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
     task = "day_weather_to_day_pyran"
@@ -276,7 +276,7 @@ def main_loop():
     train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                         characteristics="weather", limits = (-0.1, 1.1))
 
-    print("PYRANOMETER -> QPVT\n")
+    print("\nPYRANOMETER -> QPVT\n")
 
     sequence_length = 24 // 3
     X_cols = ["PYRANOMETER"]

@@ -43,6 +43,7 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
                 df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
 
     if stats is not None: mean_stds = None
+
     return df, mean_stds
 
 
@@ -93,10 +94,11 @@ class TimeSeriesDataset(Dataset):
         masks_y = torch.isnan(y).int()
         masks_y = 1 - masks_y
 
+        '''
         X = X.masked_fill(masks_X == 0, torch.nanmedian(X))
         X = torch.where(torch.isnan(X), self.means_X, X)
-
-        #X = X.masked_fill(masks_X == 0, 0)
+        '''
+        X = X.masked_fill(masks_X == 0, -1e9)
         y = y.masked_fill(masks_y == 0, -1e1) # This does not really matter as it is gonna be masked out in loss function
 
         return (X, masks_X, time), (y, masks_y)
