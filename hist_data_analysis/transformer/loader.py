@@ -14,8 +14,10 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 data = {
-    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
-    "t": ['SIN_HOUR', 'COS_HOUR', 'SIN_DAY', 'COS_DAY', 'SIN_MONTH', 'COS_MONTH'],
+    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
+    #"X": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
+    "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
+    #"t": [],
     "y": ["binned_Q_PVT"],
     "ignore": [] 
 }
@@ -30,7 +32,16 @@ def load(path, parse_dates, normalize=True):
     :return: dataframe
     """
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
+    df.sort_values(by='DATETIME', inplace=True)
+
     logger.info("All data: {} rows".format(len(df)))
+
+    empty_days = df.groupby(df['DATETIME'].dt.date).apply(lambda x: x.dropna(subset=data["X"], how='all').empty)
+    df = df[~df['DATETIME'].dt.date.isin(empty_days[empty_days].index)]
+
+    logger.info("Number of empty days: %d", empty_days.sum())
+    logger.info("Number of empty data points: %d", 8 * empty_days.sum())
+    logger.info("Data after dropping NAN days: {} rows".format(len(df)))
 
     datetimes, periods = ['month', 'day', 'hour'], [12, 30, 24]
 
@@ -47,6 +58,10 @@ def load(path, parse_dates, normalize=True):
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
+
+    nan_counts = df.isna().sum() / len(df) * 100
+    logger.info("NaN counts for columns in X: %s", nan_counts)
+
     return df
 
 def prepare(df, phase):
@@ -104,15 +119,15 @@ class TSDataset(Dataset):
     
         X, y = self.X.iloc[start_idx:end_idx].values, self.y.iloc[start_idx:end_idx].values
 
-        mask_X, mask_y = 1 - pd.isnull(X).astype(int), 1 - pd.isnull(y).astype(int)
+        mask_X, mask_y = pd.isnull(X).astype(int), pd.isnull(y).astype(int)
 
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
         mask_X, mask_y = torch.FloatTensor(mask_X), torch.FloatTensor(mask_y)
 
-        X, y = X.masked_fill(mask_X == 0, 0), y.masked_fill(mask_y == 0, 0)
+        X, y = X.masked_fill(mask_X == 1, 0), y.masked_fill(mask_y == 1, 0)
 
-        """ # COLUMNS "rain_3h", "snow_1h", "snow_3h" HAVE ONLY NANS!
-        column_to_check = 0
+        """ # COLUMNS "rain_3h", "snow_3h" HAVE ONLY 0! (a.k.a the old NANS)
+        column_to_check = 6
         column_name = self.X.columns[column_to_check]
         column_has_nonzero = torch.any(X[:, column_to_check].flatten() != 0.)
 
@@ -121,12 +136,22 @@ class TSDataset(Dataset):
            print("Column has non-zero values:", column_has_nonzero.item())
         """
 
+        """ # NO COLUMN HAS NANS
+        column_to_check = 10
+        column_name = self.X.columns[column_to_check]
+        column_has_nans = torch.isnan(X[:, column_to_check]).any()
+
+        if column_has_nans.item():
+           print("Feature:", column_name)
+           print("Column has nan values:", column_has_nans.item())
+        """
+
         mask_X_2d = torch.zeros(mask_X.size(0))
         for i in range(mask_X.size(0)):
-            if torch.any(mask_X[i] == 0):
-                mask_X_2d[i] = 0
-            else:
+            if torch.any(mask_X[i] == 1):
                 mask_X_2d[i] = 1
+            else:
+                mask_X_2d[i] = 0
 
         return X, y, mask_X_2d
     

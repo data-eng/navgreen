@@ -2,7 +2,7 @@ import time
 import logging
 import torch
 import matplotlib.pyplot as plt
-from torch.nn import MSELoss
+import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from hist_data_analysis import utils
@@ -50,8 +50,8 @@ def train(data, num_classes, epochs, patience, lr, criterion, model, optimizer, 
 
         for _, (X, y, mask) in progress_bar:
             X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
-
             y_pred = model(X, mask)
+            
             loss = criterion(y_pred, y)
 
             optimizer.zero_grad()
@@ -73,10 +73,8 @@ def train(data, num_classes, epochs, patience, lr, criterion, model, optimizer, 
         with torch.no_grad():
             for X, y, mask in val_data:
                 X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
-
                 y_pred = model(X, mask)
-                y = utils.one_hot(y, k=num_classes)
-            
+
                 val_loss = criterion(y_pred, y)
                 total_val_loss += val_loss.item()
         
@@ -113,7 +111,7 @@ def main():
     path = "data/owm+plc/training_set_classif.csv"
     num_pairs = 1440 // 180
     num_classes = 5
-    batch_size=120
+    batch_size = 32
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="train")
@@ -124,12 +122,19 @@ def main():
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
+    """ # The are no nans!
+    for batch_idx, (X, y, _) in enumerate(dl_val):
+        for seq in X:
+            if(torch.isnan(seq).any()):
+               print(seq)
+    """
+
     train_loss, val_loss = train(data=(dl_train, dl_val),
                                  num_classes=num_classes,
                                  epochs=10,
                                  patience=2,
                                  lr=1e-4,
-                                 criterion=MSELoss(),
+                                 criterion=nn.CrossEntropyLoss(),
                                  model=Transformer(in_size=len(data["X"])+len(data["t"]), out_size=num_classes),
                                  optimizer="AdamW",
                                  scheduler=("StepLR", 1.0, 0.98),
