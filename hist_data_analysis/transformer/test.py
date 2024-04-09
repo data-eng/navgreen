@@ -62,14 +62,14 @@ def test(data, num_classes, criterion, model, path):
 
 def main():
     path = "data/owm+plc/test_set_classif.csv"
-    num_pairs = 1440 // 180
+    seq_len = 1440 // 180
     num_classes = 5
     batch_size=1
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="test")
 
-    ds_test = TSDataset(df=df_prep, seq_len=num_pairs, X=params["X"], t=params["t"], y=params["y"])
+    ds_test = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"])
     dl_test = DataLoader(ds_test, batch_size, shuffle=False)
 
     test_loss = test(data=dl_test,

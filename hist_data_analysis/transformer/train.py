@@ -92,11 +92,12 @@ def train(data, num_classes, epochs, patience, lr, criterion, model, optimizer, 
             true_classes = [utils.get_max(pred).index for pred in true_values]
             pred_classes = [utils.get_max(pred).index for pred in pred_values]
 
-            utils.visualize(values=(true_classes, pred_classes), 
-                    labels=("True Values", "Predicted Values"), 
-                    title="train_"+ylabel,
-                    color='brown',
-                    plot_func=plt.scatter)
+            if plot:
+                utils.visualize(values=(true_classes, pred_classes), 
+                        labels=("True Values", "Predicted Values"), 
+                        title="train_"+ylabel,
+                        color='brown',
+                        plot_func=plt.scatter)
         else:
             stationary += 1
 
@@ -120,14 +121,14 @@ def train(data, num_classes, epochs, patience, lr, criterion, model, optimizer, 
 
 def main():
     path = "data/owm+plc/training_set_classif.csv"
-    num_pairs = 1440 // 180
+    seq_len = 1440 // 180
     num_classes = 5
     batch_size = 32
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="train")
 
-    ds = TSDataset(df=df_prep, seq_len=num_pairs, X=params["X"], t=params["t"], y=params["y"])
+    ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
