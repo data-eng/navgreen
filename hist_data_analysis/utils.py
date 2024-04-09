@@ -2,6 +2,7 @@ import os
 import json
 import math
 import numpy as np
+import torch
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from collections import namedtuple
@@ -20,6 +21,25 @@ def get_max(arr):
     max_value = arr[max_index]
     
     return Info(value=max_value, index=max_index)
+
+def hot3D(t, k, device):
+    """
+    Encode 3D tensor into one-hot format.
+    
+    :param t: tensor of shape (dim_0, dim_1, dim_2)
+    :param k: int number of classes
+    :param device: device
+    :return: tensor of shape (dim_0, dim_1, k)
+    """
+    dim_0, dim_1, _ = t.size()
+    t_hot = torch.zeros(dim_0, dim_1, k, device=device)
+
+    for x in range(dim_0):
+        for y in range(dim_1):
+            for z in t[x, y]:
+                t_hot[x, y] = torch.tensor(one_hot(z.item(), k=k))
+
+    return t_hot.to(device)
 
 def one_hot(val, k):
     """

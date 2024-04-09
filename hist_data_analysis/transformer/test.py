@@ -18,17 +18,6 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def y_hot(y, num_classes):
-    batch_size, seq_len, _ = y.size()
-    y_hot = torch.zeros(batch_size, seq_len, num_classes, device=device)
-
-    for batch in range(y.size(0)):
-        for seq in range(y.size(1)):
-            for feat in y[batch, seq]:
-                y_hot[batch, seq] = torch.tensor(utils.one_hot(feat.item(), k=num_classes))
-
-    return y_hot
-
 def test(data, num_classes, criterion, model, path):
     model.load_state_dict(torch.load(path))
     model.to(device)
@@ -41,7 +30,7 @@ def test(data, num_classes, criterion, model, path):
 
     with torch.no_grad():
         for _, (X, y, mask) in progress_bar:
-            X, y, mask = X.to(device), y_hot(y, num_classes).to(device), mask.to(device)
+            X, y, mask = X.to(device), utils.hot3D(y, num_classes, device), mask.to(device)
             y_pred = model(X, mask)
         
             loss = criterion(y_pred, y)
@@ -62,7 +51,7 @@ def test(data, num_classes, criterion, model, path):
 
     utils.visualize(values=(true_classes, pred_classes), 
                     labels=("True Values", "Predicted Values"), 
-                    title=ylabel+"_test",
+                    title="test_"+ylabel,
                     color='rebeccapurple',
                     plot_func=plt.scatter)
 
