@@ -1,5 +1,4 @@
 import time
-import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,7 +7,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 from collections import Counter
 
-from .model import MtanGruRegr
+from .model import MtanRNNRegr
 from .data_loader import load_df, TimeSeriesDataset
 from .utils import MaskedMSELoss, MaskedSmoothL1Loss
 
@@ -167,7 +166,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
 
 
-def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, characteristics, limits, pvt=False):
+def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristics, limits, pvt=False):
     torch.manual_seed(1505)
     np.random.seed(1505)
     torch.cuda.manual_seed(1505)
@@ -179,12 +178,11 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
 
     # Parameters:
     num_heads = params["num_heads"]
-    rec_hidden = params["rec_hidden"]
     embed_time = params["embed_time"]
     batch_size = params["batch_size"]
     lr = params["lr"]
 
-    params_print = (f"num_heads={num_heads}, rec_hidden={rec_hidden}, embed_time={embed_time}, "
+    params_print = (f"num_heads={num_heads}, embed_time={embed_time}, "
                     f"sequence_length={sequence_length}, batch_size={batch_size}")
 
     pvt_cols = ["DATETIME"] + X_cols + y_cols
@@ -205,12 +203,9 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
     train_df = pd.read_csv("data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
     test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
-    trainX = train_df[X_cols]
-    means_X = trainX.mean(skipna=True)
-
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                         X_cols=X_cols, y_cols=y_cols, final_train=True, means_X=means_X)
+                                         X_cols=X_cols, y_cols=y_cols, final_train=True)
 
     # Get the total number of samples and compute size of each corresponding set
     total_samples = len(training_dataset)
@@ -227,11 +222,11 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
     print("Validation dataloader loaded")
 
     # Configure model
-    model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device, output_len=sequence_length).to(device)
+    model = MtanRNNRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                        num_heads=num_heads, device=device).to(device)
     # Loss
     #criterion = MaskedMSELoss()
-    criterion = MaskedSmoothL1Loss()
+    criterion = MaskedSmoothL1Loss(sequence_length=sequence_length)
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
@@ -242,12 +237,11 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
 
     # Create a dataset and dataloader
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                                X_cols=X_cols, y_cols=y_cols, means_X=means_X)
+                                                X_cols=X_cols, y_cols=y_cols)
     testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                                X_cols=X_cols, y_cols=y_cols, final_train=True, per_day=True,
-                                                means_X=means_X)
+                                                X_cols=X_cols, y_cols=y_cols, final_train=True, per_day=True)
     training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                                 X_cols=X_cols, y_cols=y_cols, per_day=True, means_X=means_X)
+                                                 X_cols=X_cols, y_cols=y_cols, per_day=True)
 
     test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
     test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
@@ -256,8 +250,9 @@ def train_and_eval_regr(X_cols, y_cols, params, task, sequence_length, character
 
     print("Test dataloaders loaded")
 
-    trained_model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                        embed_time=embed_time, num_heads=num_heads, device=device, output_len=sequence_length).to(device)
+    trained_model = MtanRNNRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                                num_heads=num_heads, device=device).to(device)
+
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
@@ -287,28 +282,28 @@ def main_loop():
     
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'rec_hidden': 64, 'embed_time': 32}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_day_qpvt"
 
-    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", limits = (-1., 8.5))
-    
+
     print("\nWeather -> PYRANOMETER\n")
     
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h"]
     y_cols = ["PYRANOMETER"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 2, 'rec_hidden': 64, 'embed_time': sequence_length}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_day_pyran"
 
-    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                         characteristics="weather", limits = (-0.1, 1.1))
 
     print("\nPYRANOMETER -> QPVT\n")
 
     X_cols = ["PYRANOMETER"]
     y_cols = ["Q_PVT"]
-    params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 8, 'rec_hidden': 8, 'embed_time': 32}
+    params = {'batch_size': 8, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_pyran_to_day_qpvt"
 
-    train_and_eval_regr(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                        characteristics="PYRANOMETER", limits = (-1., 8.5), pvt=True)
+    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                   characteristics="PYRANOMETER", limits = (-1., 8.5), pvt=True)

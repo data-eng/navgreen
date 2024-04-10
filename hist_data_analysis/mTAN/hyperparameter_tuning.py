@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from .train_and_test import train
-from .model import MtanGruRegr
+from .train_and_test_regr import train
+from .model import MtanRNNRegr
 from .data_loader import load_df, TimeSeriesDataset
 
 import logging
@@ -37,18 +37,17 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
 
     # Get all tunable parameters ...
     # architecture wise:
-    num_heads_choices = [1, 2, 4, 8] #[2] #
-    rec_hidden_choices = [8, 16, 32] # [16] #
+    time_embedding_choices = [8, 16, 32, 64]
+    num_heads_choices = [2, 4, 8] #[2] #
     # training wise:
-    batch_size_choices = [8, 16, 32] # [16] #
+    batch_size_choices = [16, 32, 64] # [16] #
     learning_rate_choices = [0.0005, 0.001, 0.005, 0.01] # [0.001] #
 
     sequence_length = 24 // 3
-    embed_time = sequence_length
 
     # Other parameters
-    epochs = 30
-    patience = 10
+    epochs = 300
+    patience = 20
     validation_set_percentage = 0.2
 
 
@@ -57,7 +56,7 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
         "batch_size": batch_size_choices,
         "lr": learning_rate_choices,
         "num_heads": num_heads_choices,
-        "rec_hidden": rec_hidden_choices
+        "embed_time": time_embedding_choices
     }
 
     hyperparameters = dict()
@@ -98,11 +97,13 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
         hyperparameters["lr"] = parameters[1]
         hyperparameters["num_heads"] = parameters[2]
         hyperparameters["rec_hidden"] = parameters[3]
+        hyperparameters["embed_time"] = parameters[4]
 
         batch_size = hyperparameters["batch_size"]
         learning_rate = hyperparameters["lr"]
         num_heads = hyperparameters["num_heads"]
         rec_hidden = hyperparameters["rec_hidden"]
+        embed_time = hyperparameters["embed_time"]
 
         # Try training with these parameters
         print("\n")
@@ -113,8 +114,8 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         # Configure model
-        model = MtanGruRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), nhidden=rec_hidden,
-                            embed_time=embed_time, num_heads=num_heads, device=device, output_len=sequence_length).to(device)
+        model = MtanRNNRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                            num_heads=num_heads, device=device).to(device)
 
         # Train the model
         try:
