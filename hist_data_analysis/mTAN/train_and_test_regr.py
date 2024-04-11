@@ -65,7 +65,7 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         assert name is not None
         assert params is not None
 
-        plt.figure(figsize=(16, 8))  # Adjust the figure size as needed
+        plt.figure(figsize=(16, 8))
 
         for i in range(8):
             # Filter out masked values
