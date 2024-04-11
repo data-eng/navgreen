@@ -56,14 +56,10 @@ class MaskedCrossEntropyLoss(nn.Module):
         pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
                          pred.shape[2]).mean(dim=2)
 
-        softmax_output = torch.softmax(pred, dim=-1)
-        pred = softmax_output
-
         true = true.long()
         true = true * mask.long()
         loss = [F.cross_entropy(pred[b_sz, :, :], true[b_sz, :], reduction='none') for b_sz in range(true.shape[0])]
         loss = torch.stack(loss, dim=0)
-        loss = torch.mean(loss, dim=0)
 
         mask = mask.float()
         loss = loss * mask
