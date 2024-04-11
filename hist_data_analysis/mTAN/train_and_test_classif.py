@@ -8,7 +8,6 @@ import seaborn as sns
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
-from collections import Counter
 
 from .model import MtanRNNClassif
 from .data_loader import load_df, TimeSeriesDataset
@@ -72,8 +71,7 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         print(f'true_values.shape {true_values.shape}')
         print(f'predicted_values.shape {predicted_values.shape}')
 
-        if predicted_values.ndim == 2:
-            predicted_values = np.transpose(predicted_values)  # Permute dimensions from (5, 10) to (10, 5)
+        if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
         print(f'predicted_values.shape {predicted_values.shape}')
         # Add singleton dimension
         #predicted_values = np.expand_dims(predicted_values, axis=0)  # Add singleton dimension
@@ -109,42 +107,7 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         plt.xlabel('Predicted labels')
         plt.ylabel('True labels')
         plt.title('Confusion Matrix')
-        plt.show()
-
-        '''
-        for i in range(8):
-            # Filter out masked values
-            non_mask_indices = masked_values[:, i] == 1
-            non_mask_true_values = true_values[non_mask_indices, i]
-            non_mask_predicted_values = predicted_values[non_mask_indices, i]
-
-            number_counts = Counter(non_mask_predicted_values)
-            # Find the most common number
-            most_common_number, occurrences = number_counts.most_common(1)[0]
-            print(f"The most common floating-point number is {most_common_number} with {occurrences} occurrences.")
-
-            plt.subplot(2, 4, i + 1)  # 2 rows, 4 columns, i+1 subplot index
-            plt.scatter(non_mask_true_values, non_mask_predicted_values)
-            plt.xlabel("True Value")
-            plt.ylabel("Predicted Value")
-            plt.title(f"{i + 1}'th 3hrs of the day ({characteristics} to {pred_value})")
-
-            min_value, max_value = limits[0], limits[1]
-
-            # Adjust the limits based on the threshold
-            range_value = max_value - min_value
-            threshold = 0.05
-            min_value -= threshold * range_value
-            max_value += threshold * range_value
-
-            # Set limits of both x-axis and y-axis based on the adjusted minimum and maximum values
-            plt.xlim(min_value, max_value)
-            plt.ylim(min_value, max_value)
-
-        plt.tight_layout()
-        plt.savefig(f"figures/{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
-        '''
-
+        plt.savefig(f"cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
 
     return total_loss / len(dataloader)
 
@@ -169,7 +132,7 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
         start_time = time.time()
         for (X, masks_X, observed_tp), (y, mask_y) in train_loader:
-            X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
+            X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
             out = model(X, observed_tp, masks_X)
             loss = criterion(out, y, mask_y)
 
@@ -217,7 +180,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     validation_set_percentage = 0.3
 
-    epochs = 4
+    epochs = 300
     patience = 20
 
     # Parameters:
@@ -271,16 +234,16 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     # Loss
     # criterion = MaskedMSELoss()
     criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length)
-    '''
+
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-    '''
+
     # Create a dataset and dataloader
-    '''
+
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
                                                 X_cols=X_cols, y_cols=y_cols)
     testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,  X_cols=X_cols,
@@ -291,7 +254,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
     test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
     train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
-    '''
+
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
 
     print("Test dataloaders loaded")
@@ -301,27 +264,27 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
-    '''
+
     # Test model's performance on unseen data
     testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0],
                             limits=limits,
                             characteristics=characteristics, params=params_print, name="test_sliding_win", pvt=pvt)
-    print(f'Testing Loss (SmoothL1Loss) for sliding window : {testing_loss:.6f}')
+    print(f'Testing Loss (Cross Entropy) for sliding window : {testing_loss:.6f}')
 
     testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
                             limits=limits,
                             characteristics=characteristics, params=params_print, name="test_daily", pvt=pvt)
-    print(f'Testing Loss (SmoothL1Loss) daily : {testing_loss:.6f}')
-    '''
+    print(f'Testing Loss (Cross Entropy) daily : {testing_loss:.6f}')
+
     training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], limits=limits,
                              characteristics=characteristics, params=params_print, name="train_sliding_win", pvt=pvt)
-    print(f'Training Loss (SmoothL1Loss) for sliding window : {training_loss:.6f}')
-    '''
+    print(f'Training Loss (Cross Entropy) for sliding window : {training_loss:.6f}')
+
     training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
                              limits=limits,
                              characteristics=characteristics, params=params_print, name="train_daily", pvt=pvt)
-    print(f'Training Loss (SmoothL1Loss) daily : {training_loss:.6f}')
-    '''
+    print(f'Training Loss (Cross Entropy) daily : {training_loss:.6f}')
+
 
 def main_loop():
     sequence_length = 24 // 3
@@ -330,8 +293,8 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
-    task = "day_weather_to_day_qpvt"
+    params = {'batch_size': 32, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
+    task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", limits=(-1., 8.5))
