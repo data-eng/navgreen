@@ -21,16 +21,18 @@ logger.info(f'Device is {device}')
 def tune(data, static, config):
     ds_train, ds_val = data
     combs = list(it.product(*config.values()))
+    _, num_classes, epochs, patience = static.values()
     
     best_val_loss = float('inf')
     best_params = None
     results = []
 
-    for c, params in enumerate(combs):
-        logger.info(f'\nTuning case {c+1} with: {params}')
+    for c, hyperparams in enumerate(combs):
+        logger.info(f'\nTuning case {c+1} with: {hyperparams}')
 
-        _, num_classes, epochs, patience = static
-        batch_size, lr, nhead, num_layers, dim_feedforward, dropout = params
+        batch_size, lr, nhead, num_layers, dim_feedforward, dropout = hyperparams
+
+        # poetry run tune_transformer
     
         dl_train = DataLoader(ds_train, batch_size, shuffle=True)
         dl_val = DataLoader(ds_val, batch_size, shuffle=False)
@@ -56,7 +58,7 @@ def tune(data, static, config):
                                     plot=False
                                     )
         
-        results.append({'params': params, 'train_loss': train_loss, 'val_loss': val_loss})
+        results.append({'params': hyperparams, 'train_loss': train_loss, 'val_loss': val_loss})
 
         if val_loss < best_val_loss:
             logger.info('New best parameters found!\n')
@@ -78,9 +80,9 @@ def main():
     ds_train, ds_val = split(ds, vperc=0.2)
 
     results, best_params = tune(data=(ds_train, ds_val),
-                             static=static,
-                             config=config
-                             )
+                                static=static,
+                                config=config
+                                )
     
     with open('tuning_results.json', 'w') as f:
         json.dump(results, f)
