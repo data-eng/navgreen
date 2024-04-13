@@ -46,21 +46,23 @@ class MaskedSmoothL1Loss(nn.Module):
 
 
 class MaskedCrossEntropyLoss(nn.Module):
-    def __init__(self, sequence_length):
+    def __init__(self, sequence_length, weights):
         super(MaskedCrossEntropyLoss, self).__init__()
         self.sequence_length = sequence_length
+        # Calculate the inverse class frequencies
+        w = 1.0 / weights
+        self.weights = w / w.sum()
+        print(f'weights is {self.weights}')
 
     def forward(self, pred, true, mask):
-
         if pred.dim() == 2: pred = pred.permute(1,0).unsqueeze(0)
-        pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
-                         pred.shape[2]).mean(dim=2)
+        #pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
+        #                  pred.shape[2]).mean(dim=2)
 
         true = true.long()
         true = true * mask.long()
-        loss = [F.cross_entropy(pred[b_sz, :, :], true[b_sz, :], reduction='none') for b_sz in range(true.shape[0])]
+        loss = [F.cross_entropy(pred[b_sz, :, :], true[b_sz, :], reduction='none', weight=self.weights) for b_sz in range(true.shape[0])]
         loss = torch.stack(loss, dim=0)
-
         mask = mask.float()
         loss = loss * mask
 
