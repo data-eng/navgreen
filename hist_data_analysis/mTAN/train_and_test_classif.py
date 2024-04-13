@@ -1,8 +1,9 @@
 import time
 import numpy as np
 import pandas as pd
+import warnings
 
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -73,30 +74,22 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
         print(f'predicted_values.shape {predicted_values.shape}')
-        # Add singleton dimension
-        #predicted_values = np.expand_dims(predicted_values, axis=0)  # Add singleton dimension
-        #print(f'predicted_values.shape {predicted_values.shape}')
-        # Reshape and calculate mean
-        predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
-                                                            predicted_values.shape[1] // true_values.shape[1],
-                                                            predicted_values.shape[2]), axis=2)
 
+        # Reshape and calculate aggregation
+        # predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
+        #                                                    predicted_values.shape[1] // true_values.shape[1],
+        #                                                    predicted_values.shape[2]), axis=2)
+        print(predicted_values.shape)
         # Apply softmax along the last dimension
         predicted_values = np.exp(predicted_values) / np.sum(np.exp(predicted_values), axis=-1, keepdims=True)
-
         # Get the index of the maximum probability along the last dimension
         predicted_values = np.argmax(predicted_values, axis=-1)
 
         non_mask_indices = masked_values == 1
-        print(f'non_mask_indices: {non_mask_indices.shape}')
         true_values = true_values[non_mask_indices]
         predicted_values = predicted_values[non_mask_indices]
 
-        print(f'true_values.shape {true_values.shape}')
-        print(f'predicted_values.shape {predicted_values.shape}')
-
         # Compute confusion matrix
-        print(f'predicted_values.shape b4 conf matr {predicted_values.shape}')
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
         cm = confusion_matrix(true_values, predicted_values)
 
@@ -107,7 +100,21 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         plt.xlabel('Predicted labels')
         plt.ylabel('True labels')
         plt.title('Confusion Matrix')
-        plt.savefig(f"cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
+        plt.savefig(f"figures/cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
+
+        # Compute scores
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=UserWarning)
+
+            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='micro')
+            print(f"Micro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+
+            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='macro')
+            print(f"Macro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+
+            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values,
+                                                                       average='weighted')
+            print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
 
     return total_loss / len(dataloader)
 
@@ -180,8 +187,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     validation_set_percentage = 0.3
 
-    epochs = 300
-    patience = 20
+    epochs = 400
+    patience = 30
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -223,17 +230,18 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     train_dataset, val_dataset = random_split(training_dataset, [train_size, validation_size])
 
     # Create dataloaders for training and validation sets
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
     print("Train dataloader loaded")
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
     print("Validation dataloader loaded")
 
     # Configure model
     model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
-                        num_heads=num_heads, device=device).to(device)
+                           num_heads=num_heads, device=device).to(device)
     # Loss
-    # criterion = MaskedMSELoss()
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length)
+    # criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length, weights=torch.tensor([1, 1, 1, 1, 1]).to(device))
+    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+                                       weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
@@ -246,21 +254,21 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
                                                 X_cols=X_cols, y_cols=y_cols)
-    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,  X_cols=X_cols,
-                                               y_cols=y_cols, per_day=True)
+    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
+                                                y_cols=y_cols, per_day=True)
     training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
                                                  X_cols=X_cols, y_cols=y_cols, per_day=True)
 
-    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
-    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
-    train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False, drop_last=True)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
+    train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
 
-    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
     print("Test dataloaders loaded")
 
     trained_model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
-                                num_heads=num_heads, device=device).to(device)
+                                   num_heads=num_heads, device=device).to(device)
 
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
@@ -293,8 +301,19 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", limits=(-1., 8.5))
+
+    print("\nPYRANOMETER -> QPVT\n")
+
+    X_cols = ["PYRANOMETER"]
+    y_cols = ["binned_Q_PVT"]
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
+    task = "day_weather_to_binned_qpvt"
+
+    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                   characteristics="PYRANOMETER", limits=(-1., 8.5))
+
