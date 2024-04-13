@@ -93,12 +93,15 @@ class MtanRNNClassif(nn.Module):
         super(MtanRNNClassif, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device
+        self.init_embed = init_embed
         self.embed_time = embed_time
         self.query = query
         self.att = MultiTimeAttention(2 * input_dim, embed_time, num_heads)
         # self.att = MultiTimeAttention(input_dim, nhidden, embed_time, num_heads)
-        self.classifier = nn.Linear(embed_time, out_classes)
-        self.classifiers = nn.ModuleList([self.classifier for _ in range(embed_time)])
+        self.classifier = nn.Linear(1, out_classes)
+
+        # self.final = nn.Conv2d(in_channels=5, out_channels=5, kernel_size=(8, 1), stride=(4, 1), padding=(3, 0))
+        self.final = nn.Linear(embed_time * out_classes, init_embed * out_classes)
 
         self.enc = nn.RNN(embed_time, embed_time, batch_first=True)
 
@@ -123,9 +126,24 @@ class MtanRNNClassif(nn.Module):
 
         out = self.att(query, key, x, mask)
         _, out = self.enc(out)
-        out = out.squeeze()
-        #out = self.classifier(out.squeeze(0))
-        #out = [classifier(out[:, i]) for i, classifier in enumerate(self.classifiers)]
-        out = [classifier(out) for i, classifier in enumerate(self.classifiers)]
-        out = torch.stack(out, dim=1)  # Stack the outputs along the class dimension
+
+        out = out.permute(1, 2, 0)
+        out = [self.classifier(out[i, :, :]) for i in range(x.shape[0])]
+        out = torch.stack(out, dim=0)  # Stack the outputs along the class dimension
+
+        '''
+        if out.dim() == 2:
+            out = out.permute(1, 0)
+            out = out.unsqueeze(0)
+
+        out = out.unsqueeze(0)
+        out = self.final(out.permute(0, 3, 1, 2))
+        out = out.squeeze(0).permute(2, 1, 0)
+        '''
+
+        out = out.reshape(out.shape[0], -1)
+        if out.dim() == 2: out = out.unsqueeze(1)
+        out = self.final(out)
+        out = out.reshape(out.shape[0], self.init_embed, -1)
+
         return out
