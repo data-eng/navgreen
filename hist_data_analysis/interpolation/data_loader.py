@@ -49,8 +49,9 @@ class TimeSeriesDataset(Dataset):
         self.sequence_length = sequence_length
         self.per_day = per_day
 
-        df = dataframe.interpolate(method=interpolation)
+        df = dataframe
         self.X, self.y = df[X_cols], df[y_cols]
+        self.X = self.X.interpolate(method=interpolation)
 
         if final_train:
             for col in y_cols:
@@ -74,4 +75,9 @@ class TimeSeriesDataset(Dataset):
         # Convert the sequence to a PyTorch tensor
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
 
-        return X, y
+        masks_y = torch.isnan(y).int()
+        masks_y = 1 - masks_y
+
+        y = y.masked_fill(masks_y == 0, -1e9)
+
+        return X, (y, masks_y)
