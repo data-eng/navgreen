@@ -14,4 +14,4 @@ class CrossEntropyLoss(nn.Module):
         loss = torch.stack(loss, dim=0)
         loss = torch.sum(loss)
 
-        return loss
+        return loss / (loss.shape[0] * loss.shape[1])
