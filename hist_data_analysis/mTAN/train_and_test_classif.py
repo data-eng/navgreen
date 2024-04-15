@@ -239,9 +239,9 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                            num_heads=num_heads, device=device).to(device)
     # Loss
-    # criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length, weights=torch.tensor([1, 1, 1, 1, 1]).to(device))
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
-                                       weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
+    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length, weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+    #criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
@@ -301,7 +301,7 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
+    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 4, 'embed_time': 32}
     task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
@@ -311,7 +311,7 @@ def main_loop():
 
     X_cols = ["PYRANOMETER"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
+    params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
