@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -15,6 +16,45 @@ from .data_loader import load_df, TimeSeriesDataset
 from .utils import MaskedCrossEntropyLoss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def class_wise_pr_roc(labels, predicted_labels, name):
+    num_classes = len(np.unique(labels))
+    predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
+    precision = dict()
+    recall = dict()
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    pr_auc = dict()
+
+    for i in range(num_classes):
+        # Compute precision and recall for each class
+        precision[i], recall[i], _ = precision_recall_curve(labels == i, predicted_probs[:, i])
+        pr_auc[i] = auc(recall[i], precision[i])
+
+        # Compute ROC curve for each class
+        fpr[i], tpr[i], _ = roc_curve(labels == i, predicted_probs[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Plot PR curve
+        plt.figure()
+        plt.plot(recall[i], precision[i], lw=2, label='PR curve (area = %0.2f)' % pr_auc[i])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title(f'Precision-Recall curve for class {i}')
+        plt.legend(loc="lower left")
+        plt.savefig(f'figures/pr_class_{i}_{name}.png', dpi=300)
+
+        # Plot ROC curve
+        plt.figure()
+        plt.plot(fpr[i], tpr[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC curve for class {i}')
+        plt.legend(loc="lower right")
+        plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
 
 
 def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None,
@@ -116,6 +156,8 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
                                                                        average='weighted')
             print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
 
+        class_wise_pr_roc(labels=true_values, predicted_labels=predicted_values, name=f'{name}_{params}_{characteristics}_to_{pred_value}')
+
     return total_loss / len(dataloader)
 
 
@@ -188,7 +230,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     validation_set_percentage = 0.3
 
     epochs = 400
-    patience = 30
+    patience = 50
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -231,9 +273,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     # Create dataloaders for training and validation sets
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    print("Train dataloader loaded")
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
-    print("Validation dataloader loaded")
 
     # Configure model
     model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
@@ -242,14 +282,14 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length, weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
     #criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
     #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-
+    '''
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-
+    '''
     # Create a dataset and dataloader
 
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
@@ -259,8 +299,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
                                                  X_cols=X_cols, y_cols=y_cols, per_day=True)
 
-    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False, drop_last=True)
-    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=4, shuffle=False, drop_last=True)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=4, shuffle=False, drop_last=True)
     train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
 
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -312,7 +352,7 @@ def main_loop():
     X_cols = ["PYRANOMETER"]
     y_cols = ["binned_Q_PVT"]
     params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
-    task = "day_weather_to_binned_qpvt"
+    task = "PYRANOMETER_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="PYRANOMETER", limits=(-1., 8.5))

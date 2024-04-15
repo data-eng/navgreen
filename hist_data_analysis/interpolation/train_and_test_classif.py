@@ -3,7 +3,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -15,6 +16,44 @@ from .utils import CrossEntropyLoss
 from .data_loader import load_df, TimeSeriesDataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def class_wise_pr_roc(labels, predicted_labels, name):
+    num_classes = len(np.unique(labels))
+    predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
+    precision = dict()
+    recall = dict()
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    pr_auc = dict()
+
+    for i in range(num_classes):
+        # Compute precision and recall for each class
+        precision[i], recall[i], _ = precision_recall_curve(labels == i, predicted_probs[:, i])
+        pr_auc[i] = auc(recall[i], precision[i])
+
+        # Compute ROC curve for each class
+        fpr[i], tpr[i], _ = roc_curve(labels == i, predicted_probs[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Plot PR curve
+        plt.figure()
+        plt.plot(recall[i], precision[i], lw=2, label='PR curve (area = %0.2f)' % pr_auc[i])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title(f'Precision-Recall curve for class {i}')
+        plt.legend(loc="lower left")
+        plt.savefig(f'figures/pr_class_{i}_{name}.png', dpi=300)
+
+        # Plot ROC curve
+        plt.figure()
+        plt.plot(fpr[i], tpr[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC curve for class {i}')
+        plt.legend(loc="lower right")
+        plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
 
 
 def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, name=None,
@@ -88,6 +127,9 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
                                                                        average='weighted')
             print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
 
+        class_wise_pr_roc(labels=true_values, predicted_labels=predicted_values,
+                          name=f'{name}_{params}_{characteristics}_to_{pred_value}')
+
     return total_loss / len(dataloader)
 
 
@@ -159,8 +201,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     validation_set_percentage = 0.3
 
-    epochs = 400
-    patience = 30
+    epochs = 10 #400
+    patience = 50
 
     # Parameters:
     batch_size = params["batch_size"]
