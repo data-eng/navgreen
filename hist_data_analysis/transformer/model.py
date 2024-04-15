@@ -1,5 +1,3 @@
-import math
-import torch
 import logging
 import torch.nn as nn
 
@@ -15,21 +13,22 @@ class Transformer(nn.Module):
         super(Transformer, self).__init__()
 
         self.nhead = nhead
-        self.layer = nn.TransformerEncoderLayer(d_model=in_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
-        self.encoder = nn.TransformerEncoder(self.layer, num_layers=num_layers)
-        self.decoder = nn.Linear(in_size, out_size)
-        self.softmax = nn.Softmax(dim=-1)
+        self.enc_layer = nn.TransformerEncoderLayer(d_model=in_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.encoder = nn.TransformerEncoder(self.enc_layer, num_layers=num_layers)
+        self.dec_layer = nn.TransformerDecoderLayer(d_model=in_size, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
+        self.decoder = nn.TransformerDecoder(self.dec_layer, num_layers=num_layers)
+        self.classifier = nn.Linear(in_size, out_size)
         self.init_weights()
 
     def init_weights(self):
         """
-        Initializes the weights and biases of the decoder linear layer:
+        Initializes the weights and biases of the classifier linear layer:
 
-        - Sets the bias of the decoder linear layer to zero.
-        - Initializes the weights with values drawn from a uniform distribution centered around zero.
+        - Sets the bias of the classifier linear layer to zero.
+        - Initializes the weights with values drawn from a Xavier uniform distribution.
         """ 
-        self.decoder.bias.data.zero_()
-        nn.init.xavier_uniform_(self.decoder.weight.data)
+        self.classifier.bias.data.zero_()
+        nn.init.xavier_uniform_(self.classifier.weight.data)
         
     def forward(self, x, mask=None):
         """
@@ -39,18 +38,19 @@ class Transformer(nn.Module):
         - Passes the output of the encoder through the decoder linear layer.
 
         :param x: input tensor
+        :param mask: optional mask tensor for missing values
         :return: output tensor after passing through the transformer model
         """
         x = x.permute(1, 0, 2)
 
         if mask is not None:
             x = self.encoder(src=x, src_key_padding_mask=mask)
+            x = self.decoder(tgt=x, memory=x, tgt_key_padding_mask=mask, memory_key_padding_mask=mask)
         else:
             x = self.encoder(src=x)
+            x = self.decoder(tgt=x, memory=x)
 
-        x = self.decoder(input=x)
-        x = self.softmax(x)
-
+        x = self.classifier(input=x)
         x = x.permute(1, 0, 2)
 
         return x

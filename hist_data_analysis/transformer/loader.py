@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
 import logging
-from hist_data_analysis import utils
+from hist_data_analysis.transformer import utils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -15,9 +15,7 @@ logger.addHandler(stream_handler)
 
 params = {
     "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
-    #"X": ["OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
-    #"t": [],
     "y": ["binned_Q_PVT"],
     "ignore": [] 
 }
@@ -50,17 +48,25 @@ def load(path, parse_dates, normalize=True):
         df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
         df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
 
-    if os.path.exists('data/stats.json'):
-        stats = utils.load_json(filename='data/stats.json')
+    if os.path.exists('static/stats.json'):
+        stats = utils.load_json(filename='static/stats.json')
     else:
-        stats = utils.get_stats(df, path='data/')
+        stats = utils.get_stats(df, path='static/')
+
+    occs = df['binned_Q_PVT'].value_counts().to_dict()
+    freqs = {int(key): value / sum(occs.values()) for key, value in occs.items()}
+    utils.save_json(data=freqs, filename='static/freqs.json')
+
+    inverse_occs = {int(key): 1 / value for key, value in occs.items()}
+    weights = {key: value / sum(inverse_occs.values()) for key, value in inverse_occs.items()}
+    utils.save_json(data=weights, filename='static/weights.json')
 
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
 
     nan_counts = df.isna().sum() / len(df) * 100
-    #logger.info("NaN counts for columns in X: %s", nan_counts)
+    logger.info("NaN counts for columns in X: %s", nan_counts)
 
     return df
 
@@ -72,7 +78,7 @@ def prepare(df, phase):
     :param phase: str model phase (train or test)
     :return: dataframe
     """
-    name = "data/" + "df_" + phase + ".csv"
+    name = "static/" + "df_" + phase + ".csv"
 
     for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 
@@ -91,6 +97,7 @@ class TSDataset(Dataset):
         :param df: dataframe
         :param seq_len: length of the input sequence
         :param X: input features names
+        :param t: time-related features names
         :param y: target variables names
         """
         self.seq_len = seq_len
@@ -112,7 +119,7 @@ class TSDataset(Dataset):
         Retrieves a sample from the dataset at the specified index.
 
         :param idx: index of the sample
-        :return: tuple containing input features sequence and target variables sequence
+        :return: tuple containing input features sequence, target variables sequence and their respective masks
         """
         start_idx = idx
         end_idx = start_idx + self.seq_len
@@ -126,34 +133,18 @@ class TSDataset(Dataset):
 
         X, y = X.masked_fill(mask_X == 1, 0), y.masked_fill(mask_y == 1, 0)
 
-        """ # COLUMNS "rain_3h", "snow_3h" HAVE ONLY 0! (a.k.a the old NANS)
-        column_to_check = 6
-        column_name = self.X.columns[column_to_check]
-        column_has_nonzero = torch.any(X[:, column_to_check].flatten() != 0.)
+        seq_len = mask_X.size(0)
+        mask_X_1d = torch.zeros(seq_len)
+        mask_y_1d = torch.zeros(seq_len)
 
-        if column_has_nonzero.item():
-           print("Feature:", column_name)
-           print("Column has non-zero values:", column_has_nonzero.item())
-        """
-
-        """ # NO COLUMN HAS NANS
-        column_to_check = 10
-        column_name = self.X.columns[column_to_check]
-        column_has_nans = torch.isnan(X[:, column_to_check]).any()
-
-        if column_has_nans.item():
-           print("Feature:", column_name)
-           print("Column has nan values:", column_has_nans.item())
-        """
-
-        mask_X_2d = torch.zeros(mask_X.size(0))
-        for i in range(mask_X.size(0)):
+        for i in range(seq_len):
             if torch.any(mask_X[i] == 1):
-                mask_X_2d[i] = 1
-            else:
-                mask_X_2d[i] = 0
+                mask_X_1d[i] = 1
+                # mask_y_1d[i] = 1
+            if torch.any(mask_y[i] == 1):
+                mask_y_1d[i] = 1
 
-        return X, y, mask_X_2d
+        return X, y, mask_X_1d, mask_y_1d
     
     @property
     def max_seq_id(self):
