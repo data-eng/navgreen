@@ -23,42 +23,43 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
     total_loss = 0
     true_values = []
     predicted_values = []
+    masked_values = []
 
-    for X, y in dataloader:
-        X,y = X.to(device), y.to(device)
+    for X, (y, masks_y) in dataloader:
+        X, y, masks_y = X.to(device), y.to(device), masks_y.to(device)
 
         with torch.no_grad():
             out = model(X)
-            total_loss += criterion(out, y,)
+            total_loss += criterion(out, y, masks_y)
 
             if plot:
-                    if out.shape[0] != X.shape[0]:
-                        out = out.unsqueeze(0)
+                if out.shape[0] != X.shape[0]:
+                    out = out.unsqueeze(0)
 
-                    # Append masked true and predicted values
-                    true_values.append(y.cpu().numpy())
-                    predicted_values.append(out.cpu().numpy())
+                # Append masked true and predicted values
+                true_values.append(y.int().cpu().numpy())
+                predicted_values.append(out.cpu().numpy())
+                masked_values.append(masks_y.cpu().numpy())
 
     if plot:
         true_values = np.concatenate(true_values, axis=0)
         predicted_values = np.concatenate(predicted_values, axis=0)
+        masked_values = np.concatenate(masked_values, axis=0)
 
         assert pred_value is not None
         assert characteristics is not None
         assert name is not None
         assert params is not None
 
-        print(f'true_values.shape {true_values.shape}')
-        print(f'predicted_values.shape {predicted_values.shape}')
-
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
-        print(f'predicted_values.shape {predicted_values.shape}')
-
-        print(predicted_values.shape)
         # Apply softmax along the last dimension
         predicted_values = np.exp(predicted_values) / np.sum(np.exp(predicted_values), axis=-1, keepdims=True)
         # Get the index of the maximum probability along the last dimension
         predicted_values = np.argmax(predicted_values, axis=-1)
+
+        non_mask_indices = masked_values == 1
+        true_values = true_values[non_mask_indices]
+        predicted_values = predicted_values[non_mask_indices]
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
@@ -109,10 +110,10 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         total_loss = 0
 
         start_time = time.time()
-        for X, y in train_loader:
-            X, y= X.to(device), y.to(device)
+        for X, (y, masks_y) in train_loader:
+            X, y, masks_y = X.to(device), y.to(device), masks_y.to(device)
             out = model(X)
-            loss = criterion(out, y)
+            loss = criterion(out, y, masks_y)
 
             optimizer.zero_grad()
             loss.backward()
@@ -199,14 +200,13 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     # Create dataloaders for training and validation sets
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    print("Train dataloader loaded")
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
-    print("Validation dataloader loaded")
 
     # Configure model
     model = InterpClassif(dim=dim, init_embed=sequence_length).to(device)
     # Loss
-    criterion = CrossEntropyLoss()
+    #criterion = CrossEntropyLoss(weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+    criterion = CrossEntropyLoss(weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
@@ -224,8 +224,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
                                                  X_cols=X_cols, y_cols=y_cols, per_day=True, interpolation=interpolation)
 
-    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False, drop_last=True)
-    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=1, shuffle=False, drop_last=True)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=1, shuffle=False, drop_last=True)
     train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
 
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -258,15 +258,27 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 def main_loop():
     sequence_length = 24 // 3
 
-    print("Weather -> QPVT\n")
+    # interpolations = ['linear', 'quadratic', 'cubic', 'slinear', 'nearest', 'polynomial']
+    interpolation = 'linear'
+
+    print("Weather -> QPVT")
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001}
-    task = "interpol_day_weather_to_binned_qpvt"
+    params = {'batch_size': 64, 'lr': 0.001}
 
+    task = f"interpol_{interpolation}_day_weather_to_binned_qpvt"
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="weather", interpolation='linear')
+                   characteristics="weather", interpolation=interpolation)
 
-    print("\nPYRANOMETER -> QPVT\n")
+    print("\nPYRANOMETER -> QPVT")
+
+    X_cols = ["PYRANOMETER"]
+    y_cols = ["binned_Q_PVT"]
+    params = {'batch_size': 64, 'lr': 0.001}
+
+    task = f"interpol_{interpolation}_day_PYRANOMETER_to_binned_qpvt"
+    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
+                   characteristics="weather", interpolation=interpolation)
+
 
