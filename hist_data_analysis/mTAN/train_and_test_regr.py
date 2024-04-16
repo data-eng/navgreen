@@ -2,10 +2,14 @@ import time
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
+from sklearn.preprocessing import label_binarize
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 from collections import Counter
+import warnings
 
 from .model import MtanRNNRegr
 from .data_loader import load_df, TimeSeriesDataset
@@ -14,7 +18,120 @@ from .utils import MaskedMSELoss, MaskedSmoothL1Loss
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None, params=None, pvt=False):
+def class_wise_pr_roc(labels, predicted_labels, name):
+    num_classes = len(np.unique(labels))
+    predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
+    precision = dict()
+    recall = dict()
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    pr_auc = dict()
+
+    for i in range(num_classes):
+        # Compute precision and recall for each class
+        precision[i], recall[i], _ = precision_recall_curve(labels == i, predicted_probs[:, i])
+        pr_auc[i] = auc(recall[i], precision[i])
+
+        # Compute ROC curve for each class
+        fpr[i], tpr[i], _ = roc_curve(labels == i, predicted_probs[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+        # Plot PR curve
+        plt.figure()
+        plt.plot(recall[i], precision[i], lw=2, label='PR curve (area = %0.2f)' % pr_auc[i])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title(f'Precision-Recall curve for class {i}')
+        plt.legend(loc="lower left")
+        plt.savefig(f'figures/pr_class_{i}_{name}.png', dpi=300)
+
+        # Plot ROC curve
+        plt.figure()
+        plt.plot(fpr[i], tpr[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
+        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC curve for class {i}')
+        plt.legend(loc="lower right")
+        plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
+
+
+def evaluate_classif(model, dataloader, pred_value, characteristics, name, params):
+    model.eval()
+    true_values = []
+    predicted_values = []
+    masked_values = []
+
+    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
+        X, masks_X, y, observed_tp, mask_y = (X.to(device), masks_X.to(device), y.to(device), observed_tp.to(device),
+                                              mask_y.to(device))
+
+        with torch.no_grad():
+            out = model(X, observed_tp, masks_X)
+
+            if out.shape[0] != X.shape[0]:
+                out = out.unsqueeze(0)
+
+            # Append masked true and predicted values
+            true_values.append(y.cpu().numpy())
+            predicted_values.append(out.cpu().numpy())
+            masked_values.append(mask_y.cpu().numpy())
+
+    true_values = np.concatenate(true_values, axis=0)
+    predicted_values = np.concatenate(predicted_values, axis=0)
+    masked_values = np.concatenate(masked_values, axis=0)
+
+    assert pred_value is not None
+    assert characteristics is not None
+    assert name is not None
+    assert params is not None
+
+    # if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
+
+    non_mask_indices = masked_values == 1
+    true_values = true_values[non_mask_indices]
+    predicted_values = predicted_values[non_mask_indices]
+
+    # Compute confusion matrix
+    true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
+    # Define bins
+    bins = [-float('inf'), 0.42, 1.05, 1.51, 2.14, float('inf')]
+    # Bin the values into classes
+    predicted_values = np.digitize(predicted_values, bins) - 1
+    true_values = true_values.astype(int)
+
+    cm = confusion_matrix(true_values, predicted_values)
+
+    class_labels = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
+    # Plot confusion matrix as heatmap
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='viridis', xticklabels=class_labels, yticklabels=class_labels)
+    plt.xlabel('Predicted labels')
+    plt.ylabel('True labels')
+    plt.title('Confusion Matrix')
+    plt.savefig(f"figures/cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
+
+    # Compute scores
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=UserWarning)
+
+        precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='micro')
+        print(f"Micro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+
+        precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='macro')
+        print(f"Macro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+
+        precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values,
+                                                                   average='weighted')
+        print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+
+    class_wise_pr_roc(labels=true_values, predicted_labels=predicted_values,
+                      name=f'regr_{name}_{params}_{characteristics}_to_{pred_value}')
+
+
+def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None,
+             params=None, pvt=False):
     model.eval()
     total_loss = 0
     true_values = []
@@ -22,7 +139,8 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
     masked_values = []
 
     for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
-        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+        X, masks_X, y, observed_tp, mask_y = (X.to(device), masks_X.to(device), y.to(device), observed_tp.to(device),
+                                              mask_y.to(device))
 
         with torch.no_grad():
             out = model(X, observed_tp, masks_X)
@@ -73,7 +191,6 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
             non_mask_true_values = true_values[non_mask_indices, i]
             non_mask_predicted_values = predicted_values[non_mask_indices, i]
 
-
             number_counts = Counter(non_mask_predicted_values)
             # Find the most common number
             most_common_number, occurrences = number_counts.most_common(1)[0]
@@ -104,7 +221,6 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
 
 def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate, epochs, patience):
-
     # Early stopping variables
     best_val_loss = float('inf')
     final_train_loss = float('inf')
@@ -124,7 +240,8 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
 
         start_time = time.time()
         for (X, masks_X, observed_tp), (y, mask_y) in train_loader:
-            X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
+            X, masks_X, y, observed_tp, mask_y = (X.to(device), masks_X.to(device), y.to(device), observed_tp.to(device),
+                                                  mask_y.to(device))
             out = model(X, observed_tp, masks_X)
             loss = criterion(out, y, mask_y)
 
@@ -138,8 +255,8 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
-              f'Time : {(time.time() - start_time)/60:.2f} minutes')
+        #print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
+        #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -165,7 +282,6 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
     return final_train_loss, best_val_loss
 
 
-
 def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristics, limits, pvt=False):
     torch.manual_seed(1505)
     np.random.seed(1505)
@@ -173,8 +289,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     validation_set_percentage = 0.3
 
-    epochs = 200
-    patience = 20
+    epochs = 400
+    patience = 50
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -191,11 +307,11 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     df_path_train = "data/training_set_classif.csv"
     df_pvt_train, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
-                                     normalize=True, y_cols=y_cols)
+                                      normalize=True, y_cols=y_cols)
 
     df_path_test = "data/test_set_classif.csv"
     df_pvt_test, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
-                            stats=mean_stds, y_cols=y_cols)
+                             stats=mean_stds, y_cols=y_cols)
 
     df_pvt_train.to_csv("data/pvt_df_train.csv")
     df_pvt_test.to_csv("data/pvt_df_test.csv")
@@ -217,22 +333,20 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     # Create dataloaders for training and validation sets
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    print("Train dataloader loaded")
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    print("Validation dataloader loaded")
 
     # Configure model
     model = MtanRNNRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                         num_heads=num_heads, device=device).to(device)
     # Loss
-    #criterion = MaskedMSELoss()
+    # criterion = MaskedMSELoss()
     criterion = MaskedSmoothL1Loss(sequence_length=sequence_length)
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
-    
+
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
     # Create a dataset and dataloader
@@ -243,8 +357,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
                                                  X_cols=X_cols, y_cols=y_cols, per_day=True)
 
-    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=batch_size, shuffle=False)
-    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=batch_size, shuffle=False)
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=4, shuffle=False)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=4, shuffle=False)
     train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
 
@@ -255,7 +369,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
-
+    '''
     # Test model's performance on unseen data
     testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0], limits=limits,
                             characteristics=characteristics, params=params_print, name="test_sliding_win", pvt=pvt)
@@ -272,31 +386,69 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0], limits=limits,
                             characteristics=characteristics, params=params_print, name="train_daily", pvt=pvt)
     print(f'Training Loss (SmoothL1Loss) daily : {training_loss:.6f}')
+    '''
+
+    pvt_cols = ["DATETIME"] + X_cols + ['binned_Q_PVT']
+
+    df_path_train = "data/training_set_classif.csv"
+    train_df, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+                                  normalize=True, y_cols=y_cols)
+
+    df_path_test = "data/test_set_classif.csv"
+    test_df, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
+                         stats=mean_stds, y_cols=y_cols)
+
+    # Create a dataset and dataloader
+    testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
+                                                X_cols=X_cols, y_cols=['binned_Q_PVT'])
+    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
+                                                X_cols=X_cols, y_cols=['binned_Q_PVT'], final_train=True, per_day=True)
+    training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
+                                                 X_cols=X_cols, y_cols=['binned_Q_PVT'], per_day=True)
+    training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
+                                         X_cols=X_cols, y_cols=['binned_Q_PVT'], final_train=True)
+
+    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=4, shuffle=False)
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=4, shuffle=False)
+    train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False)
+
+    # Test model's performance on unseen data
+    evaluate_classif(trained_model, test_loader_sliding, pred_value='binned_Q_PVT', characteristics=characteristics,
+                     params=params_print, name="test_sliding_win")
+
+    evaluate_classif(trained_model, test_loader_per_day, pred_value='binned_Q_PVT', characteristics=characteristics,
+                     params=params_print, name="test_daily")
+
+    evaluate_classif(trained_model, train_loader, pred_value='binned_Q_PVT', characteristics=characteristics,
+                     params=params_print, name="train_sliding_win")
+
+    evaluate_classif(trained_model, train_loader_per_day, pred_value='binned_Q_PVT', characteristics=characteristics,
+                     params=params_print, name="train_daily")
 
 
 def main_loop():
-
     sequence_length = 24 // 3
 
     print("Weather -> QPVT\n")
-    
+
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["Q_PVT"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_day_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="weather", limits = (-1., 8.5))
+                   characteristics="weather", limits=(-1., 8.5))
 
     print("\nWeather -> PYRANOMETER\n")
-    
+
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h"]
     y_cols = ["PYRANOMETER"]
     params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_day_pyran"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                        characteristics="weather", limits = (-0.1, 1.1))
+                   characteristics="weather", limits=(-0.1, 1.1))
 
     print("\nPYRANOMETER -> QPVT\n")
 
@@ -306,4 +458,4 @@ def main_loop():
     task = "day_pyran_to_day_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="PYRANOMETER", limits = (-1., 8.5), pvt=True)
+                   characteristics="PYRANOMETER", limits=(-1., 8.5), pvt=True)
