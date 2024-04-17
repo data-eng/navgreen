@@ -5,9 +5,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from .train_and_test_regr import train
-from .model import MtanRNNRegr
+from .train_and_test_classif import train
+from .model import MtanClassif
 from .data_loader import load_df, TimeSeriesDataset
+from .utils import MaskedCrossEntropyLoss
 
 import logging
 
@@ -38,16 +39,16 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
     # Get all tunable parameters ...
     # architecture wise:
     time_embedding_choices = [8, 16, 32, 64]
-    num_heads_choices = [2, 4, 8] #[2] #
+    num_heads_choices = [2, 4, 8]
     # training wise:
-    batch_size_choices = [16, 32, 64] # [16] #
-    learning_rate_choices = [0.0005, 0.001, 0.005, 0.01] # [0.001] #
+    batch_size_choices = [16, 32, 64]
+    learning_rate_choices = [0.001, 0.005]
 
     sequence_length = 24 // 3
 
     # Other parameters
-    epochs = 300
-    patience = 20
+    epochs = 400
+    patience = 100
     validation_set_percentage = 0.2
 
 
@@ -72,7 +73,8 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
     train_df, _ = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True, y_cols=y_cols)
 
     # MSE loss
-    criterion = nn.MSELoss()
+    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+                                       weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
@@ -96,13 +98,11 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
         hyperparameters["batch_size"] = parameters[0]
         hyperparameters["lr"] = parameters[1]
         hyperparameters["num_heads"] = parameters[2]
-        hyperparameters["rec_hidden"] = parameters[3]
-        hyperparameters["embed_time"] = parameters[4]
+        hyperparameters["embed_time"] = parameters[3]
 
         batch_size = hyperparameters["batch_size"]
         learning_rate = hyperparameters["lr"]
         num_heads = hyperparameters["num_heads"]
-        rec_hidden = hyperparameters["rec_hidden"]
         embed_time = hyperparameters["embed_time"]
 
         # Try training with these parameters
@@ -114,8 +114,9 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
         # Configure model
-        model = MtanRNNRegr(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+        model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                             num_heads=num_heads, device=device).to(device)
+
 
         # Train the model
         try:
@@ -144,8 +145,11 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
     return best_model_parameters
 
 def hyper_tuning():
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed"]
-    y_cols = ["Q_PVT"]
+
+    print("Weather -> QPVT\n")
+
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
+    y_cols = ["binned_Q_PVT"]
 
     pvt_cols = ["DATETIME"] + X_cols + y_cols
 
