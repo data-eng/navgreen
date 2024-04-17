@@ -1,4 +1,4 @@
-import time
+import json
 import logging
 import torch
 import matplotlib.pyplot as plt
@@ -30,12 +30,12 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
     ylabel = params["y"][0]
     stationary = 0
     train_losses, val_losses = [], []
+    results = []
 
     for epoch in range(epochs):
         model.train()
         total_loss = 0.0
         true_values, pred_values = [], []
-        start_time = time.time()
 
         progress_bar = tqdm(enumerate(train_data), total=batches, desc=f"Epoch {epoch + 1}/{epochs}", leave=True)
 
@@ -66,9 +66,6 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         avg_loss = total_loss / batches
         train_losses.append(avg_loss)
 
-        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_loss:.6f}, "
-                    f"Time: {(time.time() - start_time) / 60:.2f} minutes")
-
         model.eval()
         total_val_loss = 0.0
 
@@ -91,21 +88,26 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         avg_val_loss = total_val_loss / batches
         val_losses.append(avg_val_loss)
 
-        logger.info(f"Epoch [{epoch + 1}/{epochs}], Validation Loss: {avg_val_loss:.6f}")
+        true_values = np.concatenate(true_values)
+        pred_values = np.concatenate(pred_values)
+
+        true_classes = true_values.tolist()
+        pred_classes = [utils.get_max(pred).index for pred in pred_values]
+
+        f1_micro, f1_macro, f1_weighted = utils.get_f1(true=true_classes, pred=pred_classes)
+        
+        results.append({'epoch': epoch + 1, 'train_loss': avg_loss, 'val_loss': avg_val_loss, 'f1_micro': f1_micro, 'f1_macro': f1_macro, 'f1_weighted': f1_weighted})
+        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_loss:.6f}, Validation Loss: {avg_val_loss:.6f}, F1 Score (Micro) = {f1_micro:.6f}, F1 Score (Macro) = {f1_macro:.6f}, F1 Score (Weighted) = {f1_weighted:.6f}")
+
+        with open('static/training_results.json', 'w') as f:
+            json.dump(results, f)
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             stationary = 0
             torch.save(model.state_dict(), path)
 
-            true_values = np.concatenate(true_values)
-            pred_values = np.concatenate(pred_values)
-
-            true_classes = true_values.tolist()
-            pred_classes = [utils.get_max(pred).index for pred in pred_values]
-
-            f1_micro, f1_macro, f1_weighted = utils.get_f1(true=true_classes, pred=pred_classes)
-            logger.info(f'F1 Score (Micro) = {f1_micro}, F1 Score (Macro) = {f1_macro}, F1 Score (Weighted) = {f1_weighted}')
+            logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
             if visualize:
                 utils.visualize(type="single-plot",
@@ -120,7 +122,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                 utils.visualize(type="heatmap",
                         values=(true_classes, pred_classes), 
                         labels=("True Values", "Predicted Values"), 
-                        title="Test Heatmap "+ylabel,
+                        title="Train Heatmap "+ylabel,
                         classes=classes)
                 
         else:
@@ -130,7 +132,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
             break
 
-        scheduler.step() 
+        scheduler.step()
     
     if visualize:
         utils.visualize(type="multi-plot",
@@ -148,7 +150,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 def main():
     path = "data/owm+plc/training_set_classif.csv"
     seq_len = 1440 // 180
-    batch_size = 32
+    batch_size = 1
     classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
@@ -162,16 +164,25 @@ def main():
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
+    model = Transformer(in_size=len(params["X"])+len(params["t"]), 
+                        out_size=len(classes),
+                        nhead=4, 
+                        num_layers=1,
+                        dim_feedforward=2048, 
+                        dropout=0.1
+                        )
+
     train_loss, val_loss = train(data=(dl_train, dl_val),
                                  classes=classes,
-                                 epochs=3,
-                                 patience=2,
-                                 lr=1e-4,
+                                 epochs=200,
+                                 patience=30,
+                                 lr=1e-3,
                                  criterion=utils.WeightedCrossEntropyLoss(weights),
-                                 model=Transformer(in_size=len(params["X"])+len(params["t"]), out_size=len(classes)),
+                                 model=model,
                                  optimizer="AdamW",
                                  scheduler=("StepLR", 1.0, 0.98),
                                  path="models/transformer.pth",
                                  visualize=True
                                  )
+    
     logger.info(f'Final Training Loss : {train_loss:.6f} & Validation Loss : {val_loss:.6f}\n')

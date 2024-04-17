@@ -14,7 +14,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 params = {
-    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "snow_1h", "OUTDOOR_TEMP", "PYRANOMETER", "DHW_BOTTOM"],
+    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
     "y": ["binned_Q_PVT"],
     "ignore": [] 
@@ -59,7 +59,11 @@ def load(path, parse_dates, normalize=True):
 
     inverse_occs = {int(key): 1 / value for key, value in occs.items()}
     weights = {key: value / sum(inverse_occs.values()) for key, value in inverse_occs.items()}
-    utils.save_json(data=weights, filename='static/weights.json')
+    
+    if not os.path.exists('static/weights.json'):
+        utils.save_json(data=weights, filename='static/weights.json')
+    else:
+        print("Weights file already exists. Skipping saving!")
 
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
@@ -140,7 +144,6 @@ class TSDataset(Dataset):
         for i in range(seq_len):
             if torch.any(mask_X[i] == 1):
                 mask_X_1d[i] = 1
-                # mask_y_1d[i] = 1
             if torch.any(mask_y[i] == 1):
                 mask_y_1d[i] = 1
 

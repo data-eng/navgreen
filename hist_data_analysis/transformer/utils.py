@@ -48,7 +48,7 @@ class WeightedCrossEntropyLoss(nn.Module):
         if true.size(0) == 0 or pred.size(0) == 0:
             return torch.tensor(0.0, requires_grad=True, device=pred.device)
         
-        loss = F.cross_entropy(pred, true, weight=self.weights)
+        loss = F.cross_entropy(pred, true, weight=self.weights.to(pred.device))
 
         return loss
     
@@ -104,12 +104,19 @@ def one_hot(val, k):
     return encoding
 
 def get_f1(true, pred):
+    """
+    Calculate F1 scores using micro, macro, and weighted averaging methods.
+
+    :param true: list
+    :param pred: list
+    :return: tuple
+    """
     f1_micro = f1_score(true, pred, average='micro')
     f1_macro = f1_score(true, pred, average='macro')
     f1_weighted = f1_score(true, pred, average='weighted')
     return (f1_micro, f1_macro, f1_weighted)
 
-def visualize(type, values=[], labels=[], title=None, plot_func=None, coloring=None, names=None, classes=None, tick=False):
+def visualize(type, values, labels, title, plot_func=None, coloring=None, names=None, classes=None, tick=False):
     """
     Visualize (x,y) data points.
 

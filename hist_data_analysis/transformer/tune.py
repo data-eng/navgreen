@@ -28,9 +28,13 @@ def tune(data, static, config):
     results = []
 
     for c, hyperparams in enumerate(combs):
-        logger.info(f'\nTuning case {c+1} with: {hyperparams}')
-
         batch_size, lr, nhead, num_layers, dim_feedforward, dropout = hyperparams
+
+        if dim_feedforward % nhead != 0:
+            logger.debug(f'Skipping combination {c+1} with incompatible parameters: {hyperparams}')
+            continue
+
+        logger.info(f'\nTuning case {c+1} with: {hyperparams}')
     
         dl_train = DataLoader(ds_train, batch_size, shuffle=True)
         dl_val = DataLoader(ds_val, batch_size, shuffle=False)
@@ -78,25 +82,22 @@ def main():
     df_prep = prepare(df, phase="train")
 
     static = {'seq_len': 1440 // 180, 
-              'epochs': 5, 
+              'epochs': 15, 
               'patience': 50, 
               'classes': ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"], 
               'weights': utils.load_json(filename='static/weights.json')
               }
     
-    config = {'batch_size': [8, 16, 32], 
+    config = {'batch_size': [1, 8, 16, 32, 64, 128, 256], 
               'lr': [1e-3], 
-              'nhead': [2,3,4], 
-              'num_layers': [1,2,3],
-              'dim_feedforward': [64, 256, 1024], 
+              'nhead': [1,2,3,4,6],
+              'num_layers': [1,2],
+              'dim_feedforward': [64, 256, 1024, 2048], 
               'dropout': [0.1]
               }
 
     ds = TSDataset(df=df_prep, seq_len=static["seq_len"], X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
 
-    best_params = tune(data=(ds_train, ds_val),
-                                static=static,
-                                config=config
-                                )
+    best_params = tune(data=(ds_train, ds_val), static=static, config=config)
     logger.info(f"Best model parameters: {best_params}")
