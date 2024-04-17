@@ -3,61 +3,21 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
-from sklearn.preprocessing import label_binarize
+from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
-from .model import MtanRNNClassif
+from .model import MtanClassif
 from .data_loader import load_df, TimeSeriesDataset
-from .utils import MaskedCrossEntropyLoss
+from .utils import MaskedCrossEntropyLoss, MaskedSmoothL1Loss
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def class_wise_pr_roc(labels, predicted_labels, name):
-    num_classes = len(np.unique(labels))
-    predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
-    precision = dict()
-    recall = dict()
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-    pr_auc = dict()
-
-    for i in range(num_classes):
-        # Compute precision and recall for each class
-        precision[i], recall[i], _ = precision_recall_curve(labels == i, predicted_probs[:, i])
-        pr_auc[i] = auc(recall[i], precision[i])
-
-        # Compute ROC curve for each class
-        fpr[i], tpr[i], _ = roc_curve(labels == i, predicted_probs[:, i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
-
-        # Plot PR curve
-        plt.figure()
-        plt.plot(recall[i], precision[i], lw=2, label='PR curve (area = %0.2f)' % pr_auc[i])
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.title(f'Precision-Recall curve for class {i}')
-        plt.legend(loc="lower left")
-        plt.savefig(f'figures/pr_class_{i}_{name}.png', dpi=300)
-
-        # Plot ROC curve
-        plt.figure()
-        plt.plot(fpr[i], tpr[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
-        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title(f'ROC curve for class {i}')
-        plt.legend(loc="lower right")
-        plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
-
-
-def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, limits=None, name=None,
+def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, name=None,
              params=None, pvt=False):
     model.eval()
     total_loss = 0
@@ -105,15 +65,10 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
         assert pred_value is not None
         assert characteristics is not None
-        assert limits is not None
         assert name is not None
         assert params is not None
 
-        print(f'true_values.shape {true_values.shape}')
-        print(f'predicted_values.shape {predicted_values.shape}')
-
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
-        print(f'predicted_values.shape {predicted_values.shape}')
 
         # Reshape and calculate aggregation
         # predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
@@ -131,6 +86,9 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
+        #for i in range(5):
+        #    print(f'Class {i} has {np.count_nonzero(true_values == i)} instances')
+
         cm = confusion_matrix(true_values, predicted_values)
 
         class_labels = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
@@ -142,7 +100,6 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         plt.title('Confusion Matrix')
         plt.savefig(f"figures/cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
 
-        # Compute scores
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
 
@@ -154,9 +111,7 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
             precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values,
                                                                        average='weighted')
-            print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
-
-        class_wise_pr_roc(labels=true_values, predicted_labels=predicted_values, name=f'{name}_{params}_{characteristics}_to_{pred_value}')
+            print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}\n")
 
     return total_loss / len(dataloader)
 
@@ -195,8 +150,12 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
-              f'Time : {(time.time() - start_time) / 60:.2f} minutes')
+        # print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
+        #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
+
+        if epoch % 50 == 0:
+            print(
+                f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -222,15 +181,15 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
     return final_train_loss, best_val_loss
 
 
-def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristics, limits, pvt=False):
+def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristics, pvt=False):
     torch.manual_seed(1505)
     np.random.seed(1505)
     torch.cuda.manual_seed(1505)
 
-    validation_set_percentage = 0.3
+    validation_set_percentage = 0.2
 
-    epochs = 400
-    patience = 50
+    epochs = 2#800
+    patience = 200
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -276,20 +235,20 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
 
     # Configure model
-    model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
-                           num_heads=num_heads, device=device).to(device)
+    model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                        num_heads=num_heads, device=device).to(device)
     # Loss
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length, weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
-    #criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
-    #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-    '''
+    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+                                       weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
+
     # Train the model
+
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
                                            checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
                                            epochs=epochs, patience=patience)
 
     print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
-    '''
+
     # Create a dataset and dataloader
 
     testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
@@ -307,29 +266,26 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     print("Test dataloaders loaded")
 
-    trained_model = MtanRNNClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
-                                   num_heads=num_heads, device=device).to(device)
+    trained_model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                                num_heads=num_heads, device=device).to(device)
 
     checkpoint = torch.load(f'best_model_{task}.pth')
     trained_model.load_state_dict(checkpoint['mod_state_dict'])
 
     # Test model's performance on unseen data
     testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0],
-                            limits=limits,
                             characteristics=characteristics, params=params_print, name="test_sliding_win", pvt=pvt)
     print(f'Testing Loss (Cross Entropy) for sliding window : {testing_loss:.6f}')
 
     testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
-                            limits=limits,
                             characteristics=characteristics, params=params_print, name="test_daily", pvt=pvt)
     print(f'Testing Loss (Cross Entropy) daily : {testing_loss:.6f}')
 
-    training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], limits=limits,
+    training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0],
                              characteristics=characteristics, params=params_print, name="train_sliding_win", pvt=pvt)
     print(f'Training Loss (Cross Entropy) for sliding window : {training_loss:.6f}')
 
     training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
-                             limits=limits,
                              characteristics=characteristics, params=params_print, name="train_daily", pvt=pvt)
     print(f'Training Loss (Cross Entropy) daily : {training_loss:.6f}')
 
@@ -341,19 +297,8 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 4, 'embed_time': 32}
+    params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="weather", limits=(-1., 8.5))
-
-    print("\nPYRANOMETER -> QPVT\n")
-
-    X_cols = ["PYRANOMETER"]
-    y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
-    task = "PYRANOMETER_to_binned_qpvt"
-
-    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="PYRANOMETER", limits=(-1., 8.5))
-
+                   characteristics="weather")

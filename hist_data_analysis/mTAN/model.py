@@ -15,7 +15,7 @@ class MultiTimeAttention(nn.Module):
         self.dim = input_dim
         self.linears = nn.ModuleList([nn.Linear(embed_time, embed_time),
                                       nn.Linear(embed_time, embed_time),
-                                      nn.Linear(input_dim * num_heads, embed_time)])
+                                      nn.Linear(input_dim * num_heads, 5)])
 
     def attention(self, query, key, value, mask=None, dropout=None):
         "Compute 'Scaled Dot Product Attention'"
@@ -140,6 +140,48 @@ class MtanRNNClassif(nn.Module):
         out = self.final(out.permute(0, 3, 1, 2))
         out = out.squeeze(0).permute(2, 1, 0)
         '''
+
+        out = out.reshape(out.shape[0], -1)
+        if out.dim() == 2: out = out.unsqueeze(1)
+        out = self.final(out)
+        out = out.reshape(out.shape[0], self.init_embed, -1)
+
+        return out
+
+
+class MtanClassif(nn.Module):
+
+    def __init__(self, input_dim, query, device, embed_time, num_heads, init_embed=8, out_classes=5):
+        super(MtanClassif, self).__init__()
+        assert embed_time % num_heads == 0
+        self.device = device
+        self.init_embed = init_embed
+        self.embed_time = embed_time
+        self.query = query
+        self.att = MultiTimeAttention(2 * input_dim, embed_time, num_heads)
+
+        self.final = nn.Linear(embed_time * out_classes, init_embed * out_classes)
+
+        self.periodic = nn.Linear(1, embed_time - 1)
+        self.linear = nn.Linear(1, 1)
+
+    def learn_time_embedding(self, tt):
+        tt = tt.to(self.device)
+        tt = tt.unsqueeze(-1)
+        out2 = torch.sin(self.periodic(tt))
+        out1 = self.linear(tt)
+        return torch.cat([out1, out2], -1)
+
+    def forward(self, x, time_steps, mask):
+        # x is: [batch_size, sequence_length, input_size]
+        x = torch.cat((x, mask), 2)
+        mask = torch.cat((mask, mask), 2)
+        time_steps = time_steps.to(self.device)
+
+        key = self.learn_time_embedding(time_steps).to(self.device)
+        query = self.learn_time_embedding(self.query.unsqueeze(0)).to(self.device)
+
+        out = self.att(query, key, x, mask)
 
         out = out.reshape(out.shape[0], -1)
         if out.dim() == 2: out = out.unsqueeze(1)
