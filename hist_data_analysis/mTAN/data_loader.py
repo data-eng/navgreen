@@ -93,7 +93,7 @@ class TimeSeriesDataset(Dataset):
         masks_y = torch.isnan(y).int()
         masks_y = 1 - masks_y
 
-        X = X.masked_fill(masks_X == 0, -1e9)
+        X = X.masked_fill(masks_X == 0, -2)
         y = y.masked_fill(masks_y == 0, -1e1) # This does not really matter as it is gonna be masked out in loss function
 
         return (X, masks_X, time), (y, masks_y)
