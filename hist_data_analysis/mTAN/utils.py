@@ -50,22 +50,20 @@ class MaskedCrossEntropyLoss(nn.Module):
         super(MaskedCrossEntropyLoss, self).__init__()
         self.sequence_length = sequence_length
         # Calculate the inverse class frequencies
-        w = 1.0 / weights
-        self.weights = w / w.sum()
+        if weights is not None:
+            w = 1.0 / weights
+            self.weights = w / w.sum()
+        else: self.weights = None
         print(f'weights is {self.weights}')
 
     def forward(self, pred, true, mask):
-        if pred.dim() == 2: pred = pred.permute(1,0).unsqueeze(0)
-        #pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
+        if pred.dim() == 2: pred = pred.permute(1, 0).unsqueeze(0)
+        # pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
         #                  pred.shape[2]).mean(dim=2)
 
-        true = true.long()
-        true = true * mask.long()
-        loss = [F.cross_entropy(pred[b_sz, :, :], true[b_sz, :], reduction='none', weight=self.weights) for b_sz in range(true.shape[0])]
-        loss = torch.stack(loss, dim=0)
-        mask = mask.float()
-        loss = loss * mask
+        true = true[mask == 1].long()
+        pred = pred[mask == 1]
 
-        loss = torch.sum(loss) / torch.sum(mask)
+        loss = F.cross_entropy(pred, true, weight=self.weights)
 
         return loss
