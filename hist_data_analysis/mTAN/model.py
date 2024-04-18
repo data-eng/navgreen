@@ -15,7 +15,7 @@ class MultiTimeAttention(nn.Module):
         self.dim = input_dim
         self.linears = nn.ModuleList([nn.Linear(embed_time, embed_time),
                                       nn.Linear(embed_time, embed_time),
-                                      nn.Linear(input_dim * num_heads, 5)])
+                                      nn.Linear(input_dim * num_heads, 6)])
 
     def attention(self, query, key, value, mask=None, dropout=None):
         "Compute 'Scaled Dot Product Attention'"
@@ -151,7 +151,7 @@ class MtanRNNClassif(nn.Module):
 
 class MtanClassif(nn.Module):
 
-    def __init__(self, input_dim, query, device, embed_time, num_heads, init_embed=8, out_classes=5):
+    def __init__(self, input_dim, query, device, embed_time, num_heads, init_embed=8, out_classes=6):
         super(MtanClassif, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device

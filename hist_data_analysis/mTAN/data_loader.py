@@ -59,9 +59,19 @@ class TimeSeriesDataset(Dataset):
         has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
         # Replace rows with NaN values in any of the y_cols with NaN values
         df.loc[has_nan_in_y_cols, 'Datetime'] = float('nan')
-
+        #print(f'total {df.shape} -> nan {has_nan_in_y_cols.value_counts()}')
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
+
+        all_nan_mask = self.X.isna().all(axis=1)
+        self.y.loc[all_nan_mask, : ] = 5.
+
+        '''
+        value_counts = self.y.dropna().value_counts()
+        percentages = (value_counts / len(self.y.dropna())) * 100
+
+        print(f'percentages {percentages}')
+        '''
 
         if final_train:
             for col in y_cols:
