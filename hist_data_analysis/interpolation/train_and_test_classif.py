@@ -167,8 +167,11 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
         val_loss = evaluate(model, val_loader, criterion)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
-              f'Time : {(time.time() - start_time) / 60:.2f} minutes')
+        #print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
+        #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
+
+        if epoch % 50 == 0:
+            print(f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -312,7 +315,7 @@ def main_loop():
     task = f"interpol_{interpolation}_day_weather_to_binned_qpvt"
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", interpolation=interpolation)
-
+    '''
     print("\nPYRANOMETER -> QPVT")
 
     X_cols = ["PYRANOMETER"]
@@ -322,5 +325,5 @@ def main_loop():
     task = f"interpol_{interpolation}_day_PYRANOMETER_to_binned_qpvt"
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
                    characteristics="weather", interpolation=interpolation)
-
+    '''
 
