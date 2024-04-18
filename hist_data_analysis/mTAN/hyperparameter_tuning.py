@@ -74,7 +74,7 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
 
     # MSE loss
     criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
-                                       weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
+                                       weights=torch.tensor([0.49, 0.04, 0.01, 0.02, 0.09, 0.35]).to(device))
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
