@@ -190,7 +190,7 @@ def main():
 
         _, _ = train(data=(dl_train, dl_val),
                classes=classes,
-               epochs=2,
+               epochs=300,
                patience=30,
                lr=1e-3,
                criterion=utils.WeightedCrossEntropyLoss(weights),
