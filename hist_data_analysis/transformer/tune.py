@@ -27,7 +27,7 @@ def tune(data, static, config):
     results = []
 
     for c, hyperparams in enumerate(combs):
-        batch_size, lr, nhead, num_layers, dim_feedforward, dropout = hyperparams
+        batch_size, lr, nhead, num_layers, dim_feedforward, dropout, optimizer = hyperparams
 
         if dim_feedforward % nhead != 0:
             logger.debug(f'Skipping combination {c+1} with incompatible parameters: {hyperparams}')
@@ -52,7 +52,7 @@ def tune(data, static, config):
                                      lr=lr,
                                      criterion=utils.WeightedCrossEntropyLoss(weights),
                                      model=model,
-                                     optimizer="AdamW",
+                                     optimizer=optimizer,
                                      scheduler=("StepLR", 1.0, 0.98),
                                      seed=seed,
                                      visualize=False)
@@ -82,12 +82,13 @@ def main():
               'weights': utils.load_json(filename='static/weights.json'),
               'seed': 349}
     
-    config = {'batch_size': [1, 8, 16, 32, 64, 128, 256], 
-              'lr': [1e-3], 
-              'nhead': [1,2,3,4,6],
+    config = {'batch_size': [1, 8, 16], 
+              'lr': [1e-3, 5e-4], 
+              'nhead': [1,2,3,4,6,12],
               'num_layers': [1,2],
-              'dim_feedforward': [64, 256, 1024, 2048], 
-              'dropout': [0.1]}
+              'dim_feedforward': [256, 1024, 2048], 
+              'dropout': [0, 0.1],
+              'optimizer':["Adam", "AdamW"]}
 
     ds = TSDataset(df=df_prep, seq_len=static["seq_len"], X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
