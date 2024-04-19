@@ -1,4 +1,3 @@
-import json
 import logging
 import torch
 import matplotlib.pyplot as plt
@@ -18,23 +17,40 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, path, visualize=False):
+def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, visualize=False):
     model.to(device)
     train_data, val_data = data
     batches = len(train_data)
     num_classes = len(classes)
     optimizer = utils.get_optim(optimizer, model, lr)
     scheduler = utils.get_sched(*scheduler, optimizer)
+    torch.manual_seed(seed)
 
     best_val_loss = float('inf')
     ylabel = params["y"][0]
     stationary = 0
     train_losses, val_losses = [], []
-    results = []
+
+    checkpoints = {'seed': seed, 
+                   'epochs': 0, 
+                   'best_epoch': 0, 
+                   'best_train_loss': float('inf'), 
+                   'best_val_loss': float('inf'), 
+                   'precision_micro': 0, 
+                   'precision_macro': 0, 
+                   'precision_weighted': 0,
+                   'recall_micro': 0, 
+                   'recall_macro': 0, 
+                   'recall_weighted': 0, 
+                   'f1_micro': 0,
+                   'f1_macro': 0, 
+                   'f1_weighted': 0}
+    
+    logger.info(f"\nTraining with seed {seed} just started...")
 
     for epoch in range(epochs):
         model.train()
-        total_loss = 0.0
+        total_train_loss = 0.0
         true_values, pred_values = [], []
 
         progress_bar = tqdm(enumerate(train_data), total=batches, desc=f"Epoch {epoch + 1}/{epochs}", leave=True)
@@ -51,20 +67,20 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             y_pred = utils.mask(tensor=y_pred, mask=mask_y, id=0)
             y = utils.mask(tensor=y, mask=mask_y, id=0)
             
-            loss = criterion(pred=y_pred, true=y)
+            train_loss = criterion(pred=y_pred, true=y)
 
             optimizer.zero_grad()
-            loss.backward()
+            train_loss.backward()
             optimizer.step()
 
-            total_loss += loss.item()
-            progress_bar.set_postfix(Loss=loss.item())
+            total_train_loss += train_loss.item()
+            progress_bar.set_postfix(Loss=train_loss.item())
 
             true_values.append(y.cpu().numpy())
             pred_values.append(y_pred.detach().cpu().numpy())
 
-        avg_loss = total_loss / batches
-        train_losses.append(avg_loss)
+        avg_train_loss = total_train_loss / batches
+        train_losses.append(avg_train_loss)
 
         model.eval()
         total_val_loss = 0.0
@@ -93,37 +109,31 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
         true_classes = true_values.tolist()
         pred_classes = [utils.get_max(pred).index for pred in pred_values]
-
-        f1_micro, f1_macro, f1_weighted = utils.get_f1(true=true_classes, pred=pred_classes)
         
-        results.append({'epoch': epoch + 1, 'train_loss': avg_loss, 'val_loss': avg_val_loss, 'f1_micro': f1_micro, 'f1_macro': f1_macro, 'f1_weighted': f1_weighted})
-        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_loss:.6f}, Validation Loss: {avg_val_loss:.6f}, F1 Score (Micro) = {f1_micro:.6f}, F1 Score (Macro) = {f1_macro:.6f}, F1 Score (Weighted) = {f1_weighted:.6f}")
-
-        with open('static/training_results.json', 'w') as f:
-            json.dump(results, f)
+        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             stationary = 0
-            torch.save(model.state_dict(), path)
 
             logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
+            mfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="transformer.pth")
+            torch.save(model.state_dict(), mfn)
+
+            checkpoints.update({'best_epoch': epoch+1, 
+                                'best_train_loss': avg_train_loss, 
+                                'best_val_loss': best_val_loss, 
+                                **utils.get_prfs(true=true_classes, pred=pred_classes)})
+
             if visualize:
-                utils.visualize(type="single-plot",
-                                values=(true_classes, pred_classes), 
-                                labels=("True Values", "Predicted Values"), 
-                                title="Train Scatter Plot "+ylabel,
-                                plot_func=plt.scatter,
-                                coloring='brown',
-                                classes=classes,
-                                tick=True)
-                
                 utils.visualize(type="heatmap",
                         values=(true_classes, pred_classes), 
                         labels=("True Values", "Predicted Values"), 
                         title="Train Heatmap "+ylabel,
-                        classes=classes)
+                        classes=classes,
+                        coloring=['gold', 'deepskyblue'],
+                        path=utils.get_path(dirs=["models", "transformer", str(seed)]))
                 
         else:
             stationary += 1
@@ -133,6 +143,10 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             break
 
         scheduler.step()
+
+    cfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="train_checkpoints.json")
+    checkpoints.update({'epoch': epoch+1})
+    utils.save_json(data=checkpoints, filename=cfn)
     
     if visualize:
         utils.visualize(type="multi-plot",
@@ -140,18 +154,20 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         labels=("Epoch", "Loss"), 
                         title="Loss Curves",
                         plot_func=plt.plot,
-                        coloring=['royalblue', 'olivedrab'],
-                        names=["Training", "Validation"])
+                        coloring=['brown', 'royalblue'],
+                        names=["Training", "Validation"],
+                        path=utils.get_path(dirs=["models", "transformer", str(seed)]))
 
-    logger.info("Training complete!")
+    logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
 
-    return avg_loss, best_val_loss
+    return avg_train_loss, best_val_loss
 
 def main():
     path = "data/owm+plc/training_set_classif.csv"
     seq_len = 1440 // 180
-    batch_size = 1
+    batch_size = 220
     classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
+    seeds = [6, 72, 157, 838, 1214, 1916]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="train")
@@ -164,25 +180,22 @@ def main():
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
-    model = Transformer(in_size=len(params["X"])+len(params["t"]), 
-                        out_size=len(classes),
-                        nhead=4, 
-                        num_layers=1,
-                        dim_feedforward=2048, 
-                        dropout=0.1
-                        )
+    for seed in seeds:
+        model = Transformer(in_size=len(params["X"])+len(params["t"]), 
+                            out_size=len(classes),
+                            nhead=4, 
+                            num_layers=1,
+                            dim_feedforward=2048, 
+                            dropout=0.1)
 
-    train_loss, val_loss = train(data=(dl_train, dl_val),
-                                 classes=classes,
-                                 epochs=200,
-                                 patience=30,
-                                 lr=1e-3,
-                                 criterion=utils.WeightedCrossEntropyLoss(weights),
-                                 model=model,
-                                 optimizer="AdamW",
-                                 scheduler=("StepLR", 1.0, 0.98),
-                                 path="models/transformer.pth",
-                                 visualize=True
-                                 )
-    
-    logger.info(f'Final Training Loss : {train_loss:.6f} & Validation Loss : {val_loss:.6f}\n')
+        _, _ = train(data=(dl_train, dl_val),
+               classes=classes,
+               epochs=2,
+               patience=30,
+               lr=1e-3,
+               criterion=utils.WeightedCrossEntropyLoss(weights),
+               model=model,
+               optimizer="AdamW",
+               scheduler=("StepLR", 1.0, 0.98),
+               seed=seed,
+               visualize=True)

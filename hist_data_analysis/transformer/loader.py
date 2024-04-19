@@ -94,7 +94,7 @@ def prepare(df, phase):
     return df
     
 class TSDataset(Dataset):
-    def __init__(self, df, seq_len, X, t, y):
+    def __init__(self, df, seq_len, X, t, y, per_day=False):
         """
         Initializes a time series dataset.
 
@@ -103,8 +103,10 @@ class TSDataset(Dataset):
         :param X: input features names
         :param t: time-related features names
         :param y: target variables names
+        :param per_day: boolean
         """
         self.seq_len = seq_len
+        self.per_day = per_day
 
         y_nan = df[y].isna().any(axis=1)
         df.loc[y_nan, :] = float('nan')
@@ -116,7 +118,10 @@ class TSDataset(Dataset):
         """
         :return: number of sequences that can be created from dataset X
         """
-        return self.max_seq_id + 1
+        if not self.per_day:
+            return self.max_seq_id + 1
+        else:
+            return self.num_seqs
     
     def __getitem__(self, idx):
         """
@@ -125,7 +130,11 @@ class TSDataset(Dataset):
         :param idx: index of the sample
         :return: tuple containing input features sequence, target variables sequence and their respective masks
         """
-        start_idx = idx
+        if not self.per_day:
+            start_idx = idx
+        else:
+            start_idx = idx * self.seq_len
+
         end_idx = start_idx + self.seq_len
     
         X, y = self.X.iloc[start_idx:end_idx].values, self.y.iloc[start_idx:end_idx].values
@@ -135,7 +144,7 @@ class TSDataset(Dataset):
         X, y = torch.FloatTensor(X), torch.FloatTensor(y)
         mask_X, mask_y = torch.FloatTensor(mask_X), torch.FloatTensor(mask_y)
 
-        X, y = X.masked_fill(mask_X == 1, 0), y.masked_fill(mask_y == 1, 0)
+        X, y = X.masked_fill(mask_X == 1, -2), y.masked_fill(mask_y == 1, 0)
 
         seq_len = mask_X.size(0)
         mask_X_1d = torch.zeros(seq_len)
@@ -152,6 +161,10 @@ class TSDataset(Dataset):
     @property
     def max_seq_id(self):
         return self.X.shape[0] - self.seq_len
+    
+    @property
+    def num_seqs(self):
+        return self.X.shape[0] // self.seq_len
     
 def split(dataset, vperc=0.2):
     """

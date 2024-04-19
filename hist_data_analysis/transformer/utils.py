@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import seaborn as sns
-from sklearn.metrics import f1_score
+from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 from collections import namedtuple
@@ -103,20 +103,29 @@ def one_hot(val, k):
 
     return encoding
 
-def get_f1(true, pred):
+def get_prfs(true, pred, avg=['micro', 'macro', 'weighted'], include_support=False):
     """
-    Calculate F1 scores using micro, macro, and weighted averaging methods.
+    Calculate precision, recall, fscore and support using the given averaging methods.
 
     :param true: list
     :param pred: list
-    :return: tuple
+    :param avg: list
+    :param include_support: boolean
+    :return: dict
     """
-    f1_micro = f1_score(true, pred, average='micro')
-    f1_macro = f1_score(true, pred, average='macro')
-    f1_weighted = f1_score(true, pred, average='weighted')
-    return (f1_micro, f1_macro, f1_weighted)
+    prfs = {}
 
-def visualize(type, values, labels, title, plot_func=None, coloring=None, names=None, classes=None, tick=False):
+    for method in avg:
+        precision, recall, fscore, support = precision_recall_fscore_support(true, pred, average=method)
+        
+        prfs[f'precision_{method}'] = precision
+        prfs[f'recall_{method}'] = recall
+        prfs[f'fscore_{method}'] = fscore
+        prfs[f'support_{method}'] = support if include_support else None
+
+    return prfs
+
+def visualize(type, values, labels, title, plot_func=None, coloring=None, names=None, classes=None, tick=False, path=''):
     """
     Visualize (x,y) data points.
 
@@ -151,7 +160,8 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
     elif type == 'heatmap':
         x_values, y_values = values
         cm = confusion_matrix(x_values, y_values)
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", xticklabels=classes, yticklabels=classes)
+        cmap = sns.blend_palette(coloring, as_cmap=True)
+        sns.heatmap(cm, annot=True, fmt="d", cmap=cmap, xticklabels=classes, yticklabels=classes)
 
     plt.xlabel(x_label)
     plt.ylabel(y_label)
@@ -159,7 +169,7 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
     plt.tight_layout()
 
     filename = f"{title.lower().replace(' ', '_')}.png"
-    plt.savefig(os.path.join('static/', filename))
+    plt.savefig(os.path.join(path, filename))
     plt.close()
 
 def normalize(df, stats, exclude=[]):
@@ -181,6 +191,12 @@ def normalize(df, stats, exclude=[]):
             newdf[col] = series
 
     return newdf
+
+def get_path(dirs, name=""):
+    dir_path = os.path.join(*dirs)
+    os.makedirs(dir_path, exist_ok=True)
+
+    return os.path.join(dir_path, name)
 
 def get_stats(df, path='data/'):
     """

@@ -1,4 +1,3 @@
-import json
 import torch
 import itertools as it
 from torch.utils.data import DataLoader
@@ -20,7 +19,7 @@ logger.info(f'Device is {device}')
 def tune(data, static, config):
     ds_train, ds_val = data
     combs = list(it.product(*config.values()))
-    _, epochs, patience, classes, weights = static.values()
+    _, epochs, patience, classes, weights, seed = static.values()
     num_classes = len(classes)
     
     best_val_loss = float('inf')
@@ -44,21 +43,19 @@ def tune(data, static, config):
                           nhead=nhead, 
                           num_layers=num_layers, 
                           dim_feedforward=dim_feedforward, 
-                          dropout=dropout
-                          )
+                          dropout=dropout)
 
         train_loss, val_loss = train(data=(dl_train, dl_val),
-                                    classes=classes,
-                                    epochs=epochs,
-                                    patience=patience,
-                                    lr=lr,
-                                    criterion=utils.WeightedCrossEntropyLoss(weights),
-                                    model=model,
-                                    optimizer="AdamW",
-                                    scheduler=("StepLR", 1.0, 0.98),
-                                    path="models/transformer.pth",
-                                    visualize=False
-                                    )
+                                     classes=classes,
+                                     epochs=epochs,
+                                     patience=patience,
+                                     lr=lr,
+                                     criterion=utils.WeightedCrossEntropyLoss(weights),
+                                     model=model,
+                                     optimizer="AdamW",
+                                     scheduler=("StepLR", 1.0, 0.98),
+                                     seed=seed,
+                                     visualize=False)
         
         results.append({'params': hyperparams, 'train_loss': train_loss, 'val_loss': val_loss})
 
@@ -67,11 +64,8 @@ def tune(data, static, config):
             best_val_loss = val_loss
             best_params = best_params = {'batch_size': batch_size, 'lr': lr, 'nhead': nhead, 'num_layers': num_layers, 'dim_feedforward': dim_feedforward, 'dropout': dropout}
 
-        with open('static/tuning_results.json', 'w') as f:
-            json.dump(results, f)
-    
-        with open('static/best_params.json', 'w') as f:
-            json.dump(best_params, f)
+        utils.save_json(data=results, filename='static/tuning_results.json')
+        utils.save_json(data=best_params, filename='static/best_params.json')
         
     return best_params
 
@@ -85,16 +79,15 @@ def main():
               'epochs': 15, 
               'patience': 50, 
               'classes': ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"], 
-              'weights': utils.load_json(filename='static/weights.json')
-              }
+              'weights': utils.load_json(filename='static/weights.json'),
+              'seed': 349}
     
     config = {'batch_size': [1, 8, 16, 32, 64, 128, 256], 
               'lr': [1e-3], 
               'nhead': [1,2,3,4,6],
               'num_layers': [1,2],
               'dim_feedforward': [64, 256, 1024, 2048], 
-              'dropout': [0.1]
-              }
+              'dropout': [0.1]}
 
     ds = TSDataset(df=df_prep, seq_len=static["seq_len"], X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
