@@ -121,7 +121,9 @@ def get_prfs(true, pred, avg=['micro', 'macro', 'weighted'], include_support=Fal
         prfs[f'precision_{method}'] = precision
         prfs[f'recall_{method}'] = recall
         prfs[f'fscore_{method}'] = fscore
-        prfs[f'support_{method}'] = support if include_support else None
+        
+        if include_support:
+            prfs[f'support_{method}'] = support
 
     return prfs
 

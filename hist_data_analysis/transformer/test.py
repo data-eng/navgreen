@@ -38,9 +38,9 @@ def test(data, classes, criterion, model, seed, visualize=True):
                    'recall_micro': 0, 
                    'recall_macro': 0, 
                    'recall_weighted': 0, 
-                   'f1_micro': 0,
-                   'f1_macro': 0, 
-                   'f1_weighted': 0}
+                   'fscore_micro': 0,
+                   'fscore_macro': 0, 
+                   'fscore_weighted': 0}
 
     progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
     logger.info(f"\nTesting with seed {seed} just started...")

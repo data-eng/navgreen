@@ -42,9 +42,9 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                    'recall_micro': 0, 
                    'recall_macro': 0, 
                    'recall_weighted': 0, 
-                   'f1_micro': 0,
-                   'f1_macro': 0, 
-                   'f1_weighted': 0}
+                   'fscore_micro': 0,
+                   'fscore_macro': 0, 
+                   'fscore_weighted': 0}
     
     logger.info(f"\nTraining with seed {seed} just started...")
 
@@ -145,7 +145,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         scheduler.step()
 
     cfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="train_checkpoints.json")
-    checkpoints.update({'epoch': epoch+1})
+    checkpoints.update({'epochs': epoch+1})
     utils.save_json(data=checkpoints, filename=cfn)
     
     if visualize:
@@ -165,7 +165,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 def main():
     path = "data/owm+plc/training_set_classif.csv"
     seq_len = 1440 // 180
-    batch_size = 220
+    batch_size = 1
     classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
     seeds = [6, 72, 157, 838, 1214, 1916]
 
