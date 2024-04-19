@@ -37,13 +37,13 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
 
     # Get all tunable parameters ...
     # training wise:
-    batch_size_choices = [16, 32] #[16, 32, 64]
-    learning_rate_choices = [0.0005] #[0.0005, 0.001, 0.005, 0.01]
+    batch_size_choices = [16, 32, 64] # [16, 32] #
+    learning_rate_choices = [0.001, 0.005, 0.01] # [0.0005] #
 
     sequence_length = 24 // 3
 
     # Other parameters
-    epochs = 2#400
+    epochs = 400
     patience = 100
     validation_set_percentage = 0.2
 

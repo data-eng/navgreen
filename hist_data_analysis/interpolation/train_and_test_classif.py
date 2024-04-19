@@ -250,8 +250,8 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     # Configure model
     model = InterpClassif(dim=dim, init_embed=sequence_length).to(device)
     # Loss
-    #criterion = CrossEntropyLoss(weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
-    criterion = CrossEntropyLoss(weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
+    criterion = CrossEntropyLoss(weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+    #criterion = CrossEntropyLoss(weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Train the model
     training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
@@ -310,7 +310,7 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 64, 'lr': 0.001}
+    params = {'batch_size': 16, 'lr': 0.001}
 
     task = f"interpol_{interpolation}_day_weather_to_binned_qpvt"
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
