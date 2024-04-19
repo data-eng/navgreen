@@ -72,9 +72,9 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
 
         # Reshape and calculate aggregation
-        # predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
-        #                                                    predicted_values.shape[1] // true_values.shape[1],
-        #                                                    predicted_values.shape[2]), axis=2)
+        predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
+                                                            predicted_values.shape[1] // true_values.shape[1],
+                                                            predicted_values.shape[2]), axis=2)
         print(predicted_values.shape)
         # Apply softmax along the last dimension
         predicted_values = np.exp(predicted_values) / np.sum(np.exp(predicted_values), axis=-1, keepdims=True)
@@ -87,12 +87,12 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
-        #for i in range(6):
+        #for i in range(5):
         #    print(f'Class {i} has {np.count_nonzero(true_values == i)} instances')
 
         cm = confusion_matrix(true_values, predicted_values)
 
-        class_labels = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh", "NaNs"]
+        class_labels = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
         # Plot confusion matrix as heatmap
         plt.figure(figsize=(8, 6))
         sns.heatmap(cm, annot=True, fmt='d', cmap='viridis', xticklabels=class_labels, yticklabels=class_labels)
@@ -189,7 +189,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
 
     validation_set_percentage = 0.2
 
-    epochs = 2#800
+    epochs = 1000
     patience = 200
 
     # Parameters:
@@ -242,7 +242,7 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     #criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
     #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
     criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
-                                       weights=torch.tensor([0.49, 0.04, 0.01, 0.02, 0.09, 0.35]).to(device))
+                                       weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
 
     # Train the model
 
@@ -300,7 +300,7 @@ def main_loop():
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 16, 'lr': 0.001, 'num_heads': 8, 'embed_time': 32}
+    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
     task = "day_weather_to_binned_qpvt"
 
     train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,

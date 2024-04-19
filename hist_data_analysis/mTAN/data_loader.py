@@ -63,16 +63,6 @@ class TimeSeriesDataset(Dataset):
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 
-        all_nan_mask = self.X.isna().all(axis=1)
-        self.y.loc[all_nan_mask, : ] = 5.
-
-        '''
-        value_counts = self.y.dropna().value_counts()
-        percentages = (value_counts / len(self.y.dropna())) * 100
-
-        print(f'percentages {percentages}')
-        '''
-
         if final_train:
             for col in y_cols:
                 print(f"Column {col} : min is {self.y[col].dropna().min():.4f} and max is {self.y[col].dropna().max():.4f}")
