@@ -14,6 +14,14 @@ from collections import namedtuple
 import torch.optim.lr_scheduler as sched
 
 def mask(tensor, mask, id=0):
+    """
+    Mask a tensor based on a specified condition.
+
+    :param tensor: torch.Tensor
+    :param mask: torch.Tensor
+    :param id: int value specifying the elements to keep
+    :return: torch.Tensor
+    """
     return tensor[mask == id]
 
 class WeightedCrossEntropyLoss(nn.Module):
@@ -195,6 +203,13 @@ def normalize(df, stats, exclude=[]):
     return newdf
 
 def get_path(dirs, name=""):
+    """
+    Get the path by joining directory names.
+
+    :param dirs: list
+    :param name: str
+    :return: str
+    """
     dir_path = os.path.join(*dirs)
     os.makedirs(dir_path, exist_ok=True)
 

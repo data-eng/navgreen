@@ -9,7 +9,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
     
 class Transformer(nn.Module):
-    def __init__(self, in_size=16, out_size=5, nhead=4, num_layers=1, dim_feedforward=1024, dropout=0.1):
+    def __init__(self, in_size=16, out_size=5, nhead=1, num_layers=1, dim_feedforward=2048, dropout=0):
         super(Transformer, self).__init__()
 
         self.nhead = nhead

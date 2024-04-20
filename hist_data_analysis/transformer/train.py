@@ -183,16 +183,16 @@ def main():
     for seed in seeds:
         model = Transformer(in_size=len(params["X"])+len(params["t"]), 
                             out_size=len(classes),
-                            nhead=4, 
+                            nhead=1, 
                             num_layers=1,
                             dim_feedforward=2048, 
-                            dropout=0.1)
+                            dropout=0)
 
         _, _ = train(data=(dl_train, dl_val),
                classes=classes,
                epochs=300,
                patience=30,
-               lr=1e-3,
+               lr=5e-4,
                criterion=utils.WeightedCrossEntropyLoss(weights),
                model=model,
                optimizer="AdamW",
