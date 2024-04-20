@@ -1,63 +1,26 @@
 import time
 import numpy as np
-import pandas as pd
 import warnings
-
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
-from sklearn.preprocessing import label_binarize
+import logging
 import matplotlib.pyplot as plt
-import seaborn as sns
 import torch
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import InterpClassif
-from .utils import CrossEntropyLoss
+from .utils import CrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers
 from .data_loader import load_df, TimeSeriesDataset
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s:%(lineno)d:%(levelname)s:%(name)s:%(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def class_wise_pr_roc(labels, predicted_labels, name):
-    num_classes = len(np.unique(labels))
-    predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
-    precision = dict()
-    recall = dict()
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-    pr_auc = dict()
-
-    for i in range(num_classes):
-        # Compute precision and recall for each class
-        precision[i], recall[i], _ = precision_recall_curve(labels == i, predicted_probs[:, i])
-        pr_auc[i] = auc(recall[i], precision[i])
-
-        # Compute ROC curve for each class
-        fpr[i], tpr[i], _ = roc_curve(labels == i, predicted_probs[:, i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
-
-        # Plot PR curve
-        plt.figure()
-        plt.plot(recall[i], precision[i], lw=2, label='PR curve (area = %0.2f)' % pr_auc[i])
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.title(f'Precision-Recall curve for class {i}')
-        plt.legend(loc="lower left")
-        plt.savefig(f'figures/pr_class_{i}_{name}.png', dpi=300)
-
-        # Plot ROC curve
-        plt.figure()
-        plt.plot(fpr[i], tpr[i], lw=2, label='ROC curve (area = %0.2f)' % roc_auc[i])
-        plt.plot([0, 1], [0, 1], linestyle='--', lw=2, color='r', label='Random')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title(f'ROC curve for class {i}')
-        plt.legend(loc="lower right")
-        plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
-
-
-def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characteristics=None, name=None,
-             params=None):
+def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, set_type="Train"):
     model.eval()
     total_loss = 0
     true_values = []
@@ -80,15 +43,13 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
                 predicted_values.append(out.cpu().numpy())
                 masked_values.append(masks_y.cpu().numpy())
 
+    prfs = None
     if plot:
         true_values = np.concatenate(true_values, axis=0)
         predicted_values = np.concatenate(predicted_values, axis=0)
         masked_values = np.concatenate(masked_values, axis=0)
 
         assert pred_value is not None
-        assert characteristics is not None
-        assert name is not None
-        assert params is not None
 
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
         # Apply softmax along the last dimension
@@ -102,50 +63,39 @@ def evaluate(model, dataloader, criterion, plot=False, pred_value=None, characte
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
-        cm = confusion_matrix(true_values, predicted_values)
 
-        class_labels = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
-        # Plot confusion matrix as heatmap
-        plt.figure(figsize=(8, 6))
-        sns.heatmap(cm, annot=True, fmt='d', cmap='viridis', xticklabels=class_labels, yticklabels=class_labels)
-        plt.xlabel('Predicted labels')
-        plt.ylabel('True labels')
-        plt.title('Confusion Matrix')
-        plt.savefig(f"figures/cm_{name}_{params}_{characteristics}_to_{pred_value}", dpi=300)
+        visualize(type="heatmap",
+                        values=(true_values, predicted_values),
+                        labels=("True Values", "Predicted Values"),
+                        title=f"{set_type} Heatmap "+pred_value,
+                        classes=["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"],
+                        coloring=['gold', 'deepskyblue'],
+                        path=get_path(dirs=["models", "interpolation", str(seed)]))
 
         # Compute scores
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=UserWarning)
 
-            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='micro')
-            print(f"Micro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+            prfs = get_prfs(true_values, predicted_values)
 
-            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values, average='macro')
-            print(f"Macro    | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
+            logger.info(f"Micro    | f1 score: {prfs['fscore_micro']:.6f} & precision {prfs['precision_micro']:.6f} & recall {prfs['recall_micro']:.6f}")
+            logger.info(f"Macro    | f1 score: {prfs['fscore_macro']:.6f} & precision {prfs['precision_macro']:.6f} & recall {prfs['recall_macro']:.6f}")
+            logger.info(f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
 
-            precision, recall, f1, _ = precision_recall_fscore_support(true_values, predicted_values,
-                                                                       average='weighted')
-            print(f"Weighted | f1 score: {f1:.6f} & precision {precision:.6f} & recall {recall:.6f}")
-
-        class_wise_pr_roc(labels=true_values, predicted_labels=predicted_values,
-                          name=f'{name}_{params}_{characteristics}_to_{pred_value}')
-
-    return total_loss / len(dataloader)
+    return total_loss / len(dataloader), prfs
 
 
-def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, learning_rate, epochs, patience):
+def train(model, train_loader, val_loader, criterion, learning_rate, epochs, patience, seed):
+    checkpoints = {'epochs': 0, 'best_epoch': 0, 'best_train_loss': float('inf'),
+                   'best_val_loss': float('inf')}
+
     # Early stopping variables
     best_val_loss = float('inf')
     final_train_loss = float('inf')
     epochs_without_improvement = 0
+    train_losses, val_losses = [], []
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
-    if checkpoint_pth is not None:
-        checkpoint = torch.load(checkpoint_pth)
-        model.load_state_dict(checkpoint['rec_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        print('loading saved weights', checkpoint['epoch'])
 
     for epoch in range(1, epochs + 1):
         model.train()
@@ -164,14 +114,17 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
             total_loss += loss.item()
 
         # Get validation loss
-        val_loss = evaluate(model, val_loader, criterion)
+        val_loss, _ = evaluate(model, val_loader, criterion, seed=seed)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
-        #print(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
+        #logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
         #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
 
         if epoch % 50 == 0:
-            print(f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
+            logger.info(f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
+
+        train_losses.append(average_loss)
+        val_losses.append(val_loss)
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -179,57 +132,48 @@ def train(model, train_loader, val_loader, checkpoint_pth, criterion, task, lear
             final_train_loss = average_loss
             epochs_without_improvement = 0
 
-            torch.save({
-                'epoch': epoch,
-                'mod_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'loss': average_loss,
-            }, f'best_model_{task}.pth')
+            mfn = get_path(dirs=["models", "interpolation", str(seed)], name="interpolation.pth")
+            torch.save(model.state_dict(), mfn)
+            checkpoints.update({'best_epoch': epoch, 'best_train_loss': final_train_loss, 'best_val_loss': best_val_loss})
+
         else:
             epochs_without_improvement += 1
 
         if epochs_without_improvement >= patience:
-            print(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
+            logger.info(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
             break
 
-    print("Training complete!")
+    logger.info("Training complete!")
 
-    return final_train_loss, best_val_loss
+    visualize(type="multi-plot", values=[(range(1, len(train_losses) + 1), train_losses),
+                                         (range(1, len(val_losses) + 1), val_losses)],
+              labels=("Epoch", "Loss"), title="Loss Curves", plot_func=plt.plot, coloring=['brown', 'royalblue'],
+              names=["Training", "Validation"], path=get_path(dirs=["models", "interpolation", str(seed)]))
+
+    return final_train_loss, best_val_loss, checkpoints
 
 
-def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristics, interpolation):
-    torch.manual_seed(1505)
-    np.random.seed(1505)
-    torch.cuda.manual_seed(1505)
+def train_model(X_cols, y_cols, params, sequence_length, interpolation, seed=1505):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    torch.cuda.manual_seed(seed)
 
-    validation_set_percentage = 0.3
+    validation_set_percentage = 0.2
 
-    epochs = 10 #400
-    patience = 50
+    epochs = 2 #1000
+    patience = 200
 
     # Parameters:
     batch_size = params["batch_size"]
     lr = params["lr"]
 
-    params_print = f"sequence_length={sequence_length}, batch_size={batch_size}"
-
     pvt_cols = ["DATETIME"] + X_cols + y_cols
 
     dim = len(X_cols)
 
-    df_path_train = "data/training_set_classif.csv"
-    df_pvt_train, mean_stds = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    train_df, mean_stds = load_df(df_path="data/training_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                                       normalize=True, y_cols=y_cols)
-
-    df_path_test = "data/test_set_classif.csv"
-    df_pvt_test, _ = load_df(df_path=df_path_test, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
-                             stats=mean_stds, y_cols=y_cols)
-
-    df_pvt_train.to_csv("data/pvt_df_train.csv")
-    df_pvt_test.to_csv("data/pvt_df_test.csv")
-
-    train_df = pd.read_csv("data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
-    test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    save_json(mean_stds, 'hist_data_analysis/interpolation/mean_stds.json')
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
@@ -254,76 +198,71 @@ def train_and_eval(X_cols, y_cols, params, task, sequence_length, characteristic
     #criterion = CrossEntropyLoss(weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
 
     # Train the model
-    training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                           checkpoint_pth=None, criterion=criterion, task=task, learning_rate=lr,
-                                           epochs=epochs, patience=patience)
+    training_loss, validation_loss, checkpoints = train(model=model, train_loader=train_loader, val_loader=val_loader,
+                                           criterion=criterion, learning_rate=lr, epochs=epochs, patience=patience, seed=seed)
+    checkpoints['seed'] = seed
 
-    print(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
+    logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
-    # Create a dataset and dataloader
-
-    testing_dataset_sliding = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length,
-                                                X_cols=X_cols, y_cols=y_cols, interpolation=interpolation)
-    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
-                                                y_cols=y_cols, per_day=True, interpolation=interpolation)
-    training_dataset_per_day = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
-                                                 X_cols=X_cols, y_cols=y_cols, per_day=True, interpolation=interpolation)
-
-    test_loader_sliding = DataLoader(testing_dataset_sliding, batch_size=1, shuffle=False, drop_last=True)
-    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=1, shuffle=False, drop_last=True)
-    train_loader_per_day = DataLoader(training_dataset_per_day, batch_size=batch_size, shuffle=False, drop_last=True)
 
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
 
-    print("Test dataloaders loaded")
+    trained_model = InterpClassif(dim=dim, init_embed=sequence_length).to(device)
+
+    mfn = get_path(dirs=["models", "interpolation", str(seed)], name="interpolation.pth")
+    trained_model.load_state_dict(torch.load(mfn))
+
+    _, prfs = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
+
+    checkpoints.update(**prfs)
+    cfn = get_path(dirs=["models", "interpolation", str(seed)], name="train_checkpoints.json")
+    save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
+
+
+
+def test_model(X_cols, y_cols, sequence_length, interpolation, seed):
+
+    pvt_cols = ["DATETIME"] + X_cols + y_cols
+
+    dim = len(X_cols)
+
+    mean_stds = load_json('hist_data_analysis/interpolation/mean_stds.json')
+    test_df, _ = load_df(df_path="data/test_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
+                         stats=mean_stds, y_cols=y_cols)
+
+    # Loss
+    criterion = CrossEntropyLoss(weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+
+    # Create a dataset and dataloader
+    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
+                                                y_cols=y_cols, per_day=True, interpolation=interpolation)
+
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=1, shuffle=False, drop_last=True)
 
     trained_model = InterpClassif(dim=dim, init_embed=sequence_length).to(device)
 
-    checkpoint = torch.load(f'best_model_{task}.pth')
-    trained_model.load_state_dict(checkpoint['mod_state_dict'])
+    mfn = get_path(dirs=["models", "interpolation", str(seed)], name="interpolation.pth")
+    trained_model.load_state_dict(torch.load(mfn))
 
-    # Test model's performance on unseen data
-    testing_loss = evaluate(trained_model, test_loader_sliding, criterion, plot=True, pred_value=y_cols[0],
-                            characteristics=characteristics, params=params_print, name="test_sliding_win")
-    print(f'Testing Loss (Cross Entropy) for sliding window : {testing_loss:.6f}')
+    test_loss, prfs = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], seed=seed, set_type="Test")
 
-    testing_loss = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
-                            characteristics=characteristics, params=params_print, name="test_daily")
-    print(f'Testing Loss (Cross Entropy) daily : {testing_loss:.6f}')
-
-    training_loss = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0],
-                             characteristics=characteristics, params=params_print, name="train_sliding_win")
-    print(f'Training Loss (Cross Entropy) for sliding window : {training_loss:.6f}')
-
-    training_loss = evaluate(trained_model, train_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
-                             characteristics=characteristics, params=params_print, name="train_daily")
-    print(f'Training Loss (Cross Entropy) daily : {training_loss:.6f}')
-
+    checkpoints = {'seed': seed, 'test_loss': test_loss, **prfs}
+    cfn = get_path(dirs=["models", "interpolation", str(seed)], name="test_checkpoints.json")
+    save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
 def main_loop():
+    seeds = [1505]
     sequence_length = 24 // 3
 
-    # interpolations = ['linear', 'quadratic', 'cubic', 'slinear', 'nearest', 'polynomial']
     interpolation = 'linear'
-
-    print("Weather -> QPVT")
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
     params = {'batch_size': 16, 'lr': 0.001}
 
-    task = f"interpol_{interpolation}_day_weather_to_binned_qpvt"
-    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="weather", interpolation=interpolation)
-    '''
-    print("\nPYRANOMETER -> QPVT")
 
-    X_cols = ["PYRANOMETER"]
-    y_cols = ["binned_Q_PVT"]
-    params = {'batch_size': 64, 'lr': 0.001}
+    for seed in seeds:
+        train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length,
+                    interpolation=interpolation, seed=seed)
 
-    task = f"interpol_{interpolation}_day_PYRANOMETER_to_binned_qpvt"
-    train_and_eval(X_cols=X_cols, y_cols=y_cols, params=params, task=task, sequence_length=sequence_length,
-                   characteristics="weather", interpolation=interpolation)
-    '''
-
+        test_model(X_cols=X_cols, y_cols=y_cols, sequence_length=sequence_length, interpolation=interpolation, seed=seed)

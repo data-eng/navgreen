@@ -1,6 +1,7 @@
 from hist_data_analysis.analytics import analyse,similarity
 from hist_data_analysis.sampling_rate import runme,undersampling_error
-from hist_data_analysis.mTAN import main_loop, hyper_tuning
+from hist_data_analysis.mTAN import hyper_tuning
+from hist_data_analysis.mTAN import main_loop as mTAN
 from hist_data_analysis.correlate import correlate
 from hist_data_analysis.interpolation import main_loop as interpolation
 from hist_data_analysis.interpolation import hyper_tuning as interp_hyper_tuning
