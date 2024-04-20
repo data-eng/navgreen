@@ -89,21 +89,6 @@ def load_data(print_stats=False):
                 
     return df, df_hp, df_pv
 
-def normalize(df, cols):
-    """
-    Normalize and de-trend data
-    :param df: dataframe
-    :param cols: columns to apply the transformation
-    :return: processed dataframe
-    """
-    newdf = {}
-    for col in cols:
-        series = df[col]
-        series = (series - series.mean()) / series.std()
-        series = scipy.signal.detrend(series)
-        newdf[col] = series
-    return pd.DataFrame(newdf)
-
 class Function:
     def __init__(self, terms, type):
         self.terms = terms
