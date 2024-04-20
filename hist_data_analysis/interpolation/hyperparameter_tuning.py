@@ -28,9 +28,10 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Set fixed seed for reproducibility
-torch.manual_seed(1505)
-np.random.seed(1505)
-torch.cuda.manual_seed(1505)
+seed = 1505
+torch.manual_seed(seed)
+np.random.seed(seed)
+torch.cuda.manual_seed(seed)
 
 
 def tuning(dim, task, X_cols, y_cols, pvt_cols):
@@ -105,9 +106,9 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
 
         # Train the model
         try:
-            training_loss, validation_loss = train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                                   checkpoint_pth=None, criterion=criterion, task=task,
-                                                   learning_rate=learning_rate, epochs=epochs, patience=patience)
+            training_loss, validation_loss, _ = train(model=model, train_loader=train_loader, val_loader=val_loader,
+                                                   criterion=criterion, learning_rate=learning_rate, epochs=epochs,
+                                                   patience=patience, seed=seed)
         except Exception as e:
             logger.info(e)
             training_loss, validation_loss = float('inf'), float('inf')
