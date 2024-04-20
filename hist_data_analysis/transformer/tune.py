@@ -62,7 +62,13 @@ def tune(data, static, config):
         if val_loss < best_val_loss:
             logger.info('New best parameters found!\n')
             best_val_loss = val_loss
-            best_params = best_params = {'batch_size': batch_size, 'lr': lr, 'nhead': nhead, 'num_layers': num_layers, 'dim_feedforward': dim_feedforward, 'dropout': dropout}
+
+            best_params = best_params = {'batch_size': batch_size, 
+                                         'lr': lr, 'nhead': nhead, 
+                                         'num_layers': num_layers, 
+                                         'dim_feedforward': dim_feedforward, 
+                                         'dropout': dropout,
+                                         'optimizer': optimizer}
 
         utils.save_json(data=results, filename='static/tuning_results.json')
         utils.save_json(data=best_params, filename='static/best_params.json')
