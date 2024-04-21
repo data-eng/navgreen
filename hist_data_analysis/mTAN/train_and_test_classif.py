@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import MtanClassif
 from .data_loader import load_df, TimeSeriesDataset
-from .utils import MaskedCrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers
+from .utils import MaskedCrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -24,8 +24,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, set_type='Train'):
     model.eval()
     total_loss = 0
-    true_values = []
-    predicted_values = []
+    true_values, predicted_values = [], []
+    true_values_all, predicted_values_all = [], []
     masked_values = []
 
     for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
@@ -42,8 +42,7 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
                 split_out = [tensor.squeeze(dim=0) for tensor in torch.split(out, 1)]
 
                 for i, mask in enumerate(split_masks_X):
-                    #if not (mask == 0).all().item():
-                    if True:
+                    if not (mask == 0).all().item():
                         split_masks_y[i] = split_masks_y[i].unsqueeze(0)
                         split_y[i] = split_y[i].unsqueeze(0)
                         split_out[i] = split_out[i].unsqueeze(0)
@@ -52,14 +51,10 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
                         true_values.append(split_y[i].cpu().numpy())
                         predicted_values.append(split_out[i].cpu().numpy())
                         masked_values.append(split_masks_y[i].cpu().numpy())
-                else:
-                    if out.shape[0] != X.shape[0]:
-                        out = out.unsqueeze(0)
 
-                    # Append masked true and predicted values
-                    true_values.append(y.cpu().numpy())
-                    predicted_values.append(out.cpu().numpy())
-                    masked_values.append(mask_y.cpu().numpy())
+                    # Append masked true and predicted values without losses
+                    true_values_all.append(y.cpu().numpy())
+                    predicted_values_all.append(out.cpu().numpy())
 
     prfs = None
     if plot:
@@ -67,9 +62,13 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
         predicted_values = np.concatenate(predicted_values, axis=0)
         masked_values = np.concatenate(masked_values, axis=0)
 
+        true_values_all = np.concatenate(true_values_all, axis=0)
+        predicted_values_all = np.concatenate(predicted_values_all, axis=0)
+
         assert pred_value is not None
 
         if predicted_values.ndim == 2: predicted_values = np.transpose(predicted_values)
+        if predicted_values_all.ndim == 2: predicted_values_all = np.transpose(predicted_values_all)
 
         # Reshape and calculate aggregation
         predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
@@ -80,19 +79,30 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
         # Get the index of the maximum probability along the last dimension
         predicted_values = np.argmax(predicted_values, axis=-1)
 
+        # The same for the non masked values
+        predicted_values_all = np.mean(predicted_values_all.reshape(predicted_values_all.shape[0], true_values.shape[1],
+                                                            predicted_values_all.shape[1] // true_values.shape[1],
+                                                            predicted_values_all.shape[2]), axis=2)
+        # Apply softmax along the last dimension
+        predicted_values_all = np.exp(predicted_values_all) / np.sum(np.exp(predicted_values_all), axis=-1, keepdims=True)
+        # Get the index of the maximum probability along the last dimension
+        predicted_values_all = np.argmax(predicted_values_all, axis=-1)
+
+        # Mask values out
         non_mask_indices = masked_values == 1
         true_values = true_values[non_mask_indices]
         predicted_values = predicted_values[non_mask_indices]
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
+        true_values_all, predicted_values_all = true_values_all.flatten(), predicted_values_all.flatten()
 
         visualize(type="heatmap",
                   values=(true_values, predicted_values),
                   labels=("True Values", "Predicted Values"),
                   title=f"{set_type} Heatmap " + pred_value,
                   classes=["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"],
-                  coloring=['gold', 'deepskyblue'],
+                  coloring=['azure', 'darkblue'],
                   path=get_path(dirs=["models", "mTAN", str(seed)]))
 
         # Compute scores
@@ -108,7 +118,7 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
             logger.info(
                 f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
 
-    return total_loss / len(dataloader), prfs
+    return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all)
 
 
 def train(model, train_loader, val_loader, criterion, learning_rate, epochs, patience, seed):
@@ -140,7 +150,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             total_loss += loss.item()
 
         # Get validation loss
-        val_loss, _ = evaluate(model, val_loader, criterion, seed)
+        val_loss, _, _ = evaluate(model, val_loader, criterion, seed)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
         # logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
@@ -246,7 +256,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
     mfn = get_path(dirs=["models", "mTAN", str(seed)], name="mTAN.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    _, prfs = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
+    _, prfs, _ = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
 
     checkpoints.update(**prfs)
     cfn = get_path(dirs=["models", "mTAN", str(seed)], name="train_checkpoints.json")
@@ -285,8 +295,18 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     mfn = get_path(dirs=["models", "mTAN", str(seed)], name="mTAN.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    test_loss, prfs = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0],
-                               seed=seed, set_type="Test")
+    test_loss, prfs, (true_values, predicted_values) = (
+        evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], seed=seed,
+                 set_type="Test"))
+
+    df = test_df.copy()
+    data = {"DATETIME": df.index,
+            **{col: df[col].values for col in X_cols},
+            "binned_Q_PVT_real": true_values,
+            "binned_Q_PVT_pred": predicted_values}
+
+    dfn = get_path(dirs=["models", "mTAN", str(seed)], name="data.csv")
+    save_csv(data=data, filename=dfn)
 
     checkpoints = {'seed': seed, 'test_loss': test_loss, **prfs}
     cfn = get_path(dirs=["models", "mTAN", str(seed)], name="test_checkpoints.json")

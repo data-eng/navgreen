@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
 from sklearn.preprocessing import label_binarize
 import seaborn as sns
+import pandas as pd
 import numpy as np
 import os
 import json
@@ -188,6 +189,7 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
         x_values, y_values = values
         for i, (x_values, y_values) in enumerate(values):
             plot_func(x_values, y_values, color=coloring[i], label=names[i])
+            plt.legend()
         if tick:
             plt.xticks(range(len(classes)), classes)
             plt.yticks(range(len(classes)), classes)
@@ -244,3 +246,13 @@ def class_wise_pr_roc(labels, predicted_labels, name):
         plt.title(f'ROC curve for class {i}')
         plt.legend(loc="lower right")
         plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
+
+def save_csv(data, filename):
+    """
+    Save data to a CSV file.
+
+    :param data: dictionary
+    :param filename: str
+    """
+    df = pd.DataFrame(data)
+    df.to_csv(filename, index=False)

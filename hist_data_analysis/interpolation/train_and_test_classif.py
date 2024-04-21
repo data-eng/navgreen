@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import InterpClassif
-from .utils import CrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers
+from .utils import CrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
 from .data_loader import load_df, TimeSeriesDataset
 
 logger = logging.getLogger(__name__)
@@ -23,8 +23,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, set_type="Train"):
     model.eval()
     total_loss = 0
-    true_values = []
-    predicted_values = []
+    true_values, predicted_values = [], []
+    true_values_all, predicted_values_all = [], []
     masked_values = []
 
     for X, (y, masks_y) in dataloader:
@@ -57,19 +57,23 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
         # Get the index of the maximum probability along the last dimension
         predicted_values = np.argmax(predicted_values, axis=-1)
 
+        true_values_all = true_values
+        predicted_values_all = predicted_values
+
         non_mask_indices = masked_values == 1
         true_values = true_values[non_mask_indices]
         predicted_values = predicted_values[non_mask_indices]
 
         # Compute confusion matrix
         true_values, predicted_values = true_values.flatten(), predicted_values.flatten()
+        true_values_all, predicted_values_all = true_values_all.flatten(), predicted_values_all.flatten()
 
         visualize(type="heatmap",
                         values=(true_values, predicted_values),
                         labels=("True Values", "Predicted Values"),
                         title=f"{set_type} Heatmap "+pred_value,
                         classes=["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"],
-                        coloring=['gold', 'deepskyblue'],
+                        coloring=['azure', 'darkblue'],
                         path=get_path(dirs=["models", "interpolation", str(seed)]))
 
         # Compute scores
@@ -82,7 +86,7 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
             logger.info(f"Macro    | f1 score: {prfs['fscore_macro']:.6f} & precision {prfs['precision_macro']:.6f} & recall {prfs['recall_macro']:.6f}")
             logger.info(f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
 
-    return total_loss / len(dataloader), prfs
+    return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all)
 
 
 def train(model, train_loader, val_loader, criterion, learning_rate, epochs, patience, seed):
@@ -114,7 +118,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             total_loss += loss.item()
 
         # Get validation loss
-        val_loss, _ = evaluate(model, val_loader, criterion, seed=seed)
+        val_loss, _, _ = evaluate(model, val_loader, criterion, seed=seed)
         # Compute average training loss
         average_loss = total_loss / len(train_loader)
         #logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
@@ -212,7 +216,7 @@ def train_model(X_cols, y_cols, params, sequence_length, interpolation, seed=150
     mfn = get_path(dirs=["models", "interpolation", str(seed)], name="interpolation.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    _, prfs = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
+    _, prfs, _ = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
 
     checkpoints.update(**prfs)
     cfn = get_path(dirs=["models", "interpolation", str(seed)], name="train_checkpoints.json")
@@ -244,7 +248,17 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed):
     mfn = get_path(dirs=["models", "interpolation", str(seed)], name="interpolation.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    test_loss, prfs = evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], seed=seed, set_type="Test")
+    test_loss, prfs, (true_values, predicted_values) = (
+        evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], seed=seed, set_type="Test"))
+
+    df = test_df.copy()
+    data = {"DATETIME": df.index,
+            **{col: df[col].values for col in X_cols},
+            "binned_Q_PVT_real": true_values,
+            "binned_Q_PVT_pred": predicted_values}
+
+    dfn = get_path(dirs=["models", "interpolation", str(seed)], name="data.csv")
+    save_csv(data=data, filename=dfn)
 
     checkpoints = {'seed': seed, 'test_loss': test_loss, **prfs}
     cfn = get_path(dirs=["models", "interpolation", str(seed)], name="test_checkpoints.json")
