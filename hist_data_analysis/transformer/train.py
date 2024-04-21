@@ -132,7 +132,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         labels=("True Values", "Predicted Values"), 
                         title="Train Heatmap "+ylabel,
                         classes=classes,
-                        coloring=['gold', 'deepskyblue'],
+                        coloring=['azure', 'darkblue'],
                         path=utils.get_path(dirs=["models", "transformer", str(seed)]))
                 
         else:

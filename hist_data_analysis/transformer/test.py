@@ -16,7 +16,7 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def test(data, classes, criterion, model, seed, visualize=True):
+def test(data, df, classes, criterion, model, seed, visualize=True):
     mfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="transformer.pth")
     model.load_state_dict(torch.load(mfn))
 
@@ -77,12 +77,20 @@ def test(data, classes, criterion, model, seed, visualize=True):
                         labels=("True Values", "Predicted Values"), 
                         title="Test Heatmap "+ylabel,
                         classes=classes,
-                        coloring=['gold', 'deepskyblue'],
+                        coloring=['azure', 'darkblue'],
                         path=utils.get_path(dirs=["models", "transformer", str(seed)]))
         
     checkpoints.update({'test_loss': avg_test_loss, **utils.get_prfs(true=true_classes, pred=pred_classes)})
     cfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="test_checkpoints.json")
     utils.save_json(data=checkpoints, filename=cfn)
+
+    data = {"DATETIME": df.index,
+            **{col: df[col].values for col in params["X"]},
+            "binned_Q_PVT_real": true_classes,
+            "binned_Q_PVT_pred": pred_classes}
+    
+    dfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="data.csv")
+    utils.save_csv(data=data, filename=dfn)
 
     logger.info(f'\nTesting with seed {seed} complete!\nTesting Loss: {avg_test_loss:.6f}\n')
 
@@ -114,6 +122,7 @@ def main():
                             dropout=0)
 
         _ = test(data=dl_test,
+                 df=df_prep,
                  classes=classes,
                  criterion=utils.WeightedCrossEntropyLoss(weights),
                  model=model,

@@ -2,6 +2,7 @@ import os
 import json
 import math
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -258,6 +259,16 @@ def save_json(data, filename):
     """
     with open(filename, 'w') as f:
         json.dump(data, f)
+
+def save_csv(data, filename):
+    """
+    Save data to a CSV file.
+
+    :param data: dictionary
+    :param filename: str
+    """
+    df = pd.DataFrame(data)      
+    df.to_csv(filename, index=False)
 
 def filter(df, column, threshold):
     """
