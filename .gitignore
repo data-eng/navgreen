@@ -6,4 +6,10 @@ dist/
 
 data/
 figures/
+static/
+meteo/
 exports.sh
+venv/
+meteo/
+
+models/

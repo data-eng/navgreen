@@ -58,6 +58,7 @@ def load_data(print_stats=False):
 
     df_hp = df[hp_cols]
     df_hp = df_hp[df_hp["POWER_HP"] > 1.0]
+
     logger.info("HP, POWER > 1: {} rows".format(len(df)))
 
     df_pv = df[pv_cols]
