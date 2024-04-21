@@ -12,7 +12,7 @@ SLICE_LEN = 1024
 
 def analyse( t, v ):
     """
-    Calculates analytics over a timeseries t,v
+    Calculates analytics over a mTAN t,v
     :param t: Array-like, timestamps
     :param v: Array-like, values
     :return: (dict) A variety of analytics
@@ -120,7 +120,7 @@ def make_lines( data ):
 def similarity( t1, v1, t2, v2 ):
     """
     Calculates various metrics that measure how different two
-    timeseries appear when different analytics is applied to them.
+    mTAN appear when different analytics is applied to them.
     :param t1: Array-like, timestamps
     :param v1: Array-like, values
     :param t2: Array-like, timestamps

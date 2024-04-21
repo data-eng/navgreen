@@ -20,6 +20,7 @@ matplotlib = "^3.8"
 # Live data
 influxdb-client = "^1.38"
 pymodbus = "^3.5.4"
+seaborn = "^0.13.2"
 
 # Parsing weather forecast HTML
 beautifulsoup4 = "^4.12"
@@ -38,6 +39,10 @@ sampler = "hist_data_analysis:runme"
 correlate = "hist_data_analysis:correlate"
 visualize = "hist_data_analysis:main"
 sample_input = "live_data_analysis:create_sample_input"
+mTAN = "hist_data_analysis:mTAN"
+mtan_tuning = "hist_data_analysis:hyper_tuning"
+interp_tuning = "hist_data_analysis:interp_hyper_tuning"
+interpolation = "hist_data_analysis:interpolation"
 value_checker = "navgreen_base:value_alarms"
 train_transformer = "hist_data_analysis.transformer.train:main"
 test_transformer = "hist_data_analysis.transformer.test:main"
