@@ -9,7 +9,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import MtanClassif
 from .data_loader import load_df, TimeSeriesDataset
-from .utils import MaskedCrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
+from ..utils import MaskedCrossEntropyLoss_mTAN, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -235,9 +235,9 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
     model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                         num_heads=num_heads, device=device).to(device)
     # Loss
-    # criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    # criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
     #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
                                        weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
 
     # Train the model
@@ -278,9 +278,9 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
                          stats=mean_stds, y_cols=y_cols)
 
     # Loss
-    # criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    # criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
     #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
                                        weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
 
     # Create a dataset and dataloader

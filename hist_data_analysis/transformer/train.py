@@ -3,7 +3,7 @@ import torch
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from hist_data_analysis.transformer import utils
+from hist_data_analysis import utils
 from .model import Transformer
 from .loader import *
 

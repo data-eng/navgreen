@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader, random_split
 
 from .model import InterpClassif
-from .utils import CrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
+from ..utils import CrossEntropyLoss, get_prfs, get_path, save_json, load_json, visualize, tensor_to_python_numbers, save_csv
 from .data_loader import load_df, TimeSeriesDataset
 
 logger = logging.getLogger(__name__)

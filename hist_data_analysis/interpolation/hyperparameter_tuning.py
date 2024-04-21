@@ -7,7 +7,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from .train_and_test_classif import train
 from .model import InterpClassif
 from .data_loader import load_df, TimeSeriesDataset
-from .utils import CrossEntropyLoss
+from ..utils import CrossEntropyLoss
 
 import logging
 

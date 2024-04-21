@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from .train_and_test_classif import train
 from .model import MtanClassif
 from .data_loader import load_df, TimeSeriesDataset
-from .utils import MaskedCrossEntropyLoss
+from ..utils import MaskedCrossEntropyLoss_mTAN
 
 import logging
 
@@ -74,7 +74,7 @@ def tuning(dim, task, X_cols, y_cols, pvt_cols):
     train_df, _ = load_df(df_path=df_path_train, pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True, y_cols=y_cols)
 
     # MSE loss
-    criterion = MaskedCrossEntropyLoss(sequence_length=sequence_length,
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
                                        weights=torch.tensor([0.49, 0.04, 0.01, 0.02, 0.09, 0.35]).to(device))
 
     # Create a dataset and dataloader
