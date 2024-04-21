@@ -15,7 +15,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.info(f'Device is {device}')
+#logger.info(f'Device is {device}')
 
 def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, visualize=False):
     model.to(device)
@@ -46,16 +46,17 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                    'fscore_macro': 0, 
                    'fscore_weighted': 0}
     
-    logger.info(f"\nTraining with seed {seed} just started...")
+    #logger.info(f"\nTraining with seed {seed} just started...")
 
     for epoch in range(epochs):
         model.train()
         total_train_loss = 0.0
         true_values, pred_values = [], []
 
-        progress_bar = tqdm(enumerate(train_data), total=batches, desc=f"Epoch {epoch + 1}/{epochs}", leave=True)
+        #progress_bar = tqdm(enumerate(train_data), total=batches, desc=f"Epoch {epoch + 1}/{epochs}", leave=True)
 
-        for _, (X, y, mask_X, mask_y) in progress_bar:
+        #for _, (X, y, mask_X, mask_y) in progress_bar:
+        for _, (X, y, mask_X, mask_y) in enumerate(train_data):
             X, y, mask_X, mask_y = X.to(device), y.long().to(device), mask_X.to(device), mask_y.to(device)
             y_pred = model(X, mask_X)
 
@@ -74,7 +75,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             optimizer.step()
 
             total_train_loss += train_loss.item()
-            progress_bar.set_postfix(Loss=train_loss.item())
+            #progress_bar.set_postfix(Loss=train_loss.item())
 
             true_values.append(y.cpu().numpy())
             pred_values.append(y_pred.detach().cpu().numpy())
@@ -110,13 +111,13 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         true_classes = true_values.tolist()
         pred_classes = [utils.get_max(pred).index for pred in pred_values]
         
-        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
+        #logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             stationary = 0
 
-            logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
+            #logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
             mfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="transformer.pth")
             torch.save(model.state_dict(), mfn)
@@ -139,7 +140,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             stationary += 1
 
         if stationary >= patience:
-            logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
+            #logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
             break
 
         scheduler.step()
@@ -158,21 +159,20 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         names=["Training", "Validation"],
                         path=utils.get_path(dirs=["models", "transformer", str(seed)]))
 
-    logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
+    #logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
 
     return avg_train_loss, best_val_loss
 
-def main():
-    path = "data/owm+plc/training_set_classif.csv"
+def main_loop(seed):
+    path = "data/training_set_classif.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
-    seeds = [6, 72, 157, 838, 1214, 1916]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="train")
 
-    weights = utils.load_json(filename='static/weights.json')
+    weights = utils.load_json(filename='hist_data_analysis/transformer/weights.json')
 
     ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"])
     ds_train, ds_val = split(ds, vperc=0.2)
@@ -180,22 +180,24 @@ def main():
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
-    for seed in seeds:
-        model = Transformer(in_size=len(params["X"])+len(params["t"]), 
-                            out_size=len(classes),
-                            nhead=1, 
-                            num_layers=1,
-                            dim_feedforward=2048, 
-                            dropout=0)
+    model = Transformer(in_size=len(params["X"])+len(params["t"]),
+                        out_size=len(classes),
+                        nhead=1,
+                        num_layers=1,
+                        dim_feedforward=2048,
+                        dropout=0)
 
-        _, _ = train(data=(dl_train, dl_val),
-               classes=classes,
-               epochs=300,
-               patience=30,
-               lr=5e-4,
-               criterion=utils.WeightedCrossEntropyLoss(weights),
-               model=model,
-               optimizer="AdamW",
-               scheduler=("StepLR", 1.0, 0.98),
-               seed=seed,
-               visualize=True)
+    _, _ = train(data=(dl_train, dl_val),
+           classes=classes,
+           epochs=2,#300,
+           patience=30,
+           lr=5e-4,
+           criterion=utils.WeightedCrossEntropyLoss(weights),
+           model=model,
+           optimizer="AdamW",
+           scheduler=("StepLR", 1.0, 0.98),
+           seed=seed,
+           visualize=True)
+
+def main():
+    main_loop(seed=13)

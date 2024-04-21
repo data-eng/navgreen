@@ -1,2 +1,2 @@
-from hist_data_analysis.interpolation.train_and_test_classif import main_loop
+from hist_data_analysis.interpolation.train_and_test_classif import main
 from hist_data_analysis.interpolation.hyperparameter_tuning import hyper_tuning

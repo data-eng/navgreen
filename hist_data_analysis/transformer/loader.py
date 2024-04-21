@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, random_split
 import logging
-from hist_data_analysis.transformer import utils
+from hist_data_analysis import utils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -32,14 +32,14 @@ def load(path, parse_dates, normalize=True):
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
     df.sort_values(by='DATETIME', inplace=True)
 
-    logger.info("All data: {} rows".format(len(df)))
+    #logger.info("All data: {} rows".format(len(df)))
 
     empty_days = df.groupby(df['DATETIME'].dt.date).apply(lambda x: x.dropna(subset=params["X"], how='all').empty)
     df = df[~df['DATETIME'].dt.date.isin(empty_days[empty_days].index)]
 
-    logger.info("Number of empty days: %d", empty_days.sum())
-    logger.info("Number of empty data points: %d", 8 * empty_days.sum())
-    logger.info("Data after dropping NAN days: {} rows".format(len(df)))
+    #logger.info("Number of empty days: %d", empty_days.sum())
+    #logger.info("Number of empty data points: %d", 8 * empty_days.sum())
+    #logger.info("Data after dropping NAN days: {} rows".format(len(df)))
 
     datetimes, periods = ['month', 'day', 'hour'], [12, 30, 24]
 
@@ -48,29 +48,28 @@ def load(path, parse_dates, normalize=True):
         df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
         df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
 
-    if os.path.exists('static/stats.json'):
-        stats = utils.load_json(filename='static/stats.json')
+    if os.path.exists('hist_data_analysis/transformer/stats.json'):
+        stats = utils.load_json(filename='hist_data_analysis/transformer/stats.json')
     else:
-        stats = utils.get_stats(df, path='static/')
+        stats = utils.get_stats(df, path='hist_data_analysis/transformer/')
 
     occs = df['binned_Q_PVT'].value_counts().to_dict()
     freqs = {int(key): value / sum(occs.values()) for key, value in occs.items()}
-    utils.save_json(data=freqs, filename='static/freqs.json')
+    utils.save_json(data=freqs, filename='hist_data_analysis/transformer/freqs.json')
 
     inverse_occs = {int(key): 1 / value for key, value in occs.items()}
     weights = {key: value / sum(inverse_occs.values()) for key, value in inverse_occs.items()}
     
-    if not os.path.exists('static/weights.json'):
-        utils.save_json(data=weights, filename='static/weights.json')
-    else:
-        print("Weights file already exists. Skipping saving!")
+    if not os.path.exists('hist_data_analysis/transformer/weights.json'):
+        utils.save_json(data=weights, filename='hist_data_analysis/transformer/weights.json')
+    #else: print("Weights file already exists. Skipping saving!")
 
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
 
     nan_counts = df.isna().sum() / len(df) * 100
-    logger.info("NaN counts for columns in X: %s", nan_counts)
+    #logger.info("NaN counts for columns in X: %s", nan_counts)
 
     return df
 
@@ -82,7 +81,7 @@ def prepare(df, phase):
     :param phase: str model phase (train or test)
     :return: dataframe
     """
-    name = "static/" + "df_" + phase + ".csv"
+    name = "hist_data_analysis/transformer/" + "df_" + phase + ".csv"
 
     for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 

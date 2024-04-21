@@ -26,6 +26,7 @@ seaborn = "^0.13.2"
 beautifulsoup4 = "^4.12"
 dateparser = "^1.2"
 tzlocal = "^5"
+tqdm = "^4.66.2"
 
 
 [build-system]
@@ -49,3 +50,4 @@ test_transformer = "hist_data_analysis.transformer.test:main"
 tune_transformer = "hist_data_analysis.transformer.tune:main"
 weather = "navgreen_base:weather"
 create_classif_data = "hist_data_analysis:create_classif_data"
+train_models = "hist_data_analysis:train_models"

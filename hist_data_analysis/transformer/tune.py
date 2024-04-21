@@ -14,7 +14,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.info(f'Device is {device}')
+#logger.info(f'Device is {device}')
 
 def tune(data, static, config):
     ds_train, ds_val = data

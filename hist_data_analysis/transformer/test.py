@@ -14,7 +14,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-logger.info(f'Device is {device}')
+#logger.info(f'Device is {device}')
 
 def test(data, df, classes, criterion, model, seed, visualize=True):
     mfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="transformer.pth")
@@ -106,7 +106,7 @@ def main():
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="test")
 
-    weights = utils.load_json(filename='static/weights.json')
+    weights = utils.load_json(filename='hist_data_analysis/transformer/weights.json')
 
     ds_test = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"], per_day=True)
     dl_test = DataLoader(ds_test, batch_size, shuffle=False)

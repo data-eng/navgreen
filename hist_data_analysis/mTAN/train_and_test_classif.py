@@ -110,14 +110,14 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
             warnings.simplefilter("ignore", category=UserWarning)
 
             prfs = get_prfs(true_values, predicted_values)
-
+            '''
             logger.info(
                 f"Micro    | f1 score: {prfs['fscore_micro']:.6f} & precision {prfs['precision_micro']:.6f} & recall {prfs['recall_micro']:.6f}")
             logger.info(
                 f"Macro    | f1 score: {prfs['fscore_macro']:.6f} & precision {prfs['precision_macro']:.6f} & recall {prfs['recall_macro']:.6f}")
             logger.info(
                 f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
-
+            '''
     return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all)
 
 
@@ -156,9 +156,9 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
         # logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
         #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
 
-        if epoch % 50 == 0:
-            logger.info(
-                f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
+        #if epoch % 50 == 0:
+        #    logger.info(
+        #        f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
         train_losses.append(average_loss)
         val_losses.append(val_loss)
@@ -178,10 +178,10 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             epochs_without_improvement += 1
 
         if epochs_without_improvement >= patience:
-            logger.info(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
+            #logger.info(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
             break
 
-    logger.info("Training complete!")
+    #logger.info("Training complete!")
 
     visualize(type="multi-plot", values=[(range(1, len(train_losses) + 1), train_losses),
                                          (range(1, len(val_losses) + 1), val_losses)],
@@ -245,7 +245,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
                                            criterion=criterion, learning_rate=lr, epochs=epochs, patience=patience, seed=seed)
     checkpoints['seed'] = seed
 
-    logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
+    #logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
 
     train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -312,15 +312,15 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     cfn = get_path(dirs=["models", "mTAN", str(seed)], name="test_checkpoints.json")
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
-def main_loop():
-    seeds = [1505]
+def main_loop(seed):
     sequence_length = 24 // 3
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
     y_cols = ["binned_Q_PVT"]
     params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
 
-    for seed in seeds:
-        train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+    train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+    test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
 
-        test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+def main():
+    main_loop(seed=1505)
