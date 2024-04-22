@@ -147,6 +147,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
            # logger.info(f"Early stopping after {epoch} epochs without improvement. Patience is {patience}.")
             break
 
+        checkpoints.update({'epochs': epoch})
     #logger.info("Training complete!")
 
     visualize(type="multi-plot", values=[(range(1, len(train_losses) + 1), train_losses),
@@ -264,7 +265,7 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed):
     cfn = get_path(dirs=["models", "interpolation", str(seed)], name="test_checkpoints.json")
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
-def main_loop(seed):
+def main_loop_train(seed):
 
     sequence_length = 24 // 3
 
@@ -278,8 +279,19 @@ def main_loop(seed):
     train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length,
                 interpolation=interpolation, seed=seed)
 
+def main_loop_test(seed):
+
+    sequence_length = 24 // 3
+
+    interpolation = 'linear'
+
+    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
+    y_cols = ["binned_Q_PVT"]
+    params = {'batch_size': 16, 'lr': 0.001}
+
     test_model(X_cols=X_cols, y_cols=y_cols, sequence_length=sequence_length, interpolation=interpolation, seed=seed)
 
 
 def main():
-    main_loop(seed=1505)
+    main_loop_train(seed=1505)
+    main_loop_test(seed=1505)
