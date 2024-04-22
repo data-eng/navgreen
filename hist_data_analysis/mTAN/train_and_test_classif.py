@@ -200,7 +200,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
 
     validation_set_percentage = 0.2
 
-    epochs = 2# 1000
+    epochs = 1000
     patience = 200
 
     # Parameters:

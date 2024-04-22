@@ -189,7 +189,7 @@ def main_loop(seed):
 
     _, _ = train(data=(dl_train, dl_val),
            classes=classes,
-           epochs=2,#300,
+           epochs=300,
            patience=30,
            lr=5e-4,
            criterion=utils.WeightedCrossEntropyLoss(weights),

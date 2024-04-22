@@ -6,13 +6,10 @@ from hist_data_analysis.interpolation.train_and_test_classif import main_loop_tr
 from hist_data_analysis.mTAN.train_and_test_classif import main_loop_train as train_mTAN
 from hist_data_analysis.transformer.train import main_loop as train_transformer
 
-# Epoch > 1
 
 def train_models():
-    #seeds = [6, 72, 157, 838, 1214, 1505]
-    seeds = [6, 15]
+    seeds = [6, 72, 157, 838, 1214, 1505]
     models = ["transformer", "interpolation", "mTAN"]
-    #models = ["interpolation"]
 
     train_times = {"transformer" : dict(), "interpolation" : dict(), "mTAN": dict()}
     acc_train_stats = {"transformer": dict(), "interpolation": dict(), "mTAN": dict()}
@@ -65,8 +62,3 @@ def train_models():
         # Write the dictionary to a JSON file
         with open(f'{folder_path}/acc_train_stats.json', "w") as file:
             json.dump(acc_train_stats[model], file)
-
-
-
-def eval_models():
-    pass
