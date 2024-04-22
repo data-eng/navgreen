@@ -8,3 +8,4 @@ from hist_data_analysis.correlate import correlate
 from hist_data_analysis.visualize import main
 from hist_data_analysis.classification_dataset import main as create_classif_data
 from hist_data_analysis.train_ml_models import train_models
+from hist_data_analysis.eval_ml_models import eval_models

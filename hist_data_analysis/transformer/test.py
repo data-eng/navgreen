@@ -41,11 +41,12 @@ def test(data, df, classes, criterion, model, seed, visualize=True):
                    'fscore_macro': 0, 
                    'fscore_weighted': 0}
 
-    progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
-    logger.info(f"\nTesting with seed {seed} just started...")
+    #progress_bar = tqdm(enumerate(data), total=batches, desc=f"Evaluation", leave=True)
+    #logger.info(f"\nTesting with seed {seed} just started...")
 
     with torch.no_grad():
-        for _, (X, y, mask_X, mask_y) in progress_bar:
+        #for _, (X, y, mask_X, mask_y) in progress_bar:
+        for _, (X, y, mask_X, mask_y) in enumerate(data):
             X, y, mask_X, mask_y = X.to(device), y.long().to(device), mask_X.to(device), mask_y.to(device)
             y_pred = model(X, mask_X)
 
@@ -92,16 +93,15 @@ def test(data, df, classes, criterion, model, seed, visualize=True):
     dfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="data.csv")
     utils.save_csv(data=data, filename=dfn)
 
-    logger.info(f'\nTesting with seed {seed} complete!\nTesting Loss: {avg_test_loss:.6f}\n')
+    #logger.info(f'\nTesting with seed {seed} complete!\nTesting Loss: {avg_test_loss:.6f}\n')
 
     return avg_test_loss
 
-def main():
-    path = "data/owm+plc/test_set_classif.csv"
+def main_loop(seed):
+    path = "data/test_set_classif.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
-    seeds = [6, 72, 157, 838, 1214, 1916]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True)
     df_prep = prepare(df, phase="test")
@@ -111,20 +111,22 @@ def main():
     ds_test = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"], per_day=True)
     dl_test = DataLoader(ds_test, batch_size, shuffle=False)
 
-    for seed in seeds:
-        torch.manual_seed(seed)
+    torch.manual_seed(seed)
 
-        model = Transformer(in_size=len(params["X"])+len(params["t"]), 
-                            out_size=len(classes),
-                            nhead=1, 
-                            num_layers=1,
-                            dim_feedforward=2048, 
-                            dropout=0)
+    model = Transformer(in_size=len(params["X"])+len(params["t"]),
+                        out_size=len(classes),
+                        nhead=1,
+                        num_layers=1,
+                        dim_feedforward=2048,
+                        dropout=0)
 
-        _ = test(data=dl_test,
-                 df=df_prep,
-                 classes=classes,
-                 criterion=utils.WeightedCrossEntropyLoss(weights),
-                 model=model,
-                 seed=seed,
-                 visualize=True)
+    _ = test(data=dl_test,
+             df=df_prep,
+             classes=classes,
+             criterion=utils.WeightedCrossEntropyLoss(weights),
+             model=model,
+             seed=seed,
+             visualize=True)
+
+def main():
+    main_loop(seed=13)
