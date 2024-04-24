@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pandas as pd
 import warnings
 import logging
 import matplotlib.pyplot as plt
@@ -52,9 +53,9 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
                         predicted_values.append(split_out[i].cpu().numpy())
                         masked_values.append(split_masks_y[i].cpu().numpy())
 
-                    # Append masked true and predicted values without losses
-                    true_values_all.append(y.cpu().numpy())
-                    predicted_values_all.append(out.cpu().numpy())
+                # Append masked true and predicted values without losses
+                true_values_all.append(y.cpu().numpy())
+                predicted_values_all.append(out.cpu().numpy())
 
     prfs = None
     if plot:
@@ -161,7 +162,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
         #        f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
         train_losses.append(average_loss)
-        val_losses.append(val_loss)
+        val_losses.append(val_loss.cpu())
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -193,7 +194,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
     return final_train_loss, best_val_loss, checkpoints
 
 
-def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
+def train_model(X_cols, y_cols, params, sequence_length, seed):
     torch.manual_seed(seed)
     np.random.seed(seed)
     torch.cuda.manual_seed(seed)
@@ -216,6 +217,9 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
     train_df, mean_stds = load_df(df_path="data/training_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                                       normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'hist_data_analysis/mTAN/mean_stds.json')
+
+    train_df.to_csv("data/pvt_df_train.csv")
+    train_df = pd.read_csv("data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
@@ -250,7 +254,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed=1505):
     #logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
 
-    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
 
     trained_model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                         num_heads=num_heads, device=device).to(device)
@@ -278,6 +282,9 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     test_df, _ = load_df(df_path="data/test_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                          normalize=True,
                          stats=mean_stds, y_cols=y_cols)
+
+    test_df.to_csv("data/pvt_df_test.csv")
+    test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Loss
     # criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,

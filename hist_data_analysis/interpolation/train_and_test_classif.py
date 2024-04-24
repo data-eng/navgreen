@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import pandas as pd
 import warnings
 import logging
 import matplotlib.pyplot as plt
@@ -128,7 +129,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             logger.info(f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
         '''
         train_losses.append(average_loss)
-        val_losses.append(val_loss)
+        val_losses.append(val_loss.cpu())
 
         # Check for early stopping
         if val_loss < best_val_loss:
@@ -180,6 +181,9 @@ def train_model(X_cols, y_cols, params, sequence_length, interpolation, seed=150
                                       normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'hist_data_analysis/interpolation/mean_stds.json')
 
+    train_df.to_csv("data/pvt_df_train.csv")
+    train_df = pd.read_csv("data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
                                          X_cols=X_cols, y_cols=y_cols, interpolation=interpolation)
@@ -210,7 +214,7 @@ def train_model(X_cols, y_cols, params, sequence_length, interpolation, seed=150
     #logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
 
 
-    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+    train_loader = DataLoader(training_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
 
     trained_model = InterpClassif(dim=dim, init_embed=sequence_length).to(device)
 
@@ -234,6 +238,9 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed):
     mean_stds = load_json('hist_data_analysis/interpolation/mean_stds.json')
     test_df, _ = load_df(df_path="data/test_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
                          stats=mean_stds, y_cols=y_cols)
+
+    test_df.to_csv("data/pvt_df_test.csv")
+    test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Loss
     criterion = CrossEntropyLoss(weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
