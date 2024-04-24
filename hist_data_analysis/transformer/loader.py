@@ -16,17 +16,18 @@ logger.addHandler(stream_handler)
 params = {
     "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
-    "y": ["binned_Q_PVT"],
+    #"y": ["binned_Q_PVT"],
     "ignore": [] 
 }
 
-def load(path, parse_dates, normalize=True):
+def load(path, parse_dates, bin, normalize=True):
     """
     Loads and preprocesses data from a CSV file.
 
     :param path: path to the CSV file
     :param parse_dates: columns to parse as dates in the dataframe
     :param normalize: normalization flag
+    :param bin: y_bin
     :return: dataframe
     """
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
@@ -53,20 +54,20 @@ def load(path, parse_dates, normalize=True):
     else:
         stats = utils.get_stats(df, path='hist_data_analysis/transformer/')
 
-    occs = df['binned_Q_PVT'].value_counts().to_dict()
+    occs = df[bin].value_counts().to_dict()
     freqs = {int(key): value / sum(occs.values()) for key, value in occs.items()}
-    utils.save_json(data=freqs, filename='hist_data_analysis/transformer/freqs.json')
+    utils.save_json(data=freqs, filename=f'hist_data_analysis/transformer/freqs_{bin}.json')
 
     inverse_occs = {int(key): 1 / value for key, value in occs.items()}
     weights = {key: value / sum(inverse_occs.values()) for key, value in inverse_occs.items()}
     
-    if not os.path.exists('hist_data_analysis/transformer/weights.json'):
-        utils.save_json(data=weights, filename='hist_data_analysis/transformer/weights.json')
+    if not os.path.exists(f'hist_data_analysis/transformer/weights_{bin}.json'):
+        utils.save_json(data=weights, filename=f'hist_data_analysis/transformer/weights_{bin}.json')
     #else: print("Weights file already exists. Skipping saving!")
 
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
-                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'binned_Q_PVT'])
+                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', bin])
 
     nan_counts = df.isna().sum() / len(df) * 100
     #logger.info("NaN counts for columns in X: %s", nan_counts)

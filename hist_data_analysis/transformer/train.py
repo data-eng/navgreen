@@ -17,7 +17,7 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #logger.info(f'Device is {device}')
 
-def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, visualize=False):
+def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y, visualize=False):
     model.to(device)
     train_data, val_data = data
     batches = len(train_data)
@@ -27,7 +27,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
     torch.manual_seed(seed)
 
     best_val_loss = float('inf')
-    ylabel = params["y"][0]
+    ylabel = y[0]
     stationary = 0
     train_losses, val_losses = [], []
 
@@ -119,7 +119,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
             #logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
-            mfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="transformer.pth")
+            mfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="transformer.pth")
             torch.save(model.state_dict(), mfn)
 
             checkpoints.update({'best_epoch': epoch+1, 
@@ -134,7 +134,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         title="Train Heatmap "+ylabel,
                         classes=classes,
                         coloring=['azure', 'darkblue'],
-                        path=utils.get_path(dirs=["models", "transformer", str(seed)]))
+                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
                 
         else:
             stationary += 1
@@ -145,7 +145,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
         scheduler.step()
 
-    cfn = utils.get_path(dirs=["models", "transformer", str(seed)], name="train_checkpoints.json")
+    cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="train_checkpoints.json")
     checkpoints.update({'epochs': epoch+1})
     utils.save_json(data=checkpoints, filename=cfn)
     
@@ -157,24 +157,25 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         plot_func=plt.plot,
                         coloring=['brown', 'royalblue'],
                         names=["Training", "Validation"],
-                        path=utils.get_path(dirs=["models", "transformer", str(seed)]))
+                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
 
     #logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
 
     return avg_train_loss, best_val_loss
 
-def main_loop(seed):
-    path = "data/training_set_classif.csv"
+def main_loop(seed, y_col):
+    path = "data/training_set_classif_new_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
-    classes = ["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"]
 
-    df = load(path=path, parse_dates=["DATETIME"], normalize=True)
+    classes = ["0", "1", "2", "3", "4"]
+
+    df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
     df_prep = prepare(df, phase="train")
 
-    weights = utils.load_json(filename='hist_data_analysis/transformer/weights.json')
+    weights = utils.load_json(filename=f'hist_data_analysis/transformer/weights_{y_col[0]}.json')
 
-    ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=params["y"])
+    ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col)
     ds_train, ds_val = split(ds, vperc=0.2)
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
@@ -189,7 +190,7 @@ def main_loop(seed):
 
     _, _ = train(data=(dl_train, dl_val),
            classes=classes,
-           epochs=300,
+           epochs=1, #300,
            patience=30,
            lr=5e-4,
            criterion=utils.WeightedCrossEntropyLoss(weights),
@@ -197,7 +198,8 @@ def main_loop(seed):
            optimizer="AdamW",
            scheduler=("StepLR", 1.0, 0.98),
            seed=seed,
+           y=y_col,
            visualize=True)
 
 def main():
-    main_loop(seed=13)
+    main_loop(seed=13, y_col="binned_Q_PVT")

@@ -102,9 +102,9 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
                   values=(true_values, predicted_values),
                   labels=("True Values", "Predicted Values"),
                   title=f"{set_type} Heatmap " + pred_value,
-                  classes=["< 0.42 KWh", "< 1.05 KWh", "< 1.51 KWh", "< 2.14 KWh", ">= 2.14 KWh"],
+                  classes = ["0", "1", "2", "3", "4"],
                   coloring=['azure', 'darkblue'],
-                  path=get_path(dirs=["models", "mTAN", str(seed)]))
+                  path=get_path(dirs=["models", pred_value, "mTAN", str(seed)]))
 
         # Compute scores
         with warnings.catch_warnings():
@@ -122,7 +122,7 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
     return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all)
 
 
-def train(model, train_loader, val_loader, criterion, learning_rate, epochs, patience, seed):
+def train(model, train_loader, val_loader, criterion, learning_rate, epochs, patience, seed, pred_value):
     checkpoints = {'epochs': 0, 'best_epoch': 0, 'best_train_loss': float('inf'),
                    'best_val_loss': float('inf')}
 
@@ -170,7 +170,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             final_train_loss = average_loss
             epochs_without_improvement = 0
 
-            mfn = get_path(dirs=["models", "mTAN", str(seed)], name="mTAN.pth")
+            mfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="mTAN.pth")
             torch.save(model.state_dict(), mfn)
             checkpoints.update(
                 {'best_epoch': epoch, 'best_train_loss': final_train_loss, 'best_val_loss': best_val_loss})
@@ -189,19 +189,19 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
     visualize(type="multi-plot", values=[(range(1, len(train_losses) + 1), train_losses),
                                          (range(1, len(val_losses) + 1), val_losses)],
               labels=("Epoch", "Loss"), title="Loss Curves", plot_func=plt.plot, coloring=['brown', 'royalblue'],
-              names=["Training", "Validation"], path=get_path(dirs=["models", "mTAN", str(seed)]))
+              names=["Training", "Validation"], path=get_path(dirs=["models", pred_value, "mTAN", str(seed)]))
 
     return final_train_loss, best_val_loss, checkpoints
 
 
-def train_model(X_cols, y_cols, params, sequence_length, seed):
+def train_model(X_cols, y_cols, params, sequence_length, seed, weights):
     torch.manual_seed(seed)
     np.random.seed(seed)
     torch.cuda.manual_seed(seed)
 
     validation_set_percentage = 0.2
 
-    epochs = 1000
+    epochs = 1#1000
     patience = 200
 
     # Parameters:
@@ -211,10 +211,10 @@ def train_model(X_cols, y_cols, params, sequence_length, seed):
     lr = params["lr"]
 
     pvt_cols = ["DATETIME"] + X_cols + y_cols
-
+    pred_value = y_cols[0]
     dim = len(X_cols)
 
-    train_df, mean_stds = load_df(df_path="data/training_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    train_df, mean_stds = load_df(df_path="data/training_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                                       normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'hist_data_analysis/mTAN/mean_stds.json')
 
@@ -243,12 +243,12 @@ def train_model(X_cols, y_cols, params, sequence_length, seed):
     # Loss
     # criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
     #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
-                                       weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length, weights=torch.tensor(weights).to(device))
 
     # Train the model
     training_loss, validation_loss, checkpoints = train(model=model, train_loader=train_loader, val_loader=val_loader,
-                                           criterion=criterion, learning_rate=lr, epochs=epochs, patience=patience, seed=seed)
+                                                        criterion=criterion, learning_rate=lr, epochs=epochs,
+                                                        patience=patience, seed=seed, pred_value=pred_value)
     checkpoints['seed'] = seed
 
     #logger.info(f'Final Training Loss : {training_loss:.6f} &  Validation Loss : {validation_loss:.6f}\n')
@@ -259,19 +259,19 @@ def train_model(X_cols, y_cols, params, sequence_length, seed):
     trained_model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                         num_heads=num_heads, device=device).to(device)
 
-    mfn = get_path(dirs=["models", "mTAN", str(seed)], name="mTAN.pth")
+    mfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="mTAN.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    _, prfs, _ = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=y_cols[0], seed=seed)
+    _, prfs, _ = evaluate(trained_model, train_loader, criterion, plot=True, pred_value=pred_value, seed=seed)
 
     checkpoints.update(**prfs)
-    cfn = get_path(dirs=["models", "mTAN", str(seed)], name="train_checkpoints.json")
+    cfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="train_checkpoints.json")
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
 
-def test_model(X_cols, y_cols, params, sequence_length, seed):
+def test_model(X_cols, y_cols, params, sequence_length, seed, weights):
     pvt_cols = ["DATETIME"] + X_cols + y_cols
-
+    pred_value = y_cols[0]
     dim = len(X_cols)
 
     # Parameters:
@@ -279,7 +279,7 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     embed_time = params["embed_time"]
 
     mean_stds = load_json('hist_data_analysis/mTAN/mean_stds.json')
-    test_df, _ = load_df(df_path="data/test_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    test_df, _ = load_df(df_path="data/test_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                          normalize=True,
                          stats=mean_stds, y_cols=y_cols)
 
@@ -287,10 +287,7 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     test_df = pd.read_csv("data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Loss
-    # criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
-    #                                   weights=torch.tensor([0.75, 0.055, 0.02, 0.035, 0.14]).to(device))
-    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
-                                       weights=torch.tensor([0.25, 0.2, 0.15, 0.2, 0.2]).to(device))
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length, weights=torch.tensor(weights).to(device))
 
     # Create a dataset and dataloader
     testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
@@ -301,11 +298,11 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
     trained_model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
                                 num_heads=num_heads, device=device).to(device)
 
-    mfn = get_path(dirs=["models", "mTAN", str(seed)], name="mTAN.pth")
+    mfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="mTAN.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
     test_loss, prfs, (true_values, predicted_values) = (
-        evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=y_cols[0], seed=seed,
+        evaluate(trained_model, test_loader_per_day, criterion, plot=True, pred_value=pred_value, seed=seed,
                  set_type="Test"))
 
     df = test_df.copy()
@@ -314,31 +311,30 @@ def test_model(X_cols, y_cols, params, sequence_length, seed):
             "binned_Q_PVT_real": true_values,
             "binned_Q_PVT_pred": predicted_values}
 
-    dfn = get_path(dirs=["models", "mTAN", str(seed)], name="data.csv")
+    dfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="data.csv")
     save_csv(data=data, filename=dfn)
 
     checkpoints = {'seed': seed, 'test_loss': test_loss, **prfs}
-    cfn = get_path(dirs=["models", "mTAN", str(seed)], name="test_checkpoints.json")
+    cfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="test_checkpoints.json")
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
-def main_loop_train(seed):
+def main_loop_train(seed, y_cols, weights):
     sequence_length = 24 // 3
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
-    y_cols = ["binned_Q_PVT"]
     params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
 
-    train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+    train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 
-def main_loop_test(seed):
+def main_loop_test(seed, y_cols, weights):
     sequence_length = 24 // 3
 
     X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
-    y_cols = ["binned_Q_PVT"]
     params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
 
-    test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+    test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 
 def main():
-    main_loop_train(seed=1505)
-    main_loop_test(seed=1505)
+    weights = [0.75, 0.055, 0.02, 0.035, 0.14]
+    main_loop_train(seed=1505, y_cols=["FixedBin"], weights=weights)
+    main_loop_test(seed=1505, y_cols=["FixedBin"], weights=weights)

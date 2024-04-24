@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import yaml
 
 from hist_data_analysis.interpolation.train_and_test_classif import main_loop_test as test_interpolation
 from hist_data_analysis.mTAN.train_and_test_classif import main_loop_test as test_mTAN
@@ -7,7 +8,12 @@ from hist_data_analysis.transformer.test import main_loop as test_transformer
 
 
 def eval_models():
-    seeds = [6, 72, 157, 838, 1214, 1505]
+    # seeds = [6, 72, 157, 838, 1214, 1505]
+
+    with open("hist_data_analysis/config.yaml", "r") as config:
+        config = yaml.safe_load(config)
+
+    seeds = config["seeds"]
     models = ["transformer", "interpolation", "mTAN"]
 
     acc_test_stats = {"transformer": dict(), "interpolation": dict(), "mTAN": dict()}
