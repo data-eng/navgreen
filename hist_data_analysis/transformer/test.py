@@ -119,7 +119,6 @@ def main_loop(seed, y_col):
                         nhead=1,
                         num_layers=1,
                         dim_feedforward=2048,
-                        y = y_col,
                         dropout=0)
 
     _ = test(data=dl_test,

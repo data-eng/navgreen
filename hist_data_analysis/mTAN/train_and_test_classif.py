@@ -308,8 +308,8 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights):
     df = test_df.copy()
     data = {"DATETIME": df.index,
             **{col: df[col].values for col in X_cols},
-            "binned_Q_PVT_real": true_values,
-            "binned_Q_PVT_pred": predicted_values}
+            f"{pred_value}_real": true_values,
+            f"{pred_value}_pred": predicted_values}
 
     dfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="data.csv")
     save_csv(data=data, filename=dfn)

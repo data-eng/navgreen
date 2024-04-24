@@ -237,7 +237,7 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed, weights):
     dim = len(X_cols)
 
     mean_stds = load_json('hist_data_analysis/interpolation/mean_stds.json')
-    test_df, _ = load_df(df_path="data/test_set_classif.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
+    test_df, _ = load_df(df_path="data/test_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
                          stats=mean_stds, y_cols=y_cols)
 
     test_df.to_csv("data/pvt_df_test.csv")
@@ -264,7 +264,7 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed, weights):
     data = {"DATETIME": df.index,
             **{col: df[col].values for col in X_cols},
             f"{pred_value}_real": true_values,
-            f"{pred_value}_real": predicted_values}
+            f"{pred_value}_pred": predicted_values}
 
     dfn = get_path(dirs=["models", pred_value, "interpolation", str(seed)], name="data.csv")
     save_csv(data=data, filename=dfn)
