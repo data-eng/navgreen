@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
+import torch.optim.lr_scheduler as sched
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, precision_recall_curve, roc_curve, auc
@@ -9,6 +11,80 @@ import pandas as pd
 import numpy as np
 import os
 import json
+import math
+from collections import namedtuple
+
+
+class CrossEntropyLoss(nn.Module):
+    """
+    Custom cross entropy loss that considers masks
+    """
+    def __init__(self, weights):
+        super(CrossEntropyLoss, self).__init__()
+        w = 1.0 / weights
+        self.weights = w / w.sum()
+        #print(f'weights is {self.weights}')
+
+    def forward(self, pred, true, mask):
+        if pred.dim() == 2: pred = pred.permute(1, 0).unsqueeze(0)
+        true = true.long()
+        true = true * mask.long()
+        loss = [F.cross_entropy(pred[b_sz, :, :], true[b_sz, :], reduction='none', weight=self.weights) for b_sz in range(true.shape[0])]
+        loss = torch.stack(loss, dim=0)
+        mask = mask.float()
+        loss = loss * mask
+        loss = torch.sum(loss) / torch.sum(mask)
+
+        return loss
+
+
+def mask(tensor, mask, id=0):
+    """
+    Mask a tensor based on a specified condition.
+
+    :param tensor: torch.Tensor
+    :param mask: torch.Tensor
+    :param id: int value specifying the elements to keep
+    :return: torch.Tensor
+    """
+    return tensor[mask == id]
+
+
+class WeightedCrossEntropyLoss(nn.Module):
+    def __init__(self, weights):
+        """
+        Initialize the WeightedCrossEntropyLoss module.
+
+        :param weights: dictionary
+        """
+        super(WeightedCrossEntropyLoss, self).__init__()
+        self.weights = self.extract_weights(weights)
+
+    def extract_weights(self, weights):
+        """
+        Extract weights from the given dictionary and convert them to a tensor.
+
+        :param weights: dictionary
+        :return: tensor
+        """
+        weights = dict(sorted(weights.items()))
+        weights = [weights[str(i)] for i in range(len(weights))]
+        return torch.tensor(weights)
+
+    def forward(self, pred, true):
+        """
+        Compute the weighted cross-entropy loss.
+
+        :param pred: tensor (batch_size * seq_len, num_classes)
+        :param true: tensor (batch_size * seq_len)
+        :return: tensor
+        """
+        if true.size(0) == 0 or pred.size(0) == 0:
+            return torch.tensor(0.0, requires_grad=True, device=pred.device)
+
+        loss = F.cross_entropy(pred, true, weight=self.weights.to(pred.device))
+
+        return loss
 
 class MaskedMSELoss(nn.Module):
     """
@@ -58,12 +134,12 @@ class MaskedSmoothL1Loss(nn.Module):
         return loss
 
 
-class MaskedCrossEntropyLoss(nn.Module):
+class MaskedCrossEntropyLoss_mTAN(nn.Module):
     """
     Cross Entropy Loss that utilizes masks
     """
     def __init__(self, sequence_length, weights):
-        super(MaskedCrossEntropyLoss, self).__init__()
+        super(MaskedCrossEntropyLoss_mTAN, self).__init__()
         self.sequence_length = sequence_length
         # Calculate the inverse class frequencies
         if weights is not None:
@@ -85,6 +161,75 @@ class MaskedCrossEntropyLoss(nn.Module):
         return loss
 
 
+def tensor_to_python_numbers(tensor):
+    """
+    Converts all items in a dictionary to numpy numbers
+    :param tensor:
+    :return:
+    """
+    if isinstance(tensor, torch.Tensor):
+        return tensor.item() if tensor.numel() == 1 else tensor.cpu().numpy().tolist()
+    elif isinstance(tensor, np.ndarray):
+        return tensor.item() if np.prod(tensor.shape) == 1 else tensor.tolist()
+    elif isinstance(tensor, (list, tuple)):
+        return [tensor_to_python_numbers(item) for item in tensor]
+    elif isinstance(tensor, dict):
+        return {key: tensor_to_python_numbers(value) for key, value in tensor.items()}
+    else:
+        return tensor
+
+def get_max(arr):
+    """
+    Get the maximum value and its index from an array.
+
+    :param arr: numpy array
+    :return: namedtuple
+    """
+    Info = namedtuple('Info', ['value', 'index'])
+
+    max_index = np.argmax(arr)
+    max_value = arr[max_index]
+
+    return Info(value=max_value, index=max_index)
+
+
+def hot3D(t, k, device):
+    """
+    Encode 3D tensor into one-hot format.
+
+    :param t: tensor of shape (dim_0, dim_1, dim_2)
+    :param k: int number of classes
+    :param device: device
+    :return: tensor of shape (dim_0, dim_1, k)
+    """
+    dim_0, dim_1, _ = t.size()
+    t_hot = torch.zeros(dim_0, dim_1, k, device=device)
+
+    for x in range(dim_0):
+        for y in range(dim_1):
+            for z in t[x, y]:
+                t_hot[x, y] = torch.tensor(one_hot(z.item(), k=k))
+
+    return t_hot.to(device)
+
+
+def one_hot(val, k):
+    """
+    Convert categorical value to one-hot encoded representation.
+
+    :param val: float
+    :param k: number of classes
+    :return: list
+    """
+    encoding = []
+
+    if math.isnan(val):
+        encoding = [val for _ in range(k)]
+    else:
+        encoding = [0 for _ in range(k)]
+        encoding[int(val)] = 1
+
+    return encoding
 
 def tensor_to_python_numbers(tensor):
     """
@@ -162,6 +307,16 @@ def load_json(filename):
 
     return data
 
+def save_csv(data, filename):
+    """
+    Save data to a CSV file.
+
+    :param data: dictionary
+    :param filename: str
+    """
+    df = pd.DataFrame(data)
+    df.to_csv(filename, index=False)
+
 def visualize(type, values, labels, title, plot_func=None, coloring=None, names=None, classes=None, tick=False, path=''):
     """
     Visualize (x,y) data points.
@@ -209,6 +364,121 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
     plt.savefig(os.path.join(path, filename), dpi=300)
     plt.close()
 
+
+
+def normalize(df, stats, exclude=[]):
+    """
+    Normalize data.
+
+    :param df: dataframe
+    :param stats: tuple of mean and std
+    :param exclude: column to exclude from normalization
+    :return: processed dataframe
+    """
+    newdf = df.copy()
+
+    for col in df.columns:
+        if col not in exclude:
+            series = df[col]
+            mean, std = stats[col]
+            series = (series - mean) / std
+            newdf[col] = series
+
+    return newdf
+
+
+def get_stats(df, path='data/'):
+    """
+    Compute mean and standard deviation for each column in the dataframe.
+
+    :param df: dataframe
+    :return: dictionary
+    """
+    stats = {}
+    filename = os.path.join(path, 'stats.pkl')
+
+    for col in df.columns:
+        if col != "DATETIME":
+            series = df[col]
+            mean = series.mean()
+            std = series.std()
+            stats[col] = (mean, std)
+
+    filename = os.path.join(path, 'stats.json')
+    save_json(data=stats, filename=filename)
+
+    return stats
+
+
+def filter(df, column, threshold):
+    """
+    Filter dataframe based on a single column and its threshold if the column exists.
+
+    :param df: dataframe
+    :param column: column name to filter
+    :param threshold: threshold value for filtering
+    :return: filtered dataframe if column exists, otherwise original dataframe
+    """
+    if column in df.columns:
+        if threshold is not None:
+            df = df[df[column] > threshold]
+        else:
+            df.drop(column, axis="columns", inplace=True)
+
+    return df
+
+
+def aggregate(df, grp="1min", func=lambda x: x):
+    """
+    Resample dataframe based on the provided frequency and aggregate using the specified function.
+
+    :param df: dataframe
+    :param grp: resampling frequency ('1min' -> original)
+    :param func: aggregation function (lambda x: x -> no aggregation)
+    :return: aggregated dataframe
+    """
+    df = df.set_index("DATETIME")
+
+    if grp:
+        df = df.resample(grp)
+        df = df.apply(func)
+        df = df.dropna()
+
+    df = df.sort_index()
+
+    return df
+
+
+def get_optim(name, model, lr):
+    """
+    Get optimizer object based on name, model, and learning rate.
+
+    :param name: str
+    :param model: model
+    :param lr: float
+    :return: optimizer object
+    """
+    optim_class = getattr(optim, name)
+    optimizer = optim_class(model.parameters(), lr=lr)
+
+    return optimizer
+
+
+def get_sched(name, step_size, gamma, optimizer):
+    """
+    Get scheduler object based on name, step size, gamma, and optimizer.
+
+    :param name: str
+    :param step_size: int
+    :param gamma: gamma float
+    :param optimizer: optimizer object
+    :return: scheduler object
+    """
+    sched_class = getattr(sched, name)
+    scheduler = sched_class(optimizer, step_size, gamma)
+
+    return scheduler
+
 def class_wise_pr_roc(labels, predicted_labels, name):
     num_classes = len(np.unique(labels))
     predicted_probs = label_binarize(predicted_labels, classes=np.arange(num_classes))
@@ -247,12 +517,4 @@ def class_wise_pr_roc(labels, predicted_labels, name):
         plt.legend(loc="lower right")
         plt.savefig(f'figures/roc_class_{i}_{name}.png', dpi=300)
 
-def save_csv(data, filename):
-    """
-    Save data to a CSV file.
 
-    :param data: dictionary
-    :param filename: str
-    """
-    df = pd.DataFrame(data)
-    df.to_csv(filename, index=False)

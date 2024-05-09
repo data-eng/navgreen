@@ -611,7 +611,7 @@ tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "pa
 typing = ["typing-extensions"]
 xmp = ["defusedxml"]
 
-[[package]
+[[package]]
 name = "pymodbus"
 version = "3.6.6"
 description = "A fully featured modbus protocol stack in python"

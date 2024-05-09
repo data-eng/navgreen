@@ -1,0 +1,24 @@
+# This file may be used to create an environment using:
+# $ conda create --name <env> --file <this file>
+# platform: linux-64
+_libgcc_mutex=0.1=main
+asttokens=2.0.5=pyhd3eb1b0_0
+blas=1.0=mkl
+charset-normalizer=2.0.4=pyhd3eb1b0_0
+cycler=0.11.0=pyhd3eb1b0_0
+decorator=5.1.1=pyhd3eb1b0_0
+executing=0.8.3=pyhd3eb1b0_0
+parso=0.8.3=pyhd3eb1b0_0
+pexpect=4.8.0=pyhd3eb1b0_3
+prompt_toolkit=3.0.43=hd3eb1b0_0
+ptyprocess=0.7.0=pyhd3eb1b0_2
+pure_eval=0.2.2=pyhd3eb1b0_0
+python-dateutil=2.8.2=pyhd3eb1b0_0
+python-tzdata=2023.3=pyhd3eb1b0_0
+seaborn=0.13.2=hd8ed1ab_0
+seaborn-base=0.13.2=pyhd8ed1ab_0
+six=1.16.0=pyhd3eb1b0_1
+stack_data=0.2.0=pyhd3eb1b0_0
+threadpoolctl=2.2.0=pyh0d69192_0
+tzdata=2024a=h04d1e81_0
+wcwidth=0.2.5=pyhd3eb1b0_0
