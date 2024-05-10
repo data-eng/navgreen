@@ -2,8 +2,6 @@ import json
 import numpy as np
 import yaml
 
-from interpolation.train_and_test_classif import main_loop_test as test_interpolation
-from mTAN.train_and_test_classif import main_loop_test as test_mTAN
 from transformer.test import main_loop as test_transformer
 
 
@@ -14,26 +12,22 @@ def eval_models():
     seeds = config["seeds"]
     bins = config["bins"]
 
-    models = ["interpolation", "mTAN", "transformer"]
-
-    model_test = {"transformer" : test_transformer,
-                   "interpolation" : test_interpolation,
-                   "mTAN": test_mTAN}
+    models = ["transformer"]
+    model_test = {"transformer": test_transformer}
 
     # Start testing the models for each seed and binning.
     # The testing information is stored within the folder 'models/{bin}/{model_name}'
-    for bin, weights in bins:
+    for bin in bins:
         for seed in seeds:
             for model in models:
                 print(f'Start test bin={bin} with model "{model}" for seed={seed}')
-                if model == "transformer": model_test[model](seed, [bin])
-                else: model_test[model](seed, [bin], weights)
+                model_test[model](seed, [bin])
                 print(f'End test bin={bin} with model "{model}" for seed={seed}')
 
     # Calculate mean and std of testin statistics for each model
-    for bin, _ in bins:
+    for bin in bins:
         bin_folder_path = f'models/{bin}'
-        acc_test_stats = {"transformer": dict(), "interpolation": dict(), "mTAN": dict()}
+        acc_test_stats = {"transformer": dict()}
         for model in models:
             epoch_time = []
             folder_path = f'{bin_folder_path}/{model}'

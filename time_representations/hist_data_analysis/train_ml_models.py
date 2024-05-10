@@ -3,10 +3,7 @@ import json
 import numpy as np
 import yaml
 
-from interpolation.train_and_test_classif import main_loop_train as train_interpolation
-from mTAN.train_and_test_classif import main_loop_train as train_mTAN
 from transformer.train import main_loop as train_transformer
-
 
 
 def train_models():
@@ -16,33 +13,30 @@ def train_models():
     seeds = config["seeds"]
     bins = config["bins"]
 
-    models = ["interpolation", "mTAN", "transformer"]
+    models = ["transformer"]
 
     train_times = {}
-    for bin, _ in bins:
-        train_times[bin] = {"transformer" : dict(), "interpolation" : dict(), "mTAN": dict()}
+    for bin in bins:
+        train_times[bin] = {"transformer": dict()}
 
-    model_train = {"transformer" : train_transformer,
-                   "interpolation" : train_interpolation,
-                   "mTAN": train_mTAN}
+    model_train = {"transformer": train_transformer}
 
     # Start training the models for each seed and binning.
     # The training information is stored within the folder 'models/{bin}/{model_name}'
-    for bin, weights in bins:
+    for bin in bins:
         for seed in seeds:
             for model in models:
                 print(f'Start training bin={bin} with model "{model}" for seed={seed}')
                 start_time = time.time()
-                if model == "transformer": model_train[model](seed, [bin])
-                else: model_train[model](seed, [bin], weights)
+                model_train[model](seed, [bin])
                 # Store training time for this model
                 train_times[bin][model][seed] = time.time() - start_time
                 print(f'End training bin={bin} with model "{model}" for seed={seed} [training time:{train_times[bin][model][seed]:.2f}]')
 
     # Calculate mean and std of training statistics for each model
-    for bin, _ in bins:
+    for bin in bins:
         bin_folder_path = f'models/{bin}'
-        acc_train_stats = {"transformer": dict(), "interpolation": dict(), "mTAN": dict()}
+        acc_train_stats = {"transformer": dict()}
         for model in models:
             epoch_time = []
             folder_path = f'{bin_folder_path}/{model}'
