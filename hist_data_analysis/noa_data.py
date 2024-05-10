@@ -286,9 +286,6 @@ def open_weather_and_installation_data():
     combined_df = combine_dataframes(weather_df=weather_df, data_df=data_df)
     combined_df = combined_df.reset_index()
     combined_df = combined_df.sort_values(by='DATETIME')
-    print(combined_df)
-    print()
-    print(noa_df)
     combined_df = combine_dataframes(weather_df=noa_df, data_df=combined_df)
     combined_df.to_csv('../data/Q_PVT_classification_dataset.csv', index=True)
 
