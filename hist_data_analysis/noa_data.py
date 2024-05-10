@@ -192,10 +192,26 @@ def create_navgreen_data_dataframe(data_file, keep_columns, grp, aggregators):
     return df
 
 
+def create_navgreen_noa_data_dataframe(noa_df_pth, grp, aggregators):
+    df = pd.read_csv(noa_df_pth, low_memory=False)
+    df['DATETIME'] = pd.to_datetime(df['DAY'] + ' ' + df['TIME'], format='%d/%m/%Y %H:%M')
+    df = df.drop(columns=['DAY', 'TIME'])
+
+    logger.info(f"NOA df before {grp} aggregation: {len(df)} rows")
+    # Group by grp intervals and apply different aggregations to each column
+    df = df.groupby(pd.Grouper(key='DATETIME', freq=grp)).agg(aggregators)
+    logger.info(f"NOA df after {grp} aggregation: {len(df)} rows")
+
+    # Make DATETIME a regular column and not index
+    df = df.reset_index()
+
+    return df
+
+
 def combine_dataframes(weather_df, data_df):
 
     # Filter dataframes wrt the dates we care about
-    logger.info(f"All data | Weather df: {len(weather_df)} rows & Data df: {len(data_df)} rows")
+    logger.info(f"All data | df1: {len(weather_df)} rows & df2: {len(data_df)} rows")
     # Concatenate DataFrames along the 'DATETIME' column
     df = pd.concat([weather_df.set_index('DATETIME'), data_df.set_index('DATETIME')], axis=1, join='outer')
     logger.info(f"Concat data : {len(df)}")
@@ -211,11 +227,9 @@ def concatenate_and_sort(df1, df2, column='DATETIME'):
 
     # Concatenate the two DataFrames
     concatenated_df = pd.concat([df1, df2])
-
     # Sort the concatenated DataFrame based on the datetime_column
     sorted_df = concatenated_df.sort_values(by=column)
-
-    # Convert the timestamps back to a timezone-naive representation:
+    # Convert the timestamps back to a timezone-naive representation
     sorted_df['DATETIME'] = sorted_df['DATETIME'].dt.tz_convert(None)
 
     logger.info(f"Together : {len(sorted_df)}")
@@ -224,8 +238,8 @@ def concatenate_and_sort(df1, df2, column='DATETIME'):
 
 
 def open_weather_and_installation_data():
-    group = "1h"
 
+    group = "1h"
     # Parse weather data
     parsed_weather_data = weather_parser_lp(weather_file="../data/obs_weather.txt")
     # Define weather columns aggregator
@@ -255,19 +269,32 @@ def open_weather_and_installation_data():
     # Concatenate all of our available data
     data_df = concatenate_and_sort(hist_df, nav_df)
 
+    # Get NOA weather data
+    aggregators_noa = {'T2': 'mean', 'RH2': 'mean', 'WSPD': 'mean', 'WDIR': 'mean', 'RAIN': 'sum'}
+    noa_df = create_navgreen_noa_data_dataframe(noa_df_pth='../data/North_Athens_2023_data.csv',
+                                                grp=group, aggregators=aggregators_noa)
+
     weather_df.to_csv('../data/weather_df.csv', index=False)
     data_df.to_csv('../data/data_df.csv', index=False)
+    noa_df.to_csv('../data/noa_df.csv', index=False)
 
     weather_df = pd.read_csv('../data/weather_df.csv')
     data_df = pd.read_csv('../data/data_df.csv')
+    noa_df = pd.read_csv('../data/noa_df.csv')
 
     # Create the combined DataFrame
     combined_df = combine_dataframes(weather_df=weather_df, data_df=data_df)
+    combined_df = combined_df.reset_index()
+    combined_df = combined_df.sort_values(by='DATETIME')
+    print(combined_df)
+    print()
+    print(noa_df)
+    combined_df = combine_dataframes(weather_df=noa_df, data_df=combined_df)
     combined_df.to_csv('../data/Q_PVT_classification_dataset.csv', index=True)
 
     # Show the remaining values after removing NaN rows
     combined_df.dropna(inplace=True)
-    logger.info(combined_df)
+    logger.info(combined_df.shape)
 
     train_test_split('../data/Q_PVT_classification_dataset.csv')
 
