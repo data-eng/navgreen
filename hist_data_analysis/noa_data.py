@@ -121,8 +121,8 @@ def train_test_split(data_path):
     test_set = df[(df['DATETIME'] > '2023-03-01') & (df['DATETIME'] < '2024-01-01')]
 
     # Save each DataFrame to a separate CSV file in the specified path
-    train_df_pth = '../data/training_set_classif.csv'
-    test_df_pth = '../data/test_set_classif.csv'
+    train_df_pth = '../data/training_set_classif_new_classes_noa.csv'
+    test_df_pth = '../data/test_set_classif_new_classes_noa.csv'
     training_set.to_csv(train_df_pth, index=False)
     test_set.to_csv(test_df_pth, index=False)
 
@@ -287,6 +287,7 @@ def open_weather_and_installation_data():
     combined_df = combined_df.reset_index()
     combined_df = combined_df.sort_values(by='DATETIME')
     combined_df = combine_dataframes(weather_df=noa_df, data_df=combined_df)
+    combined_df = combined_df.sort_values(by='DATETIME')
     combined_df.to_csv('../data/Q_PVT_classification_dataset.csv', index=True)
 
     # Show the remaining values after removing NaN rows
