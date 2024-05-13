@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+from datetime import datetime
 import logging
 
 # Configure logger and set its level
@@ -16,6 +16,16 @@ stream_handler.setFormatter(formatter)
 # Add handler to logger
 logger.addHandler(stream_handler)
 
+start_date = '2022-09-26'
+# start_timestamp = 1664139600
+datetime_representation = datetime.strptime(start_date, '%Y-%m-%d')
+start_timestamp = datetime_representation.timestamp()
+
+end_date = '2023-09-27'
+# end_timestamp = 1695762000
+datetime_representation = datetime.strptime(end_date, '%Y-%m-%d')
+end_timestamp = datetime_representation.timestamp()
+
 
 def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     """
@@ -23,6 +33,9 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     :return: whole dataframe, dataframe for hp, dataframe for solar
     """
     df = pd.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+    # Test data from 2022-09-26 to 2023-09-26
+    df = df[(df['DATETIME'] > start_date) & (df['DATETIME'] < end_date)]
 
     # Drop unneeded columns
     for c in df.columns:
@@ -50,16 +63,22 @@ class TimeSeriesDataset(Dataset):
         self.per_day = per_day
 
         df = dataframe
-        df['Datetime'] = df.index.astype('int64')
+        df['Datetime'] = df.index.astype('int64') // 10**9
         # Normalize Unix time between 0 and 1
+        '''
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
         df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time)
+        '''
+        df['Datetime'] = (df['Datetime'] - start_timestamp) / (end_timestamp - start_timestamp)
+        epsilon = 0.001
+        assert df['Datetime'].between(0-epsilon, 1+epsilon).all(), \
+            "Not all values in the 'Datetime' column are between 0 and 1."
 
         # Check if any column in y_cols contains NaN values for each row
         has_nan_in_y_cols = df[y_cols].isna().any(axis=1)
         # Replace rows with NaN values in any of the y_cols with NaN values
         df.loc[has_nan_in_y_cols, 'Datetime'] = float('nan')
-        #print(f'total {df.shape} -> nan {has_nan_in_y_cols.value_counts()}')
+        # print(f'total {df.shape} -> nan {has_nan_in_y_cols.value_counts()}')
         self.X, self.y = df[X_cols], df[y_cols]
         self.time = df['Datetime']
 

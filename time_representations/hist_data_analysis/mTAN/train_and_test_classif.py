@@ -73,19 +73,21 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
         if predicted_values_all.ndim == 2: predicted_values_all = np.transpose(predicted_values_all)
 
         # Reshape and calculate aggregation
+        '''
         predicted_values = np.mean(predicted_values.reshape(predicted_values.shape[0], true_values.shape[1],
                                                             predicted_values.shape[1] // true_values.shape[1],
                                                             predicted_values.shape[2]), axis=2)
+        '''
         # Apply softmax along the last dimension
         predicted_values = np.exp(predicted_values) / np.sum(np.exp(predicted_values), axis=-1, keepdims=True)
         # Get the index of the maximum probability along the last dimension
         predicted_values = np.argmax(predicted_values, axis=-1)
-        
-    
+
+        '''
         predicted_values_all = np.mean(predicted_values_all.reshape(predicted_values_all.shape[0], true_values.shape[1],
                                                             predicted_values_all.shape[1] // true_values.shape[1],
                                                             predicted_values_all.shape[2]), axis=2)
-
+        '''
         predicted_values_all = np.exp(predicted_values_all) / np.sum(np.exp(predicted_values_all), axis=-1, keepdims=True)
         predicted_values_probs = predicted_values_all.copy()
         predicted_values_probs = predicted_values_probs.reshape(-1, predicted_values_probs.shape[-1])
@@ -158,11 +160,11 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
         average_loss = total_loss / len(train_loader)
         # logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
         #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
-        '''
+
         if epoch % 50 == 0:
             logger.info(
                 f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
-        '''
+
         train_losses.append(average_loss)
         val_losses.append(val_loss.cpu())
 
@@ -205,7 +207,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights):
 
     validation_set_percentage = 0.2
 
-    epochs = 1 # 1000
+    epochs = 1000
     patience = 200
 
     # Parameters:
@@ -218,8 +220,10 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights):
     pred_value = y_cols[0]
     dim = len(X_cols)
 
-    train_df, mean_stds = load_df(df_path="../../data/training_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
-                                      normalize=True, y_cols=y_cols)
+    train_df, mean_stds = load_df(df_path="../../data/training_set_noa_classes.csv",
+                                  pvt_cols=pvt_cols,
+                                  parse_dates=["DATETIME"],
+                                  normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'mTAN/mean_stds.json')
 
     train_df.to_csv("../../data/pvt_df_train.csv")
@@ -287,7 +291,7 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights):
     embed_time = params["embed_time"]
 
     mean_stds = load_json('mTAN/mean_stds.json')
-    test_df, _ = load_df(df_path="../../data/test_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    test_df, _ = load_df(df_path="../../data/test_set_noa_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                          normalize=True,
                          stats=mean_stds, y_cols=y_cols)
 
@@ -330,19 +334,21 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights):
     cfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="test_checkpoints.json")
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
-def main_loop_train(seed, y_cols, weights):
-    sequence_length = 24 // 3
 
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
-    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
+def main_loop_train(seed, y_cols, weights):
+    sequence_length = 24
+
+    X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
+    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
 
     train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 
-def main_loop_test(seed, y_cols, weights):
-    sequence_length = 24 // 3
 
-    X_cols = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]
-    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 32}
+def main_loop_test(seed, y_cols, weights):
+    sequence_length = 24
+
+    X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
+    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
 
     test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 

@@ -2,9 +2,9 @@ import json
 import numpy as np
 import yaml
 
-from interpolation.train_and_test_classif import main_loop_test as test_interpolation
+# from interpolation.train_and_test_classif import main_loop_test as test_interpolation
 from mTAN.train_and_test_classif import main_loop_test as test_mTAN
-from transformer.test import main_loop as test_transformer
+# from transformer.test import main_loop as test_transformer
 
 
 def eval_models():
@@ -14,10 +14,11 @@ def eval_models():
     seeds = config["seeds"]
     bins = config["bins"]
 
-    models = ["interpolation", "mTAN", "transformer"]
+    #models = ["interpolation", "mTAN", "transformer"]
+    models = ["mTAN"]
 
-    model_test = {"transformer" : test_transformer,
-                   "interpolation" : test_interpolation,
+    model_test = {#"transformer" : test_transformer,
+                   #"interpolation" : test_interpolation,
                    "mTAN": test_mTAN}
 
     # Start testing the models for each seed and binning.
