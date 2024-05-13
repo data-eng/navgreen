@@ -60,14 +60,14 @@ def binnings(df_train_path, df_test_path):
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
-
+    '''
     facetname = "ValueCountBin"
     print(facetname)
-    thresholds[facetname] = [0., 2., 3., 4.]  # classCount(df[["DATETIME", "Q_PVT"]])
+    thresholds[facetname] = classCount(df[["DATETIME", "Q_PVT"]]) #  [0., 2., 3., 4.]  #
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
-
+    '''
     facetname = "ValueRangeBin"
     print(facetname)
     thresholds[facetname] = [0.05, 0.21, 0.525, 1.05]
@@ -75,9 +75,11 @@ def binnings(df_train_path, df_test_path):
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
 
+    '''
     nancount = len(df[pd.isna(df["Q_PVT"])])
     notnancount = df.ValueCountBin.value_counts().sum()
     assert nancount + notnancount == len(df)
+    '''
 
     df.to_csv(df_train_path)
 
@@ -88,26 +90,94 @@ def binnings(df_train_path, df_test_path):
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
-
+    '''
     facetname = "ValueCountBin"
     print(facetname)
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
-
+    '''
     facetname = "ValueRangeBin"
     print(facetname)
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
 
+    '''
     nancount = len(df[pd.isna(df["Q_PVT"])])
     notnancount = df.ValueCountBin.value_counts().sum()
     assert nancount + notnancount == len(df)
+    '''
 
     df.to_csv(df_test_path)
 
 
+def train_test_split(data_path):
+    # Read the CSV file into a pandas DataFrame
+    df = pd.read_csv(data_path)
+
+    # Convert the datetime column to datetime type if it's not already
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+
+    init_columns = sorted(df.columns)
+
+    # Calculate the day position relative to the end of the month
+    df['days_from_end'] = df['DATETIME'].dt.days_in_month - df['DATETIME'].dt.day
+
+    # Define a function to categorize the days
+    def categorize_days(days):
+        if days == 0:
+            return 'last'
+        elif days == 1:
+            return 'penultimate'
+        elif days == 2:
+            return 'antepenultimate'
+        else:
+            return 'other'
+
+    # Categorize the days
+    df['day_category'] = df['days_from_end'].apply(lambda x: categorize_days(x))
+
+    # Split the DataFrame into three separate DataFrames based on day category
+    test_set = df[df['day_category'].isin(['last', 'penultimate', 'antepenultimate'])]
+    training_set = df[df['day_category'] == 'other']
+
+    # Print the length of each DataFrame
+    logger.info(f"Length of Test Set: {len(test_set)}")
+    logger.info(f"Length of Training Set: {len(training_set)}")
+
+    # Assert that the sum of lengths matches the length of the original DataFrame
+    assert (len(test_set) + len(training_set)) == len(df)
+
+    # Print the number of different days within each dataset
+    logger.info(f"Number of different days in Test Set: {test_set['DATETIME'].dt.day.nunique()}" )
+    logger.info(f"Number of different days in Training Set: {training_set['DATETIME'].dt.day.nunique()}")
+
+    # Print the number of unique days within each dataset
+    logger.info(f"Number of different days in Test Set: {test_set['DATETIME'].dt.date.nunique()}")
+    logger.info(f"Number of different days in Training Set: {training_set['DATETIME'].dt.date.nunique()}")
+
+    # Assert that the sum of unique days matches the one of the original DataFrame
+    assert df['DATETIME'].dt.date.nunique() == (test_set['DATETIME'].dt.date.nunique() +
+                                                training_set['DATETIME'].dt.date.nunique())
+
+    # Drop unwanted columns
+    test_set = test_set.drop(['days_from_end', 'day_category'], axis=1)
+    training_set = training_set.drop(['days_from_end', 'day_category'], axis=1)
+
+    assert (init_columns == sorted(training_set.columns)) and (init_columns == sorted(test_set.columns))
+
+    # Save each DataFrame to a separate CSV file in the specified path
+    train_df_pth = '../data/training_set_noa_classes.csv'
+    test_df_pth = '../data/test_set_noa_classes.csv'
+    training_set.to_csv(train_df_pth, index=False)
+    test_set.to_csv(test_df_pth, index=False)
+
+    # Create the bins
+    binnings(df_train_path=train_df_pth, df_test_path=test_df_pth)
+
+
+'''
 def train_test_split(data_path):
     # Read the CSV file into a pandas DataFrame
     df = pd.read_csv(data_path)
@@ -121,14 +191,16 @@ def train_test_split(data_path):
     test_set = df[(df['DATETIME'] > '2023-03-01') & (df['DATETIME'] < '2024-01-01')]
 
     # Save each DataFrame to a separate CSV file in the specified path
-    train_df_pth = '../data/training_set_classif_new_classes_noa.csv'
-    test_df_pth = '../data/test_set_classif_new_classes_noa.csv'
+    # train_df_pth = '../data/training_set_classif_new_classes_noa.csv'
+    # test_df_pth = '../data/test_set_classif_new_classes_noa.csv'
+    train_df_pth = '../data/training_set_noa.csv'
+    test_df_pth = '../data/test_set_noa.csv'
     training_set.to_csv(train_df_pth, index=False)
     test_set.to_csv(test_df_pth, index=False)
 
     # Create the bins
-    binnings(df_train_path=train_df_pth, df_test_path=test_df_pth)
-
+    # binnings(df_train_path=train_df_pth, df_test_path=test_df_pth)
+'''
 
 def create_data_dataframe(data_file, keep_columns, grp, aggregators):
 
