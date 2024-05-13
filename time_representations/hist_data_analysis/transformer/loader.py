@@ -20,6 +20,42 @@ params = {
     "ignore": [] 
 }
 
+def include_time_repr(df, cors, unis, args):
+    """
+    Add time representations to a DataFrame.
+
+    :param df: dataframe
+    :param cors: list of correlation functions
+    :param unis: list of uniqueness functions
+    :param args: list of arguments for the functions
+    :return: dataframe
+    """
+    # args: [(period, total, shift) -> months, (period, total, shift) -> hours]
+    datetimes = ['month', 'hour']
+
+    def sine(timestamps, args):
+        period, _, shift = args
+        return np.sin(np.pi*(timestamps-shift)/period)
+
+    def cosine(timestamps, args):
+        period, _, shift = args
+        return np.cos(np.pi*(timestamps-shift)/period)
+    
+    def linear(timestamps, args):
+        period, _, shift = args
+        return (timestamps-shift)/period - 1
+    
+    def condlinear(timestamps, args):
+        period, total, shift = args
+        return (timestamps-shift)/period if timestamps<=period else (total-timestamps-shift)/period
+
+    for i, dtime in enumerate(datetimes):
+        timestamps = df['DATETIME'].dt.__getattribute__(dtime)
+        df[f'COR_{dtime.upper()}'] = cors[i](timestamps, args[i])
+        df[f'UNI_{dtime.upper()}'] = unis[i](timestamps, args[i])
+
+    return df
+
 def load(path, parse_dates, bin, normalize=True):
     """
     Loads and preprocesses data from a CSV file.
@@ -42,12 +78,7 @@ def load(path, parse_dates, bin, normalize=True):
     #logger.info("Number of empty data points: %d", 8 * empty_days.sum())
     #logger.info("Data after dropping NAN days: {} rows".format(len(df)))
 
-    datetimes, periods = ['month', 'day', 'hour'], [12, 30, 24]
-
-    for i, dtime in enumerate(datetimes):
-        timestamps = df['DATETIME'].dt.__getattribute__(dtime)
-        df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
-        df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
+    df = include_time_repr(df)
 
     if os.path.exists('transformer/stats.json'):
         stats = utils.load_json(filename='transformer/stats.json')
