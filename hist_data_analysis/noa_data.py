@@ -36,8 +36,8 @@ def classCount(df):
 
     # index where values > 0.05 start
     gt05 = (numpy.argwhere(sorted_ > 0.05))[0][0]
-    # step = (len(sorted) - gt05)
-    idx = numpy.arange(gt05, len(sorted_)-1, 208.5).astype(int)
+    step = (len(sorted_) - gt05) / 4
+    idx = numpy.arange(gt05, len(sorted_) - 1, step).astype(int)
 
     print(sorted_[idx])
     df_out = df.copy()
@@ -60,14 +60,14 @@ def binnings(df_train_path, df_test_path):
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
-    '''
+
     facetname = "ValueCountBin"
     print(facetname)
-    thresholds[facetname] = classCount(df[["DATETIME", "Q_PVT"]]) #  [0., 2., 3., 4.]  #
+    thresholds[facetname] = classCount(df[["DATETIME", "Q_PVT"]])
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
-    '''
+
     facetname = "ValueRangeBin"
     print(facetname)
     thresholds[facetname] = [0.05, 0.21, 0.525, 1.05]
@@ -75,11 +75,9 @@ def binnings(df_train_path, df_test_path):
     print("{} class sizes, training set: ".format(facetname))
     print(df[facetname].value_counts())
 
-    '''
     nancount = len(df[pd.isna(df["Q_PVT"])])
     notnancount = df.ValueCountBin.value_counts().sum()
     assert nancount + notnancount == len(df)
-    '''
 
     df.to_csv(df_train_path)
 
@@ -90,24 +88,22 @@ def binnings(df_train_path, df_test_path):
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
-    '''
+
     facetname = "ValueCountBin"
     print(facetname)
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
-    '''
+
     facetname = "ValueRangeBin"
     print(facetname)
     df = makeFacet(df, facetname, thresholds[facetname])
     print("{} class sizes, test set: ".format(facetname))
     print(df[facetname].value_counts())
 
-    '''
     nancount = len(df[pd.isna(df["Q_PVT"])])
     notnancount = df.ValueCountBin.value_counts().sum()
     assert nancount + notnancount == len(df)
-    '''
 
     df.to_csv(df_test_path)
 
