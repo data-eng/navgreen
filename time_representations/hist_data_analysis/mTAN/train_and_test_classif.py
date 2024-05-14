@@ -115,14 +115,14 @@ def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, se
             warnings.simplefilter("ignore", category=UserWarning)
 
             prfs = get_prfs(true_values, predicted_values)
-            '''
+
             logger.info(
                 f"Micro    | f1 score: {prfs['fscore_micro']:.6f} & precision {prfs['precision_micro']:.6f} & recall {prfs['recall_micro']:.6f}")
             logger.info(
                 f"Macro    | f1 score: {prfs['fscore_macro']:.6f} & precision {prfs['precision_macro']:.6f} & recall {prfs['recall_macro']:.6f}")
             logger.info(
                 f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
-            '''
+
     return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all, predicted_values_probs)
 
 
@@ -161,7 +161,7 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
         # logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
         #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
 
-        if epoch % 50 == 0:
+        if epoch % 50 == 0 or epoch == 2:
             logger.info(
                 f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
@@ -339,7 +339,9 @@ def main_loop_train(seed, y_cols, weights):
     sequence_length = 24
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
-    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
+    # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
+    params = {'batch_size': 16, 'lr': 0.01, 'num_heads': 8, 'embed_time': 24}
+    # params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24} # better, smoother loss and still lowering
 
     train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 
@@ -348,7 +350,8 @@ def main_loop_test(seed, y_cols, weights):
     sequence_length = 24
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
-    params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
+    # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
+    params = {'batch_size': 16, 'lr': 0.01, 'num_heads': 8, 'embed_time': 24}
 
     test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 

@@ -3,27 +3,27 @@ import json
 import numpy as np
 import yaml
 
-from interpolation.train_and_test_classif import main_loop_train as train_interpolation
+# from interpolation.train_and_test_classif import main_loop_train as train_interpolation
 from mTAN.train_and_test_classif import main_loop_train as train_mTAN
-from transformer.train import main_loop as train_transformer
-
+# from transformer.train import main_loop as train_transformer
 
 
 def train_models():
     with open("../config.yaml", "r") as config:
         config = yaml.safe_load(config)
 
-    seeds = config["seeds"]
+    seeds = [1]  # config["seeds"]
     bins = config["bins"]
 
-    models = ["interpolation", "mTAN", "transformer"]
+    models = ["mTAN"]  # ["interpolation", "mTAN", "transformer"]
 
     train_times = {}
     for bin, _ in bins:
-        train_times[bin] = {"transformer" : dict(), "interpolation" : dict(), "mTAN": dict()}
+        # train_times[bin] = {"transformer" : dict(), "interpolation" : dict(), "mTAN": dict()}
+        train_times[bin] = {"mTAN": dict()}
 
-    model_train = {"transformer" : train_transformer,
-                   "interpolation" : train_interpolation,
+    model_train = {# "transformer" : train_transformer,
+                   # "interpolation" : train_interpolation,
                    "mTAN": train_mTAN}
 
     # Start training the models for each seed and binning.
