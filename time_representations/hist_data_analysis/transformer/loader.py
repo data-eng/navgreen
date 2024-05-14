@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import Dataset, random_split
 import logging
 import utils
+import datetime
+import astral, astral.sun
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -20,43 +22,142 @@ params = {
     "ignore": [] 
 }
 
-def include_time_repr(df, cors, unis, args):
+def include_time_repr(df, datetimes, cors, uniqs, args):
     """
     Add time representations to a DataFrame.
 
     :param df: dataframe
-    :param cors: list of correlation functions
-    :param unis: list of uniqueness functions
-    :param args: list of arguments for the functions
+    :param datatimes: list of str
+    :param cors: list of str
+    :param uniqs: list of str
+    :param args: list of arguments
     :return: dataframe
     """
-    # args: [(period, total, shift) -> months, (period, total, shift) -> hours]
-    datetimes = ['month', 'hour']
-
-    def sine(timestamps, args):
-        period, _, shift = args
-        return np.sin(np.pi*(timestamps-shift)/period)
-
-    def cosine(timestamps, args):
-        period, _, shift = args
-        return np.cos(np.pi*(timestamps-shift)/period)
-    
-    def linear(timestamps, args):
-        period, _, shift = args
-        return (timestamps-shift)/period - 1
-    
-    def condlinear(timestamps, args):
-        period, total, shift = args
-        return (timestamps-shift)/period if timestamps<=period else (total-timestamps-shift)/period
 
     for i, dtime in enumerate(datetimes):
-        timestamps = df['DATETIME'].dt.__getattribute__(dtime)
-        df[f'COR_{dtime.upper()}'] = cors[i](timestamps, args[i])
-        df[f'UNI_{dtime.upper()}'] = unis[i](timestamps, args[i])
+        timestamps = df['DATETIME']
+        tr = TimeRepr(timestamps, datetime=dtime, args=args[i])
+
+        df[f'COR_{dtime.upper()}'] = getattr(tr, cors[i])
+        df[f'UNIQ_{dtime.upper()}'] = getattr(tr, uniqs[i])
 
     return df
 
-def load(path, parse_dates, bin, normalize=True):
+class TimeRepr():
+    def __init__(self, timestamps, dtime, args):
+        """
+        Initializes a time representation class.
+
+        :param timestamps: pandas series
+        :param dtime: datetime attribute (e.g., 'day', 'month')
+        :param args: list of arguments for the functions
+        """
+        self.timestamps = timestamps
+        self.dtime = dtime
+        self.args = args
+
+    @property
+    def sine(self):
+        """
+        Calculate sine representation of timestamps.
+        
+        :return: numpy array
+        """
+        period, _, shift = self.args
+        self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
+
+        return np.sin(np.pi*(self.timestamps-shift)/period)
+
+    @property
+    def cosine(self):
+        """
+        Calculate cosine representation of timestamps.
+        
+        :return: numpy array
+        """
+        period, _, shift = self.args
+        self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
+
+        return np.cos(np.pi*(self.timestamps-shift)/period)
+    
+    @property
+    def sawtooth(self):
+        """
+        Calculate sawtooth representation of timestamps.
+        
+        :return: numpy array
+        """
+        period, _, shift = self.args
+        self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
+
+        return (self.timestamps-shift)/period - 1
+    
+    @property
+    def cond_sawtooth(self):
+        """
+        Calculate conditional sawtooth representation of timestamps.
+        
+        :return: numpy array
+        """
+        period, total, shift = self.args
+        self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
+
+        if self.timestamps <= period:
+            return (self.timestamps-shift)/period
+        else:
+            return (total-self.timestamps-shift)/period
+
+    @property   
+    def triangular_pulse(self):
+        """
+        Calculate triangular pulse representation of timestamps.
+        
+        :return: list
+        """
+        pulse = []
+        timestamps_dates = self.timestamps.dt.date
+        
+        for date in timestamps_dates.unique():
+            d0 = pd.Timestamp(date)
+            d1 = pd.Timestamp(date + datetime.timedelta(days=1))
+
+            timestamps_one_day = self.timestamps.loc[(self.timestamps >= d0) & (self.timestamps < d1)]
+            datetimes = timestamps_one_day.to_list()
+
+            where = astral.LocationInfo("Athens", "Greece", "Europe/Athens", 37.995849, 23.814583)
+            sun = astral.sun.sun(where.observer, datetimes[0], tzinfo=where.timezone)
+
+            s0 = sun["sunrise"]
+            s1 = sun["noon"]
+            s2 = sun["sunset"]
+
+            slope0 = 1/(s1-s0).total_seconds()
+            slope1 = -1/(s2-s1).total_seconds()
+
+            m1 = map( lambda t: t.replace(tzinfo=where.tzinfo), datetimes )
+            m2 = map( lambda t: (0.01 if (t<s0) or (t>s2) else \
+                                ((t-s0).total_seconds()*slope0 if t < s1 else \
+                                (1+(t-s1).total_seconds()*slope1))) , m1 )
+            
+            pulse.extend(list(m2))
+        
+        return pulse
+    
+    def linear(self):
+        """
+        Calculate linear representation of timestamps.
+        
+        :return: list
+        """
+        total = (self.timestamps.iloc[-1] - self.timestamps.iloc[0]).total_seconds()
+        line = list(map(lambda t: 1e-9 + (t - self.timestamps.iloc[0]).total_seconds()/total, self.timestamps))
+
+        a = line[1]/10
+        line[0], line[-1] = a, 1-a
+    
+        return line
+
+def load(path, parse_dates, bin, time_repr, normalize=True):
     """
     Loads and preprocesses data from a CSV file.
 
@@ -64,6 +165,7 @@ def load(path, parse_dates, bin, normalize=True):
     :param parse_dates: columns to parse as dates in the dataframe
     :param normalize: normalization flag
     :param bin: y_bin
+    :param time_repr: tuple
     :return: dataframe
     """
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
@@ -78,7 +180,7 @@ def load(path, parse_dates, bin, normalize=True):
     #logger.info("Number of empty data points: %d", 8 * empty_days.sum())
     #logger.info("Data after dropping NAN days: {} rows".format(len(df)))
 
-    df = include_time_repr(df)
+    df = include_time_repr(df, *time_repr)
 
     if os.path.exists('transformer/stats.json'):
         stats = utils.load_json(filename='transformer/stats.json')
