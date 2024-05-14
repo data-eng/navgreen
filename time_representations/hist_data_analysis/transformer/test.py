@@ -16,7 +16,7 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def test(data, df, classes, criterion, model, seed, y, visualize=True):
+def test(data, df, params, classes, criterion, model, seed, y, visualize=True):
     ylabel = y[0]
     mfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="transformer.pth")
     model.load_state_dict(torch.load(mfn))
@@ -99,14 +99,14 @@ def test(data, df, classes, criterion, model, seed, y, visualize=True):
 
     return avg_test_loss
 
-def main_loop(seed, y_col):
+def main_loop(time_repr, seed, y_col):
     path = "../../data/test_set_classif_new_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
 
-    df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
-    df_prep = prepare(df, phase="test")
+    df, params = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0], time_repr=time_repr)
+    df_prep = prepare(df, phase="test", ignore=params["ignore"])
 
     weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
@@ -124,6 +124,7 @@ def main_loop(seed, y_col):
 
     _ = test(data=dl_test,
              df=df_prep,
+             params=params,
              classes=classes,
              criterion=utils.WeightedCrossEntropyLoss(weights),
              model=model,
@@ -132,4 +133,6 @@ def main_loop(seed, y_col):
              visualize=True)
 
 def main():
-    main_loop(seed=13, y_col="binned_Q_PVT")
+    main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [(12, 12, 1), (12, 12, 1)]),
+              seed=13, 
+              y_col="binned_Q_PVT")

@@ -174,8 +174,8 @@ def main_loop(time_repr, seed, y_col):
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
 
-    df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0], time_repr=time_repr)
-    df_prep = prepare(df, phase="train")
+    df, params = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0], time_repr=time_repr)
+    df_prep = prepare(df, phase="train", ignore=params["ignore"])
 
     weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
@@ -194,7 +194,7 @@ def main_loop(time_repr, seed, y_col):
 
     _, _ = train(data=(dl_train, dl_val),
            classes=classes,
-           epochs=1, #300,
+           epochs=300,
            patience=30,
            lr=5e-4,
            criterion=utils.WeightedCrossEntropyLoss(weights),

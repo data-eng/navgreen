@@ -1,3 +1,32 @@
-seeds: [6, 72]  #[6, 72, 157, 838, 1214, 1505]
+seeds: [6, 72] # [6, 72, 157, 838, 1214, 1505]
 bins: ["FixedBin" , "ValueCountBin", "ValueRangeBin"]
 
+time_reprs:
+  - 1:
+      datetime: ['month', 'hour']
+      cors: ['sine', 'cosine']
+      uniqs: ['cosine', 'cosine']
+      args:
+        - [12, 12, 1]
+        - [12, 12, 1]
+  - 2:
+      datetime: ['date']
+      cors: ['triangular_pulse']
+      uniqs: ['linear']
+      args:
+        - [12, 12, 1]
+
+time_reprs:
+  1:
+    datetime: ["month", "hour"]
+    cors: ["sine", "cosine"]
+    uniqs: ["cosine", "cosine"]
+    args:
+        - [12, 12, 1]
+        - [12, 12, 1]
+  2:
+    datetime: ["date"]
+    cors: ["triangular_pulse"]
+    uniqs: ["linear"]
+    args:
+        - [12, 12, 1]

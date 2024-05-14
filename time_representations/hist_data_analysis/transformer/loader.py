@@ -15,14 +15,7 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-params = {
-    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
-    "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
-    #"y": ["binned_Q_PVT"],
-    "ignore": [] 
-}
-
-def include_time_repr(df, datetimes, cors, uniqs, args):
+def include_time_repr(df, params, datetimes, cors, uniqs, args):
     """
     Add time representations to a DataFrame.
 
@@ -41,7 +34,11 @@ def include_time_repr(df, datetimes, cors, uniqs, args):
         df[f'COR_{dtime.upper()}'] = getattr(tr, cors[i])
         df[f'UNIQ_{dtime.upper()}'] = getattr(tr, uniqs[i])
 
-    return df
+        if "t" not in params:
+            params["t"] = []
+        params["t"].extend([f'COR_{dtime.upper()}', f'UNIQ_{dtime.upper()}'])
+
+    return df, params
 
 class TimeRepr():
     def __init__(self, timestamps, dtime, args):
@@ -49,7 +46,7 @@ class TimeRepr():
         Initializes a time representation class.
 
         :param timestamps: pandas series
-        :param dtime: datetime attribute (e.g., 'day', 'month')
+        :param dtime: datetime attribute (e.g., 'day', 'month', 'date')
         :param args: list of arguments for the functions
         """
         self.timestamps = timestamps
@@ -66,7 +63,10 @@ class TimeRepr():
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
-        return np.sin(np.pi*(self.timestamps-shift)/period)
+        sine_result = np.sin(np.pi*(self.timestamps-shift)/period)
+        sine_result += sine_result[1]/10
+
+        return sine_result
 
     @property
     def cosine(self):
@@ -78,34 +78,44 @@ class TimeRepr():
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
-        return np.cos(np.pi*(self.timestamps-shift)/period)
+        cosine_result = np.cos(np.pi*(self.timestamps-shift)/period)
+        cosine_result += cosine_result[1]/10
+
+        return cosine_result
     
     @property
     def sawtooth(self):
         """
         Calculate sawtooth representation of timestamps.
         
-        :return: numpy array
+        :return: pandas series
         """
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
-        return (self.timestamps-shift)/period - 1
+        sawtooth_result = (self.timestamps-shift)/period - 1
+        sawtooth_result += sawtooth_result[1]/10
+
+        return sawtooth_result
     
     @property
     def cond_sawtooth(self):
         """
         Calculate conditional sawtooth representation of timestamps.
         
-        :return: numpy array
+        :return: pandas series
         """
         period, total, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
         if self.timestamps <= period:
-            return (self.timestamps-shift)/period
+            cond_sawtooth_result = (self.timestamps-shift)/period
         else:
-            return (total-self.timestamps-shift)/period
+            cond_sawtooth_result = (total-self.timestamps-shift)/period
+
+        cond_sawtooth_result += cond_sawtooth_result[1]/10
+
+        return cond_sawtooth_result
 
     @property   
     def triangular_pulse(self):
@@ -140,6 +150,8 @@ class TimeRepr():
                                 (1+(t-s1).total_seconds()*slope1))) , m1 )
             
             pulse.extend(list(m2))
+
+        pulse = np.array(pulse) + pulse[1]/10
         
         return pulse
     
@@ -147,13 +159,12 @@ class TimeRepr():
         """
         Calculate linear representation of timestamps.
         
-        :return: list
+        :return: numpy array
         """
         total = (self.timestamps.iloc[-1] - self.timestamps.iloc[0]).total_seconds()
         line = list(map(lambda t: 1e-9 + (t - self.timestamps.iloc[0]).total_seconds()/total, self.timestamps))
 
-        a = line[1]/10
-        line[0], line[-1] = a, 1-a
+        line = np.array(line) + line[1]/10
     
         return line
 
@@ -168,8 +179,14 @@ def load(path, parse_dates, bin, time_repr, normalize=True):
     :param time_repr: tuple
     :return: dataframe
     """
+    params = {"X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
+              "ignore": [] 
+              }
+    
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
     df.sort_values(by='DATETIME', inplace=True)
+
+    df = df[(df['DATETIME'] > '2022-11-10') & (df['DATETIME'] < '2023-09-26')]
 
     #logger.info("All data: {} rows".format(len(df)))
 
@@ -180,7 +197,7 @@ def load(path, parse_dates, bin, time_repr, normalize=True):
     #logger.info("Number of empty data points: %d", 8 * empty_days.sum())
     #logger.info("Data after dropping NAN days: {} rows".format(len(df)))
 
-    df = include_time_repr(df, *time_repr)
+    df, params = include_time_repr(df, params, *time_repr)
 
     if os.path.exists('transformer/stats.json'):
         stats = utils.load_json(filename='transformer/stats.json')
@@ -205,9 +222,9 @@ def load(path, parse_dates, bin, time_repr, normalize=True):
     nan_counts = df.isna().sum() / len(df) * 100
     #logger.info("NaN counts for columns in X: %s", nan_counts)
 
-    return df
+    return df, params
 
-def prepare(df, phase):
+def prepare(df, phase, ignore):
     """
     Prepares the dataframe for training by filtering columns and saving to CSV.
 
@@ -217,7 +234,7 @@ def prepare(df, phase):
     """
     name =  "transformer/" + "df_" + phase + ".csv"
 
-    for column, threshold in params["ignore"]:
+    for column, threshold in ignore:
         df = utils.filter(df, column=column, threshold=threshold) 
 
     df.set_index('DATETIME', inplace=True)
