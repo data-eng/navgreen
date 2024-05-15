@@ -15,27 +15,25 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
-def include_time_repr(df, params, datetimes, cors, uniqs, args):
+def include_time_repr(df, params, dts, cors, uniqs, args):
     """
     Add time representations to a DataFrame.
 
     :param df: dataframe
-    :param datatimes: list of str
+    :param dts: list of str
     :param cors: list of str
     :param uniqs: list of str
     :param args: list of arguments
     :return: dataframe
     """
-
-    for i, dtime in enumerate(datetimes):
+    for i, dtime in enumerate(dts):
         timestamps = df['DATETIME']
-        tr = TimeRepr(timestamps, datetime=dtime, args=args[i])
+        tr_cor = TimeRepr(timestamps, dtime, args=args[i][0])
+        tr_uniq = TimeRepr(timestamps, dtime, args=args[i][1])
 
-        df[f'COR_{dtime.upper()}'] = getattr(tr, cors[i])
-        df[f'UNIQ_{dtime.upper()}'] = getattr(tr, uniqs[i])
+        df[f'COR_{dtime.upper()}'] = getattr(tr_cor, cors[i])
+        df[f'UNIQ_{dtime.upper()}'] = getattr(tr_uniq, uniqs[i])
 
-        if "t" not in params:
-            params["t"] = []
         params["t"].extend([f'COR_{dtime.upper()}', f'UNIQ_{dtime.upper()}'])
 
     return df, params
@@ -58,13 +56,13 @@ class TimeRepr():
         """
         Calculate sine representation of timestamps.
         
-        :return: numpy array
+        :return: pandas series
         """
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
         sine_result = np.sin(np.pi*(self.timestamps-shift)/period)
-        sine_result += sine_result[1]/10
+        sine_result += sine_result.iloc[1]/10
 
         return sine_result
 
@@ -73,13 +71,13 @@ class TimeRepr():
         """
         Calculate cosine representation of timestamps.
         
-        :return: numpy array
+        :return: pandas series
         """
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
         cosine_result = np.cos(np.pi*(self.timestamps-shift)/period)
-        cosine_result += cosine_result[1]/10
+        cosine_result += cosine_result.iloc[1]/10
 
         return cosine_result
     
@@ -93,8 +91,8 @@ class TimeRepr():
         period, _, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
-        sawtooth_result = (self.timestamps-shift)/period - 1
-        sawtooth_result += sawtooth_result[1]/10
+        sawtooth_result = (self.timestamps-shift)/period
+        sawtooth_result += sawtooth_result.iloc[1]/10
 
         return sawtooth_result
     
@@ -103,15 +101,14 @@ class TimeRepr():
         """
         Calculate conditional sawtooth representation of timestamps.
         
-        :return: pandas series
+        :return: numpy array
         """
         period, total, shift = self.args
         self.timestamps = self.timestamps.dt.__getattribute__(self.dtime)
 
-        if self.timestamps <= period:
-            cond_sawtooth_result = (self.timestamps-shift)/period
-        else:
-            cond_sawtooth_result = (total-self.timestamps-shift)/period
+        cond_sawtooth_result = np.where(self.timestamps <= period, 
+                                       (self.timestamps-shift)/period, 
+                                       (total-self.timestamps-shift)/period)
 
         cond_sawtooth_result += cond_sawtooth_result[1]/10
 
@@ -155,6 +152,7 @@ class TimeRepr():
         
         return pulse
     
+    @property
     def linear(self):
         """
         Calculate linear representation of timestamps.
@@ -179,7 +177,8 @@ def load(path, parse_dates, bin, time_repr, normalize=True):
     :param time_repr: tuple
     :return: dataframe
     """
-    params = {"X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
+    params = {"X": ["OUTDOOR_TEMP", "PYRANOMETER"],
+              "t": [],
               "ignore": [] 
               }
     
@@ -216,8 +215,8 @@ def load(path, parse_dates, bin, time_repr, normalize=True):
     #else: print("Weights file already exists. Skipping saving!")
 
     if normalize:
-        df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
-                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', bin])
+        df = utils.normalize(df, stats, exclude=['DATETIME', 'COR_MONTH', 'COR_DAY', 'COR_HOUR', 'COR_DATE', 
+                                                 'UNIQ_MONTH', 'UNIQ_DAY', 'UNIQ_HOUR', 'UNIQ_DATE', bin])
 
     nan_counts = df.isna().sum() / len(df) * 100
     #logger.info("NaN counts for columns in X: %s", nan_counts)

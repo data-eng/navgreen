@@ -169,7 +169,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
 
 def main_loop(time_repr, seed, y_col):
-    path = "../../data/training_set_classif_new_classes.csv"
+    path = "../data/training_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
@@ -193,19 +193,19 @@ def main_loop(time_repr, seed, y_col):
                         dropout=0)
 
     _, _ = train(data=(dl_train, dl_val),
-           classes=classes,
-           epochs=300,
-           patience=30,
-           lr=5e-4,
-           criterion=utils.WeightedCrossEntropyLoss(weights),
-           model=model,
-           optimizer="AdamW",
-           scheduler=("StepLR", 1.0, 0.98),
-           seed=seed,
-           y=y_col,
-           visualize=True)
+                 classes=classes,
+                 epochs=300,
+                 patience=30,
+                 lr=5e-4,
+                 criterion=utils.WeightedCrossEntropyLoss(weights),
+                 model=model,
+                 optimizer="AdamW",
+                 scheduler=("StepLR", 1.0, 0.98),
+                 seed=seed,
+                 y=y_col,
+                 visualize=True)
 
 def main():
-    main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [(12, 12, 1), (12, 12, 1)]),
+    main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [[(12, None, 0), (12, None, 0)], [(24, None, 0), (24, None, 0)]]),
               seed=13, 
               y_col="binned_Q_PVT")

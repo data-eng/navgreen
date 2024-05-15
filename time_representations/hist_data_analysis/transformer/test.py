@@ -100,7 +100,7 @@ def test(data, df, params, classes, criterion, model, seed, y, visualize=True):
     return avg_test_loss
 
 def main_loop(time_repr, seed, y_col):
-    path = "../../data/test_set_classif_new_classes.csv"
+    path = "../data/test_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
@@ -129,10 +129,10 @@ def main_loop(time_repr, seed, y_col):
              criterion=utils.WeightedCrossEntropyLoss(weights),
              model=model,
              seed=seed,
-             y = y_col,
+             y=y_col,
              visualize=True)
 
 def main():
-    main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [(12, 12, 1), (12, 12, 1)]),
+    main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [[(12, None, 0), (12, None, 0)], [(24, None, 0), (24, None, 0)]]),
               seed=13, 
               y_col="binned_Q_PVT")

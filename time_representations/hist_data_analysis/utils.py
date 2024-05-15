@@ -365,7 +365,6 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
     plt.close()
 
 
-
 def normalize(df, stats, exclude=[]):
     """
     Normalize data.

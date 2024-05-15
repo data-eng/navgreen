@@ -3,30 +3,13 @@ import json
 import numpy as np
 import yaml
 
-"""
-# YAML
-time_reprs = {
-        1: {"datetime": ["month", "hour"],
-              "cors": ["sine", "cosine"],
-              "uniqs": ["cosine", "cosine"],
-              "args": [[12, 12, 1], [12, 12, 1]] 
-              },
-
-        2: {"datetime": ["date"],
-              "cors": ["triangular_pulse"],
-              "uniqs": ["linear"],
-              "args": [[12, 12, 1]] 
-              }
-]
-"""
-
 from transformer.train import main_loop as train_transformer
 
 def train_models():
     with open("../config.yaml", "r") as config:
         config = yaml.safe_load(config)
 
-    time_reprs = config["time_repr"]
+    time_reprs = config["time_reprs"]
     seeds = config["seeds"]
     bins = config["bins"]
 
@@ -41,7 +24,7 @@ def train_models():
     model_train = {"transformer": train_transformer}
     
     # Start training the models for each time_repr, seed and binning.
-    # The training information is stored within the folder 'models/{time_repr}/{bin}/{model_name}'
+    # The training information is stored within the folder 'models/{time_repr_key}/{bin}/{model_name}'
     for time_repr_key, time_repr_value in time_reprs.items():
         for bin in bins:
             for seed in seeds:
@@ -49,12 +32,11 @@ def train_models():
                     print(f'Start training time_repr={time_repr_key}, bin={bin} with model "{model}" for seed={seed}')
                     start_time = time.time()
 
-                    time_repr = (time_repr_value['cors'], time_repr_value['uniqs'], [tuple(arg) for arg in time_repr_value['args']])
-
+                    time_repr = (time_repr_value['dts'], time_repr_value['cors'], time_repr_value['uniqs'], [[tuple(arg) for arg in args_list] for args_list in time_repr_value['args']])
                     model_train[model](time_repr, seed, [bin])
 
                     # Store training time for this model
-                    train_times[time_repr][bin][model][seed] = time.time() - start_time
+                    train_times[time_repr_key][bin][model][seed] = time.time() - start_time
                     print(f'End training time_repr={time_repr_key}, bin={bin} with model "{model}" for seed={seed} [training time:{train_times[time_repr_key][bin][model][seed]:.2f}]')
 
     # Calculate mean and std of training statistics for each model
