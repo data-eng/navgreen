@@ -15,14 +15,15 @@ def train_models():
     seeds = [1]  # config["seeds"]
     bins = config["bins"]
 
-    models = ["mTAN"]  # ["interpolation", "mTAN", "transformer"]
+    # models = ["transformer", "mTAN"]  # ["interpolation", "mTAN", "transformer"]
+    models = ["mTAN"]
 
     train_times = {}
     for bin, _ in bins:
         # train_times[bin] = {"transformer" : dict(), "interpolation" : dict(), "mTAN": dict()}
         train_times[bin] = {"mTAN": dict()}
 
-    model_train = {# "transformer" : train_transformer,
+    model_train = { # "transformer" : train_transformer,
                    # "interpolation" : train_interpolation,
                    "mTAN": train_mTAN}
 

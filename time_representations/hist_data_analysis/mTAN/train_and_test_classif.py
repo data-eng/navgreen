@@ -207,8 +207,8 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights):
 
     validation_set_percentage = 0.2
 
-    epochs = 1000
-    patience = 200
+    epochs = 4000  # 1000
+    patience = 100 #200
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -339,8 +339,16 @@ def main_loop_train(seed, y_cols, weights):
     sequence_length = 24
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
-    # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
-    params = {'batch_size': 16, 'lr': 0.01, 'num_heads': 8, 'embed_time': 24}
+
+    # params = {'batch_size': 64, 'lr': 0.05, 'num_heads': sequence_length, 'embed_time': sequence_length*4}
+    # params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24}  # bestt
+    # params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24}
+
+    # params = {'batch_size': 128, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24} # lower error but mid metrics
+    params = {'batch_size': 64, 'lr': 0.005, 'num_heads': 6, 'embed_time': 24}  # lower error but mid metrics
+
+    # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': sequence_length, 'embed_time': sequence_length*4} # bestTT
+
     # params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24} # better, smoother loss and still lowering
 
     train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
@@ -350,8 +358,8 @@ def main_loop_test(seed, y_cols, weights):
     sequence_length = 24
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
-    # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
-    params = {'batch_size': 16, 'lr': 0.01, 'num_heads': 8, 'embed_time': 24}
+    # params = {'num_heads': 8, 'embed_time': 24}
+    params = {'num_heads': 8, 'embed_time': 24}
 
     test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
 
