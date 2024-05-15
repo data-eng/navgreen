@@ -22,6 +22,64 @@ logger.addHandler(stream_handler)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
+def evaluate_time_repr(model, dataloader, seed, target_layer, pred_value):
+    model.eval()
+
+    tensor_list = []
+
+    def hook_fn(module, input, output):
+        # print('Output shape:', output.shape)
+        #global layer_output
+        #layer_output = output
+        tensor_list.append(torch.sin(output))
+
+    hook_handle = target_layer.register_forward_hook(hook_fn)
+
+    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
+        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+
+        with torch.no_grad():
+            _ = model(X, observed_tp, masks_X)
+            # print(layer_output)
+
+            #tensor_list.append(layer_output)
+
+    stacked_tensor = torch.cat(tensor_list, dim=0)
+    mean_tensor = torch.mean(stacked_tensor, dim=0)
+    std_tensor = torch.std(stacked_tensor, dim=0)
+
+    for j in range(mean_tensor.shape[1]):
+        std_ = std_tensor[:, j]
+        std_array = std_.cpu().numpy()
+        day_tensor = mean_tensor[:, j]
+        day_array = day_tensor.cpu().numpy()
+        x_values = range(1, 25)
+
+        upper_bound = std_array + day_array
+        lower_bound = -std_array + day_array
+
+        # Plot the data along with the upper and lower bounds
+        plt.plot(x_values, upper_bound, linestyle='--', color='purple', alpha=0.3, label='Upper Bound')
+        plt.plot(x_values, lower_bound, linestyle='--', color='purple', alpha=0.3, label='Lower Bound')
+        plt.fill_between(x_values, upper_bound, lower_bound, color='purple', alpha=0.3)
+
+        for x in x_values:
+            plt.axvline(x=x, color='gray', alpha=0.3)
+
+        # Plot the data
+        plt.plot(x_values, day_array, marker='o')
+        plt.xlabel('Hour in the day')
+        plt.ylabel('Time representation values')
+        plt.title(f'Plot of mean time feature {j}')
+
+        cfn = get_path(dirs=["models", pred_value, "mTAN", str(seed), "time_repr"], name=f"feature_{j}.png")
+        plt.savefig(cfn, dpi=400)
+        plt.clf()
+
+    hook_handle.remove()
+
+
 def evaluate(model, dataloader, criterion, seed, plot=False, pred_value=None, set_type='Train'):
     model.eval()
     total_loss = 0
@@ -208,7 +266,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights):
     validation_set_percentage = 0.2
 
     epochs = 4000  # 1000
-    patience = 100 #200
+    patience = 200 #200
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -335,17 +393,52 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights):
     save_json(data=tensor_to_python_numbers(checkpoints), filename=cfn)
 
 
+def test_model_time_repr(X_cols, y_cols, params, sequence_length, seed):
+    pvt_cols = ["DATETIME"] + X_cols + y_cols
+    pred_value = y_cols[0]
+    dim = len(X_cols)
+
+    # Parameters:
+    num_heads = params["num_heads"]
+    embed_time = params["embed_time"]
+
+    mean_stds = load_json('mTAN/mean_stds.json')
+    test_df, _ = load_df(df_path="../../data/test_set_noa_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+                         normalize=True,
+                         stats=mean_stds, y_cols=y_cols)
+
+    test_df.to_csv("../../data/pvt_df_test.csv")
+    test_df = pd.read_csv("../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+
+    # Create a dataset and dataloader
+    testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
+                                                y_cols=y_cols, per_day=True)
+
+    test_loader_per_day = DataLoader(testing_dataset_per_day, batch_size=1, shuffle=False, drop_last=True)
+
+    trained_model = MtanClassif(input_dim=dim, query=torch.linspace(0, 1., embed_time), embed_time=embed_time,
+                                num_heads=num_heads, device=device).to(device)
+
+    mfn = get_path(dirs=["models", pred_value, "mTAN", str(seed)], name="mTAN.pth")
+    trained_model.load_state_dict(torch.load(mfn))
+
+    target_layer = trained_model.periodic
+    evaluate_time_repr(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
+                       seed=seed, pred_value=pred_value)
+
+
+
 def main_loop_train(seed, y_cols, weights):
     sequence_length = 24
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
 
     # params = {'batch_size': 64, 'lr': 0.05, 'num_heads': sequence_length, 'embed_time': sequence_length*4}
-    # params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24}  # bestt
+    params = {'batch_size': 64, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24}  # bestt
     # params = {'batch_size': 32, 'lr': 0.001, 'num_heads': 8, 'embed_time': 24}
 
     # params = {'batch_size': 128, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24} # lower error but mid metrics
-    params = {'batch_size': 64, 'lr': 0.005, 'num_heads': 6, 'embed_time': 24}  # lower error but mid metrics
+    #params = {'batch_size': 256, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}  # lower error but mid metrics
 
     # params = {'batch_size': 16, 'lr': 0.005, 'num_heads': sequence_length, 'embed_time': sequence_length*4} # bestTT
 
@@ -362,6 +455,16 @@ def main_loop_test(seed, y_cols, weights):
     params = {'num_heads': 8, 'embed_time': 24}
 
     test_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed, weights=weights)
+
+
+def main_loop_test_time_repr(seed, y_cols):
+    sequence_length = 24
+
+    X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
+    params = {'num_heads': 8, 'embed_time': 24}
+
+    test_model_time_repr(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed)
+
 
 def main():
     weights = [0.75, 0.055, 0.02, 0.035, 0.14]

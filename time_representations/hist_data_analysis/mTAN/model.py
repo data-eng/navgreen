@@ -47,11 +47,10 @@ class MultiTimeAttention(nn.Module):
 
 class MtanClassif(nn.Module):
 
-    def __init__(self, input_dim, query, device, embed_time, num_heads, init_embed=8, out_classes=5):
+    def __init__(self, input_dim, query, device, embed_time, num_heads):
         super(MtanClassif, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device
-        self.init_embed = init_embed
         self.embed_time = embed_time
         self.query = query
         self.att = MultiTimeAttention(2 * input_dim, embed_time, num_heads)
