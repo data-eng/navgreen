@@ -16,13 +16,11 @@ stream_handler.setFormatter(formatter)
 # Add handler to logger
 logger.addHandler(stream_handler)
 
-start_date = '2022-09-26'
-# start_timestamp = 1664139600
+start_date = '2022-11-10' # '2022-09-26'
 datetime_representation = datetime.strptime(start_date, '%Y-%m-%d')
 start_timestamp = datetime_representation.timestamp()
 
 end_date = '2023-09-27'
-# end_timestamp = 1695762000
 datetime_representation = datetime.strptime(end_date, '%Y-%m-%d')
 end_timestamp = datetime_representation.timestamp()
 
@@ -36,6 +34,18 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     df['DATETIME'] = pd.to_datetime(df['DATETIME'])
     # Test data from 2022-09-26 to 2023-09-26
     df = df[(df['DATETIME'] > start_date) & (df['DATETIME'] < end_date)]
+
+    nan_count = df[y_cols[0]].isna().sum()
+    nan_percentage = (nan_count / len(df)) * 100
+    print(f"Percentage of NaN values in '{y_cols[0]}': {nan_percentage:.2f}%")
+
+    nan_count = df[pvt_cols[2]].isna().sum()
+    nan_percentage = (nan_count / len(df)) * 100
+    print(f"Percentage of NaN values in '{pvt_cols[2]}': {nan_percentage:.2f}%")
+
+    nan_count = df[pvt_cols[1]].isna().sum()
+    nan_percentage = (nan_count / len(df)) * 100
+    print(f"Percentage of NaN values in '{pvt_cols[1]}': {nan_percentage:.2f}%")
 
     # Drop unneeded columns
     for c in df.columns:
