@@ -169,14 +169,14 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
 
 def main_loop(seed, y_col):
-    path = "../../data/training_set_classif_new_classes.csv"
-    seq_len = 1440 // 180
+    path = "../../data/training_set_noa_classes.csv"
+    seq_len = 24
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
     df_prep = prepare(df, phase="train")
-
+    return
     weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
     ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col)
@@ -206,4 +206,5 @@ def main_loop(seed, y_col):
            visualize=True)
 
 def main():
-    main_loop(seed=13, y_col="binned_Q_PVT")
+    main_loop(seed=13, y_col="ValueRangeBin")
+

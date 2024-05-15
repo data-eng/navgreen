@@ -30,7 +30,13 @@ def load(path, parse_dates, bin, normalize=True):
     :param bin: y_bin
     :return: dataframe
     """
+    start_date = '2022-11-10' # '2022-09-26' #
+    end_date = '2023-09-27'
+
     df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+    # Test data from 2022-09-26 to 2023-09-26
+    df = df[(df['DATETIME'] > start_date) & (df['DATETIME'] < end_date)]
     df.sort_values(by='DATETIME', inplace=True)
 
     #logger.info("All data: {} rows".format(len(df)))
