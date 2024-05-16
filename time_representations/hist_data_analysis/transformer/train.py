@@ -17,7 +17,7 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #logger.info(f'Device is {device}')
 
-def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y, visualize=False):
+def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y, dirs, visualize=False):
     model.to(device)
     train_data, val_data = data
     batches = len(train_data)
@@ -111,15 +111,15 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         true_classes = true_values.tolist()
         pred_classes = [utils.get_max(pred).index for pred in pred_values]
         
-        #logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
+        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             stationary = 0
 
-            #logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
+            logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
-            mfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="transformer.pth")
+            mfn = utils.get_path(dirs=dirs, name="transformer.pth")
             torch.save(model.state_dict(), mfn)
 
             checkpoints.update({'best_epoch': epoch+1, 
@@ -134,24 +134,24 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         title="Train Heatmap "+ylabel,
                         classes=classes,
                         coloring=['azure', 'darkblue'],
-                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
+                        path=utils.get_path(dirs=dirs))
                 
         else:
             stationary += 1
 
         if stationary >= patience:
-            #logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
+            logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
             break
 
         scheduler.step()
 
-    cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="train_checkpoints.json")
+    cfn = utils.get_path(dirs=dirs, name="train_checkpoints.json")
     checkpoints.update({'epochs': epoch+1})
     utils.save_json(data=checkpoints, filename=cfn)
     
     if visualize:
 
-        cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="train_losses.json")
+        cfn = utils.get_path(dirs=dirs, name="train_losses.json")
         utils.save_json(data=train_losses, filename=cfn)
 
         utils.visualize(type="multi-plot",
@@ -161,14 +161,14 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         plot_func=plt.plot,
                         coloring=['brown', 'royalblue'],
                         names=["Training", "Validation"],
-                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
+                        path=utils.get_path(dirs=dirs))
 
-    #logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
+    logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
 
     return avg_train_loss, best_val_loss
 
 
-def main_loop(time_repr, seed, y_col):
+def main_loop(time_repr, seed, y_col, dirs):
     path = "../data/training_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
@@ -194,7 +194,7 @@ def main_loop(time_repr, seed, y_col):
 
     _, _ = train(data=(dl_train, dl_val),
                  classes=classes,
-                 epochs=300,
+                 epochs=200,
                  patience=30,
                  lr=5e-4,
                  criterion=utils.WeightedCrossEntropyLoss(weights),
@@ -203,9 +203,11 @@ def main_loop(time_repr, seed, y_col):
                  scheduler=("StepLR", 1.0, 0.98),
                  seed=seed,
                  y=y_col,
+                 dirs=dirs,
                  visualize=True)
 
 def main():
     main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [[(12, None, 0), (12, None, 0)], [(24, None, 0), (24, None, 0)]]),
               seed=13, 
-              y_col="binned_Q_PVT")
+              y_col=["binned_Q_PVT"],
+              dirs=["models", "1", "binned_Q_PVT", "transformer", "13"])

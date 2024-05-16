@@ -16,9 +16,9 @@ logger.addHandler(stream_handler)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 logger.info(f'Device is {device}')
 
-def test(data, df, params, classes, criterion, model, seed, y, visualize=True):
+def test(data, df, params, classes, criterion, model, seed, y, dirs, visualize=True):
     ylabel = y[0]
-    mfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="transformer.pth")
+    mfn = utils.get_path(dirs=dirs, name="transformer.pth")
     model.load_state_dict(torch.load(mfn))
 
     model.to(device)
@@ -79,10 +79,10 @@ def test(data, df, params, classes, criterion, model, seed, y, visualize=True):
                         title="Test Heatmap "+ylabel,
                         classes=classes,
                         coloring=['azure', 'darkblue'],
-                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
+                        path=utils.get_path(dirs=dirs))
         
     checkpoints.update({'test_loss': avg_test_loss, **utils.get_prfs(true=true_classes, pred=pred_classes)})
-    cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="test_checkpoints.json")
+    cfn = utils.get_path(dirs=dirs, name="test_checkpoints.json")
     utils.save_json(data=checkpoints, filename=cfn)
 
     predicted_values_prob = np.exp(pred_values) / np.sum(np.exp(pred_values), axis=-1, keepdims=True)
@@ -92,14 +92,14 @@ def test(data, df, params, classes, criterion, model, seed, y, visualize=True):
             f"{ylabel}_pred": pred_classes,
             f"{ylabel}_probs": predicted_values_prob.tolist()}
     
-    dfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="data.csv")
+    dfn = utils.get_path(dirs=dirs, name="data.csv")
     utils.save_csv(data=data, filename=dfn)
 
     #logger.info(f'\nTesting with seed {seed} complete!\nTesting Loss: {avg_test_loss:.6f}\n')
 
     return avg_test_loss
 
-def main_loop(time_repr, seed, y_col):
+def main_loop(time_repr, seed, y_col, dirs):
     path = "../data/test_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
@@ -130,9 +130,11 @@ def main_loop(time_repr, seed, y_col):
              model=model,
              seed=seed,
              y=y_col,
+             dirs=dirs,
              visualize=True)
 
 def main():
     main_loop(time_repr=(["sine", "sine"], ["cosine", "cosine"], [[(12, None, 0), (12, None, 0)], [(24, None, 0), (24, None, 0)]]),
               seed=13, 
-              y_col="binned_Q_PVT")
+              y_col=["binned_Q_PVT"],
+              dirs=["models", "1", "binned_Q_PVT", "transformer", "13"])

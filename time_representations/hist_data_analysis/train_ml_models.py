@@ -33,7 +33,8 @@ def train_models():
                     start_time = time.time()
 
                     time_repr = (time_repr_value['dts'], time_repr_value['cors'], time_repr_value['uniqs'], [[tuple(arg) for arg in args_list] for args_list in time_repr_value['args']])
-                    model_train[model](time_repr, seed, [bin])
+                    dirs = ["models", str(time_repr_key), str(bin), model, str(seed)]
+                    model_train[model](time_repr, seed, [bin], dirs)
 
                     # Store training time for this model
                     train_times[time_repr_key][bin][model][seed] = time.time() - start_time

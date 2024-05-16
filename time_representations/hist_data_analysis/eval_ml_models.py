@@ -25,7 +25,8 @@ def eval_models():
 
                     # Assuming test_transformer takes time_repr as input
                     time_repr = (time_repr_value['dts'], time_repr_value['cors'], time_repr_value['uniqs'], [[tuple(arg) for arg in args_list] for args_list in time_repr_value['args']])
-                    model_test[model](time_repr, seed, [bin])
+                    dirs = ["models", str(time_repr_key), str(bin), model, str(seed)]
+                    model_test[model](time_repr, seed, [bin], dirs)
 
                     print(f'End test time_repr={time_repr_key}, bin={bin} with model "{model}" for seed={seed}')
 
