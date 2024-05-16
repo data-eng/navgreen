@@ -32,8 +32,8 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     """
     df = pd.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
     df['DATETIME'] = pd.to_datetime(df['DATETIME'])
-    # Test data from 2022-09-26 to 2023-09-26
-    df = df[(df['DATETIME'] > start_date) & (df['DATETIME'] < end_date)]
+    # Test data from specified date range
+    df = df[(df['DATETIME'] >= start_date) & (df['DATETIME'] < end_date)]
 
     nan_count = df[y_cols[0]].isna().sum()
     nan_percentage = (nan_count / len(df)) * 100
@@ -63,7 +63,12 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
                 df[c] = (series - mean_stds[c][0]) / mean_stds[c][1]
 
     if stats is not None: mean_stds = None
-
+    '''
+    for i in range(0, 24):
+        df_temp = df[df.DATETIME.dt.hour == i]
+        A = df_temp["PYRANOMETER"].mean()
+        print(i, A)
+    '''
     return df, mean_stds
 
 
