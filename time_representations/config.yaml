@@ -9,13 +9,19 @@ time_reprs:
     args:
       - [[None, None, None], [None, None, None]]
   2:
+    dts: ["date"]
+    cors: ["fixed_triangular_pulse"]
+    uniqs: ["linear"]
+    args:
+      - [[None, None, None], [None, None, None]]
+  3:
     dts: ["month", "hour"]
     cors: ["sine", "cosine"]
     uniqs: ["sine", "cosine"]
     args:
       - [[12, None, 0], [12, None, 0]]
       - [[24, None, 0], [24, None, 0]]
-  3:
+  4:
     dts: ["month", "hour"]
     cors: ["sine", "cosine"]
     uniqs: ["sawtooth", "sawtooth"]

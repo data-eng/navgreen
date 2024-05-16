@@ -179,7 +179,7 @@ def main_loop(time_repr, seed, y_col, dirs):
 
     weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
-    ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col)
+    ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col, per_day=True)
     ds_train, ds_val = split(ds, vperc=0.2)
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
@@ -194,7 +194,7 @@ def main_loop(time_repr, seed, y_col, dirs):
 
     _, _ = train(data=(dl_train, dl_val),
                  classes=classes,
-                 epochs=200,
+                 epochs=300,
                  patience=30,
                  lr=5e-4,
                  criterion=utils.WeightedCrossEntropyLoss(weights),

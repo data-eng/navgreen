@@ -119,7 +119,7 @@ class TimeRepr():
         """
         Calculate triangular pulse representation of timestamps.
         
-        :return: list
+        :return: numpy array
         """
         pulse = []
         timestamps_dates = self.timestamps.dt.date
@@ -148,6 +148,31 @@ class TimeRepr():
             
             pulse.extend(list(m2))
 
+        pulse = np.array(pulse) + pulse[1]/10
+        
+        return pulse
+    
+    @property   
+    def fixed_triangular_pulse(self):
+        """
+        Calculate triangular pulse representation of timestamps using fixed times.
+        
+        :return: numpy array
+        """
+        pulse = []
+        
+        for timestamp in self.timestamps:
+            hour = timestamp.hour
+            
+            if hour < 7 or hour >= 19:
+                pulse_value = 0.01
+            elif hour >= 7 and hour < 13:
+                pulse_value = (hour - 7) / 6
+            else:
+                pulse_value = (19 - hour) / 6
+            
+            pulse.append(pulse_value)
+        
         pulse = np.array(pulse) + pulse[1]/10
         
         return pulse
