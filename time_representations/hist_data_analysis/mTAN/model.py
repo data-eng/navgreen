@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
 
 class MultiTimeAttention(nn.Module):
 
@@ -47,7 +48,7 @@ class MultiTimeAttention(nn.Module):
 
 class MtanClassif(nn.Module):
 
-    def __init__(self, input_dim, query, device, embed_time, num_heads):
+    def __init__(self, input_dim, query, device, embed_time, num_heads, time_representation):
         super(MtanClassif, self).__init__()
         assert embed_time % num_heads == 0
         self.device = device
@@ -55,13 +56,16 @@ class MtanClassif(nn.Module):
         self.query = query
         self.att = MultiTimeAttention(2 * input_dim, embed_time, num_heads)
 
+        self.time_repr = torch.sin if time_representation == 'sin' else self.triangular_pulse
         self.periodic = nn.Linear(1, embed_time - 1)
         self.linear = nn.Linear(1, 1)
+
+        self.counter = 0
 
     def learn_time_embedding(self, tt):
         tt = tt.to(self.device)
         tt = tt.unsqueeze(-1)
-        out2 = torch.sin(self.periodic(tt))
+        out2 = self.time_repr(self.periodic(tt))
         out1 = self.linear(tt)
         return torch.cat([out1, out2], -1)
 
@@ -77,3 +81,119 @@ class MtanClassif(nn.Module):
         out = self.att(query, key, x, mask)
 
         return out
+
+
+    def triangular_pulse1(self, linear_tensor, a=1.0, c=0.0):
+
+        # Calculate the distance from the center
+        distance = torch.abs(linear_tensor - c)
+        # Calculate the triangular pulse values
+        pulse = torch.where(distance <= a, 1 - (distance / a), torch.tensor(0.0))
+        return pulse
+
+    def triangular_pulse(self, linear_tensor):
+
+        # Max PYRANOMETER value
+        max_pos = 11
+
+        pulse = torch.zeros(linear_tensor.shape).to(self.device)
+
+        first_half_of_the_day = torch.abs(linear_tensor[:, :max_pos, :])
+        second_half_of_the_day = torch.abs(linear_tensor[:, max_pos + 1:, :])
+
+        diff_tensor_first = torch.diff(first_half_of_the_day, dim=1)
+        diff_tensor_second = torch.diff(second_half_of_the_day, dim=1)
+
+        # Define the start and end positions for the triangular function
+        start_pos = torch.argmax(diff_tensor_first, dim=1)
+        end_pos = torch.argmax(diff_tensor_second, dim=1) + 12
+
+        start_pos = torch.full(start_pos.shape, 9)
+        end_pos = torch.full(end_pos.shape, 17)
+
+        # Create the ascending part of the triangle
+        for i in range(0, max_pos+1):
+            pulse[:, i, :] = torch.clamp((i - start_pos) / (max_pos - start_pos), min=0.0)
+
+        # Create the descending part of the triangle
+        for i in range(max_pos+1, pulse.shape[1]):
+            pulse[:, i, :] = torch.clamp((end_pos - i) / (end_pos - max_pos), min=0.0)
+
+        if self.counter % 10000 == 0:
+            x_values = range(1, 25)
+            '''for j in range(pulse.shape[2]):
+                day_tensor = pulse[0, :, j]
+                day_array = day_tensor.cpu().numpy()
+
+                # Plot the data
+                plt.plot(x_values, day_array, marker='o')
+                plt.xlabel('Hour in the day')
+                plt.ylabel('Time representation values')
+                plt.title(f'Plot of mean time feature {j}')'''
+
+            day_tensor = pulse[0, :, 0]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            day_tensor = pulse[0, :, 5]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            day_tensor = pulse[0, :, 21]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            plt.xlabel('Hour in the day')
+            plt.ylabel('Time representation values')
+            plt.title(f'Plot of mean time feature {0}')
+
+            plt.show()
+        self.counter += 1
+
+        return pulse
+
+    def triangular_pulse2(self, linear_tensor):
+
+        # Max PYRANOMETER value
+        max_pos = 11
+
+        pulse = torch.zeros(linear_tensor.shape).to(self.device)
+
+        first_half_of_the_day = linear_tensor[:, :max_pos, :]
+        second_half_of_the_day = linear_tensor[:, max_pos + 1:, :]
+
+        # Define the start and end positions for the triangular function
+        start_pos = torch.argmax(first_half_of_the_day, dim=1)
+        end_pos = torch.argmax(second_half_of_the_day, dim=1) + max_pos + 1
+
+        # Create the ascending part of the triangle
+        for i in range(0, max_pos+1):
+            pulse[:, i, :] = torch.clamp((i - start_pos) / (max_pos - start_pos), min=0.0)
+
+        # Create the descending part of the triangle
+        for i in range(max_pos+1, pulse.shape[1]):
+            pulse[:, i, :] = torch.clamp((end_pos - i) / (end_pos - max_pos), min=0.0)
+
+        if self.counter % 10000 == 0:
+            x_values = range(1, 25)
+
+            day_tensor = pulse[0, :, 0]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            day_tensor = pulse[0, :, 5]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            day_tensor = pulse[0, :, 12]
+            day_array = day_tensor.cpu().numpy()
+            plt.plot(x_values, day_array, marker='o')
+
+            plt.xlabel('Hour in the day')
+            plt.ylabel('Time representation values')
+            plt.title(f'Plot of mean time feature {0}')
+
+            plt.show()
+        self.counter += 1
+
+        return pulse
