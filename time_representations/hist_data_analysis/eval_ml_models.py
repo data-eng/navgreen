@@ -11,11 +11,11 @@ def eval_models():
     with open("../config.yaml", "r") as config:
         config = yaml.safe_load(config)
 
-    seeds = [1] #config["seeds"]
+    seeds = config["seeds"]
     bins = config["bins"]
     time_representations = config["time_repr"]
 
-    #models = ["interpolation", "mTAN", "transformer"]
+    # models = ["interpolation", "mTAN", "transformer"]
     models = ["mTAN"]
 
     model_test = {#"transformer" : test_transformer,

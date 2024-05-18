@@ -293,6 +293,10 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
             logger.info(
                 f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
 
+        if epoch % 500 == 0 or epoch == 1:
+            mfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", str(seed)], name=f"mTAN_{epoch}.pth")
+            torch.save(model.state_dict(), mfn)
+
         train_losses.append(average_loss)
         val_losses.append(val_loss.cpu())
 
@@ -337,7 +341,7 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights, time_rep
     validation_set_percentage = 0.2
 
     epochs = 5000  # 1000
-    patience = 200 #200
+    patience = 250 #200
 
     # Parameters:
     num_heads = params["num_heads"]
@@ -431,8 +435,7 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights, time_repr
     test_df = pd.read_csv("../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Loss
-    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length,
-                                       weights=torch.tensor(weights).to(device))
+    criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length, weights=torch.tensor(weights).to(device))
 
     # Create a dataset and dataloader
     testing_dataset_per_day = TimeSeriesDataset(dataframe=test_df, sequence_length=sequence_length, X_cols=X_cols,
@@ -508,8 +511,7 @@ def main_loop_train(seed, y_cols, weights, time_representation):
 
     X_cols = ["PYRANOMETER", "OUTDOOR_TEMP"]
 
-    params = {'batch_size': 32, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}  # For sin
-    params = {'batch_size': 32, 'lr': 0.01, 'num_heads': 8, 'embed_time': 24}
+    params = {'batch_size': 32, 'lr': 0.005, 'num_heads': 8, 'embed_time': 24}
 
     train_model(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed,
                 weights=weights, time_representation=time_representation)
@@ -534,8 +536,3 @@ def main_loop_test_time_repr(seed, y_cols, time_representation):
     test_model_time_repr(X_cols=X_cols, y_cols=y_cols, params=params, sequence_length=sequence_length, seed=seed,
                          time_representation=time_representation)
 
-
-def main():
-    weights = [0.75, 0.055, 0.02, 0.035, 0.14]
-    main_loop_train(seed=1505, y_cols=["FixedBin"], weights=weights)
-    main_loop_test(seed=1505, y_cols=["FixedBin"], weights=weights)

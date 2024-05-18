@@ -12,7 +12,7 @@ def train_models():
     with open("../config.yaml", "r") as config:
         config = yaml.safe_load(config)
 
-    seeds = [1, 8]  # config["seeds"]
+    seeds = config["seeds"]
     bins = config["bins"]
     time_representations = config["time_repr"]
 

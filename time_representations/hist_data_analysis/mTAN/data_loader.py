@@ -35,6 +35,7 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     # Test data from specified date range
     df = df[(df['DATETIME'] >= start_date) & (df['DATETIME'] < end_date)]
 
+    '''
     nan_count = df[y_cols[0]].isna().sum()
     nan_percentage = (nan_count / len(df)) * 100
     print(f"Percentage of NaN values in '{y_cols[0]}': {nan_percentage:.2f}%")
@@ -46,6 +47,7 @@ def load_df(df_path, pvt_cols, y_cols, parse_dates, normalize=True, stats=None):
     nan_count = df[pvt_cols[1]].isna().sum()
     nan_percentage = (nan_count / len(df)) * 100
     print(f"Percentage of NaN values in '{pvt_cols[1]}': {nan_percentage:.2f}%")
+    '''
 
     # Drop unneeded columns
     for c in df.columns:
