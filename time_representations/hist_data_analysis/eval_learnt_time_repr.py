@@ -7,23 +7,31 @@ def eval_models():
     with open("../config.yaml", "r") as config:
         config = yaml.safe_load(config)
 
-    seeds = config["seeds"]
     bins = config["bins"]
+    '''
+    sin_best = ["sin", "1013"]
+    time_representation = sin_best[0]
+    seed = sin_best[1]
 
     for bin, _ in bins:
-        for seed in seeds:
-            print(f'Start test bin={bin} with "mTAN" for seed={seed}')
-            test_time_repr(seed, [bin])
-            print(f'End test bin={bin} with "mTAN" for seed={seed}')
+        print(f'Start test bin={bin} with model "mTAN" for seed={seed} and '
+              f'time representation={time_representation}')
+        test_time_repr(seed, [bin], time_representation)
+        print(f'End test bin={bin} with model "mTAN" for seed={seed} and '
+              f'time representation={time_representation}')
+    '''
+    pulse_best = ["tr_pulse", "1013"]
+    time_representation = pulse_best[0]
+    seed = pulse_best[1]
 
     for bin, _ in bins:
-        bin_folder_path = f'models/{bin}'
-
-        folder_path = f'{bin_folder_path}/mTAN'
-
-        for s in seeds:
-            seed = str(s)
-            p = f'{folder_path}/{seed}'
+        print(f'Start test bin={bin} with model "mTAN" for seed={seed} and '
+              f'time representation={time_representation}')
+        test_time_repr(seed, [bin], time_representation)
+        print(f'End test bin={bin} with model "mTAN" for seed={seed} and '
+              f'time representation={time_representation}')
 
 
 eval_models()
+
+

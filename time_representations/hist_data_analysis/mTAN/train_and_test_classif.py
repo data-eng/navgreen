@@ -150,6 +150,68 @@ def evaluate_time_repr_sin(model, dataloader, seed, target_layer, pred_value, ti
     hook_handle.remove()
 
 
+def evaluate_time_repr_pulse(model, dataloader, seed, target_layer, pred_value, time_representation):
+    model.eval()
+
+    tensor_list = []
+
+    def triangular_pulse(linear_tensor):
+        max_pos = 11
+        distance = torch.abs(linear_tensor - linear_tensor[:, max_pos, :].unsqueeze(1))
+        a = torch.quantile(distance, 0.25)
+        # Calculate the triangular pulse values
+        condition = distance <= a
+        pulse = torch.where(condition, 1 - (distance / a), torch.tensor(0.0))
+        return pulse
+
+    def hook_fn(module, input, output):
+        tensor_list.append(triangular_pulse(output))
+
+    hook_handle = target_layer.register_forward_hook(hook_fn)
+
+    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
+        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+
+        with torch.no_grad():
+            _ = model(X, observed_tp, masks_X)
+
+    pulse = torch.cat(tensor_list, dim=0)
+
+    for j in range(pulse.shape[1]):
+        x_values = range(1, 25)
+
+        day_tensor = pulse[0, :, 0]
+        day_array = day_tensor.detach().cpu().numpy()
+        plt.plot(x_values, day_array, marker='o')
+
+        day_tensor = pulse[0, :, 5]
+        day_array = day_tensor.detach().cpu().numpy()
+        plt.plot(x_values, day_array, marker='o')
+
+        day_tensor = pulse[0, :, 8]
+        day_array = day_tensor.detach().cpu().numpy()
+        plt.plot(x_values, day_array, marker='o')
+
+        day_tensor = pulse[0, :, 10]
+        day_array = day_tensor.detach().cpu().numpy()
+        plt.plot(x_values, day_array, marker='o')
+
+        day_tensor = pulse[0, :, 20]
+        day_array = day_tensor.detach().cpu().numpy()
+        plt.plot(x_values, day_array, marker='o')
+
+        plt.xlabel('Hour in the day')
+        plt.ylabel('Time representation values')
+        plt.title(f'Plot of mean time feature {0}')
+
+        cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", str(seed), "time_repr"],
+                       name=f"feature_{j}.png")
+        plt.savefig(cfn, dpi=400)
+        plt.clf()
+
+    hook_handle.remove()
+
+
 def evaluate(model, dataloader, criterion, seed, time_representation, plot=False, pred_value=None, set_type='Train'):
     model.eval()
     total_loss = 0
@@ -497,9 +559,14 @@ def test_model_time_repr(X_cols, y_cols, params, sequence_length, seed, time_rep
     mfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", str(seed)], name="mTAN.pth")
     trained_model.load_state_dict(torch.load(mfn))
 
-    target_layer = trained_model.periodic
-    evaluate_time_repr_sin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
-                       seed=seed, pred_value=pred_value, time_representation=time_representation)
+    if time_representation == "sin":
+        target_layer = trained_model.periodic
+        evaluate_time_repr_sin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
+                           seed=seed, pred_value=pred_value, time_representation=time_representation)
+    else:
+        target_layer = trained_model.periodic
+        evaluate_time_repr_pulse(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
+                               seed=seed, pred_value=pred_value, time_representation=time_representation)
 
     target_layer = trained_model.linear
     evaluate_time_repr_lin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
