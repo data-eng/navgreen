@@ -80,9 +80,14 @@ class TimeSeriesDataset(Dataset):
         self.per_day = per_day
 
         df = dataframe
-        df['Datetime'] = df.index.astype('int64') // 10**9
-        # Normalize Unix time between 0 and 1
         '''
+        df['Datetime'] = pd.to_datetime(df.index)
+        df['Datetime'] = df['Datetime'].dt.hour / 24 + 0.0001
+        '''
+        df['Datetime'] = df.index.astype('int64') // 10**9
+
+        '''
+        # Normalize Unix time between 0 and 1
         min_time, max_time = df['Datetime'].min(), df['Datetime'].max()
         df['Datetime'] = (df['Datetime'] - min_time) / (max_time - min_time)
         '''

@@ -85,21 +85,30 @@ def approx_pyranometer():
     plt.clf()
 
 
-def evaluate_time_repr_lin(model, dataloader, seed, target_layer, pred_value, time_representation, model_name):
+def evaluate_time_repr_lin(model, dataloader, target_layer, pred_value, time_representation, model_name):
     model.eval()
 
     tensor_list = []
+    list_t = []
 
     def hook_fn(module, input, output):
         tensor_list.append(output)
 
     hook_handle = target_layer.register_forward_hook(hook_fn)
 
-    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
-        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+    for (X, masks_X, observed_tp), (y, _) in dataloader:
+        X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
 
         with torch.no_grad():
             _ = model(X, observed_tp, masks_X)
+            list_t.append(len(list_t))
+
+    hook_handle.remove()
+
+    # tensor_list = tensor_list[0::2]
+
+    data = [[tensor.squeeze().cpu().numpy()] for tensor in tensor_list]
+    df = pd.DataFrame(data, columns=[f'linear_time_feature_{time_representation}'])
 
     stacked_tensor = torch.cat(tensor_list, dim=0).squeeze()
     mean_tensor = torch.mean(stacked_tensor, dim=0).squeeze()
@@ -126,7 +135,7 @@ def evaluate_time_repr_lin(model, dataloader, seed, target_layer, pred_value, ti
     plt.ylabel('Time representation values')
 
     cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", "best_model", "time_repr"],
-                   name=f"{model_name}_feature_linear.png")
+                   name=f"linear_feature.png")
     plt.savefig(cfn, dpi=400, bbox_inches='tight')
     plt.clf()
     '''
@@ -155,10 +164,10 @@ def evaluate_time_repr_lin(model, dataloader, seed, target_layer, pred_value, ti
     plt.clf()
     '''
 
-    hook_handle.remove()
+    return df
 
 
-def evaluate_time_repr_sin(model, dataloader, seed, target_layer, pred_value, time_representation, model_name):
+def evaluate_time_repr_sin(model, dataloader, target_layer, pred_value, time_representation, model_name):
     model.eval()
 
     tensor_list = []
@@ -168,17 +177,20 @@ def evaluate_time_repr_sin(model, dataloader, seed, target_layer, pred_value, ti
 
     hook_handle = target_layer.register_forward_hook(hook_fn)
 
-    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
-        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+    for (X, masks_X, observed_tp), (y, _) in dataloader:
+        X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
 
         with torch.no_grad():
             _ = model(X, observed_tp, masks_X)
 
-    '''flattened_list = [tensor.squeeze().transpose(0, 1).view(-1).cpu().numpy() for tensor in tensor_list]
-    df = pd.DataFrame(flattened_list)
-    cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", "best_model"],
-                   name=f"sin_time_representation.csv")
-    df.to_csv(cfn, index=False)'''
+    tensor_list = tensor_list[1::2]  # [1:4:2]
+    data = []
+    for tensor in tensor_list:
+        array = tensor.squeeze().T.cpu().numpy()
+        data.append([list(row) for row in array])
+
+    # Create the DataFrame
+    df = pd.DataFrame(data, columns=[f'time_feature_{i}' for i in range(23)])
 
     stacked_tensor = torch.cat(tensor_list, dim=0)
     mean_tensor = torch.mean(stacked_tensor, dim=0)
@@ -217,12 +229,20 @@ def evaluate_time_repr_sin(model, dataloader, seed, target_layer, pred_value, ti
 
     # Plot sin regarding the groups
     groups = [
+        [0, 5, 8, 15],
+        [4, 6],
+        [11, 21],
+        [1, 3, 9, 10, 12, 13, 18, 19, 20, 22],
+        [7, 14, 17],
+        [2, 16]]
+
+    '''    groups = [
         [0, 2, 5, 7, 8, 15, 17],
         [1, 3, 9, 10, 12, 13, 18, 20, 22],
         [4, 6, 19, 21],
         [11],
         [14],
-        [16]]
+        [16]]'''
 
     x_values = range(1, 25)
 
@@ -251,15 +271,17 @@ def evaluate_time_repr_sin(model, dataloader, seed, target_layer, pred_value, ti
         plt.xlabel('Hour in the day')
         plt.ylabel('Time representation values')
 
-        cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", "best_model", "grouped_time_repr"],
+        cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", "best_model", "grouped_time_repr_linspace"],
                        name=f"{model_name}_feature_group_{grp_num}.png")
         plt.savefig(cfn, dpi=400, bbox_inches='tight')
         plt.clf()
 
     hook_handle.remove()
 
+    return df
 
-def evaluate_time_repr_pulse(model, dataloader, seed, target_layer, pred_value, time_representation, model_name):
+
+def evaluate_time_repr_pulse(model, dataloader, target_layer, pred_value, time_representation, model_name):
     model.eval()
 
     tensor_list = []
@@ -278,11 +300,20 @@ def evaluate_time_repr_pulse(model, dataloader, seed, target_layer, pred_value, 
 
     hook_handle = target_layer.register_forward_hook(hook_fn)
 
-    for (X, masks_X, observed_tp), (y, mask_y) in dataloader:
-        X, masks_X, y, mask_y = X.to(device), masks_X.to(device), y.to(device), mask_y.to(device)
+    for (X, masks_X, observed_tp), (y, _) in dataloader:
+        X, masks_X, y = X.to(device), masks_X.to(device), y.to(device)
 
         with torch.no_grad():
             _ = model(X, observed_tp, masks_X)
+
+    # tensor_list = tensor_list[0::2]
+    data = []
+    for tensor in tensor_list:
+        array = tensor.squeeze().T.cpu().numpy()
+        data.append([list(row) for row in array])
+
+    # Create the DataFrame
+    df = pd.DataFrame(data, columns=[f'time_feature_{i}' for i in range(23)])
 
     pulse = torch.cat(tensor_list, dim=0)
 
@@ -324,6 +355,8 @@ def evaluate_time_repr_pulse(model, dataloader, seed, target_layer, pred_value, 
 
     hook_handle.remove()
 
+    return df
+
 
 def test_model_time_repr(X_cols, y_cols, params, sequence_length, seed, time_representation):
     pvt_cols = ["DATETIME"] + X_cols + y_cols
@@ -358,21 +391,28 @@ def test_model_time_repr(X_cols, y_cols, params, sequence_length, seed, time_rep
         mfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", str(seed)], name=model_name)
         trained_model.load_state_dict(torch.load(mfn))
 
+        target_layer = trained_model.periodic
         if time_representation == "sin":
-            target_layer = trained_model.periodic
-            evaluate_time_repr_sin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
-                                   seed=seed, pred_value=pred_value, time_representation=time_representation,
-                                   model_name=model_name)
+            periodic_df = evaluate_time_repr_sin(model=trained_model, dataloader=test_loader_per_day,
+                                                 target_layer=target_layer, pred_value=pred_value,
+                                                 time_representation=time_representation, model_name=model_name)
         else:
-            target_layer = trained_model.periodic
-            evaluate_time_repr_pulse(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
-                                     seed=seed, pred_value=pred_value, time_representation=time_representation,
-                                     model_name=model_name)
+            periodic_df = evaluate_time_repr_pulse(model=trained_model, dataloader=test_loader_per_day,
+                                                   target_layer=target_layer, pred_value=pred_value,
+                                                   time_representation=time_representation, model_name=model_name)
 
         target_layer = trained_model.linear
-        evaluate_time_repr_lin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
-                               seed=seed, pred_value=pred_value, time_representation=time_representation,
-                               model_name=model_name)
+        lin_df = evaluate_time_repr_lin(model=trained_model, dataloader=test_loader_per_day, target_layer=target_layer,
+                                        pred_value=pred_value, time_representation=time_representation,
+                                        model_name=model_name)
+
+        df_combined = pd.concat([periodic_df, lin_df], axis=1)
+        df_combined = df_combined.iloc[0::2]
+        test_df.index = pd.to_datetime(test_df.index)
+        df_combined.index = pd.unique(test_df.index.date)
+        cfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", "best_model"],
+                       name=f"{model_name}_feature_{time_representation}.csv")
+        df_combined.to_csv(cfn)
 
 
 def main_loop_test_time_repr(seed, y_cols, time_representation):
