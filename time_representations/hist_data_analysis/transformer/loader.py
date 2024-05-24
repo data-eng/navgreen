@@ -164,12 +164,12 @@ class TimeRepr():
         for timestamp in self.timestamps:
             hour = timestamp.hour
             
-            if hour < 7 or hour >= 19:
+            if hour < 7 or hour >= 21:
                 pulse_value = 0.01
             elif hour >= 7 and hour < 13:
                 pulse_value = (hour - 7) / 6
             else:
-                pulse_value = (19 - hour) / 6
+                pulse_value = (21 - hour) / 8
             
             pulse.append(pulse_value)
         

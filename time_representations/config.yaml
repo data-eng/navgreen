@@ -1,5 +1,5 @@
-seeds: [6] # [6, 72, 157, 838, 1214, 1505]
-bins: ["FixedBin" , "ValueCountBin", "ValueRangeBin"]
+seeds: [8, 72, 265, 834, 1013, 2910]
+bins: ["ValueRangeBin"]
 
 time_reprs:
   1:
@@ -16,15 +16,15 @@ time_reprs:
       - [[None, None, None], [None, None, None]]
   3:
     dts: ["month", "hour"]
-    cors: ["sine", "cosine"]
-    uniqs: ["sine", "cosine"]
+    cors: ["sine", "sine"]
+    uniqs: ["cosine", "cosine"]
     args:
       - [[12, None, 0], [12, None, 0]]
       - [[24, None, 0], [24, None, 0]]
   4:
     dts: ["month", "hour"]
-    cors: ["sine", "cosine"]
+    cors: ["sine", "sine"]
     uniqs: ["sawtooth", "sawtooth"]
     args:
-      - [[6, None, 1.5708], [6, None, 6]]
-      - [[12, None, 1.5708], [12, None, 12]]
+      - [[12, None, 0], [6, None, 6]]
+      - [[24, None, 0], [12, None, 12]]
