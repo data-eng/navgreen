@@ -287,7 +287,7 @@ def evaluate_time_repr_pulse(model, dataloader, target_layer, pred_value, time_r
     tensor_list = []
 
     def triangular_pulse(linear_tensor):
-        max_pos = 11
+        max_pos = 12
         distance = torch.abs(linear_tensor - linear_tensor[:, max_pos, :].unsqueeze(1))
         a = torch.quantile(distance, 0.25)
         # Calculate the triangular pulse values
