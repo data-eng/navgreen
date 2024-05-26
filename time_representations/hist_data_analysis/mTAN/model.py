@@ -106,10 +106,10 @@ class MtanClassif(nn.Module):
 
         # Define the start and end positions for the triangular function
         start_pos = torch.argmax(diff_tensor_first, dim=1)
-        end_pos = torch.argmax(diff_tensor_second, dim=1) + 12
+        end_pos = torch.argmax(diff_tensor_second, dim=1) + 13
 
-        start_pos = torch.full(start_pos.shape, 9)
-        end_pos = torch.full(end_pos.shape, 17)
+        start_pos = torch.full(start_pos.shape, 6)
+        end_pos = torch.full(end_pos.shape, 21)
 
         # Create the ascending part of the triangle
         for i in range(0, max_pos+1):
@@ -238,7 +238,7 @@ class MtanClassif(nn.Module):
 
     def triangular_pulse2(self, linear_tensor):
 
-        max_pos = 11
+        max_pos = 12
 
         # Calculate the distance from the value of the midday of each day
         distance = torch.abs(linear_tensor - linear_tensor[:, max_pos, :].unsqueeze(1))
