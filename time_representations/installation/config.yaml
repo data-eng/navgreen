@@ -1,5 +1,33 @@
 seeds: [8, 72, 265, 834, 1013, 2910]
-bins: [
-        ["ValueRangeBin",  [0.7049093788491994, 0.11666373394333979,  0.048389934893542146, 0.032729192327995774,  0.09730775998592293]]
-        ]
+
+bins: [ ["ValueRangeBin",  [0.7049093788491994, 0.11666373394333979,  0.048389934893542146, 0.032729192327995774,  0.09730775998592293]]]
+
+time_reprs:
+  1:
+    dts: ["date"]
+    cors: ["triangular_pulse"]
+    uniqs: ["linear"]
+    args:
+      - [[None, None, None], [None, None, None]]
+  2:
+    dts: ["date"]
+    cors: ["fixed_triangular_pulse"]
+    uniqs: ["linear"]
+    args:
+      - [[None, None, None], [None, None, None]]
+  3:
+    dts: ["month", "hour"]
+    cors: ["sine", "sine"]
+    uniqs: ["cosine", "cosine"]
+    args:
+      - [[12, None, 0], [12, None, 0]]
+      - [[24, None, 0], [24, None, 0]]
+  4:
+    dts: ["month", "hour"]
+    cors: ["sine", "sine"]
+    uniqs: ["sawtooth", "sawtooth"]
+    args:
+      - [[12, None, 0], [6, None, 6]]
+      - [[24, None, 0], [12, None, 12]]
+
 time_repr: ["sin", "tr_pulse"]

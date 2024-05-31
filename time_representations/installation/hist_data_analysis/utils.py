@@ -150,6 +150,7 @@ class MaskedCrossEntropyLoss_mTAN(nn.Module):
 
     def forward(self, pred, true, mask):
         if pred.dim() == 2: pred = pred.permute(1, 0).unsqueeze(0)
+
         #pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
         #                  pred.shape[2]).mean(dim=2)
 
@@ -363,7 +364,6 @@ def visualize(type, values, labels, title, plot_func=None, coloring=None, names=
     filename = f"{title.lower().replace(' ', '_')}.png"
     plt.savefig(os.path.join(path, filename), dpi=300)
     plt.close()
-
 
 
 def normalize(df, stats, exclude=[]):
