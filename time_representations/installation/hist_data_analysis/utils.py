@@ -150,8 +150,9 @@ class MaskedCrossEntropyLoss_mTAN(nn.Module):
 
     def forward(self, pred, true, mask):
         if pred.dim() == 2: pred = pred.permute(1, 0).unsqueeze(0)
-        pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
-                          pred.shape[2]).mean(dim=2)
+
+        #pred = pred.view(pred.shape[0], self.sequence_length, pred.shape[1] // self.sequence_length,
+        #                  pred.shape[2]).mean(dim=2)
 
         true = true[mask == 1].long()
         pred = pred[mask == 1]
