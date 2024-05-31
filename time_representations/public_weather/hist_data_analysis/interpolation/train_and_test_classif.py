@@ -172,7 +172,7 @@ def train_model(X_cols, y_cols, params, sequence_length, interpolation, weights,
 
     validation_set_percentage = 0.2
 
-    epochs = 1 # 1000
+    epochs = 1000
     patience = 200
 
     # Parameters:
@@ -183,12 +183,12 @@ def train_model(X_cols, y_cols, params, sequence_length, interpolation, weights,
 
     dim = len(X_cols)
 
-    train_df, mean_stds = load_df(df_path="../../data/training_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    train_df, mean_stds = load_df(df_path="../../../data/training_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                                       normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'interpolation/mean_stds.json')
 
-    train_df.to_csv("../../data/pvt_df_train.csv")
-    train_df = pd.read_csv("../../data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    train_df.to_csv("../../../data/pvt_df_train.csv")
+    train_df = pd.read_csv("../../../data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
@@ -242,11 +242,11 @@ def test_model(X_cols, y_cols, sequence_length, interpolation, seed, weights):
     dim = len(X_cols)
 
     mean_stds = load_json('interpolation/mean_stds.json')
-    test_df, _ = load_df(df_path="../../data/test_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
+    test_df, _ = load_df(df_path="../../../data/test_set_classif_new_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"], normalize=True,
                          stats=mean_stds, y_cols=y_cols)
 
-    test_df.to_csv("../../data/pvt_df_test.csv")
-    test_df = pd.read_csv("../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    test_df.to_csv("../../../data/pvt_df_test.csv")
+    test_df = pd.read_csv("../../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
     # Loss
     criterion = CrossEntropyLoss(weights=torch.tensor(weights).to(device))
 
