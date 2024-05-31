@@ -100,7 +100,7 @@ def test(data, df, params, classes, criterion, model, seed, y, dirs, visualize=T
     return avg_test_loss
 
 def main_loop(time_repr, seed, y_col, dirs):
-    path = "../data/test_set_noa_classes.csv"
+    path = "../../../data/test_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]

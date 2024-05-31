@@ -111,13 +111,13 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
         true_classes = true_values.tolist()
         pred_classes = [utils.get_max(pred).index for pred in pred_values]
         
-        logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
+        # logger.info(f"Epoch [{epoch + 1}/{epochs}], Training Loss: {avg_train_loss:.6f}, Validation Loss: {avg_val_loss:.6f}")
 
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             stationary = 0
 
-            logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
+            # logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
             mfn = utils.get_path(dirs=dirs, name="transformer.pth")
             torch.save(model.state_dict(), mfn)
@@ -140,7 +140,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             stationary += 1
 
         if stationary >= patience:
-            logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
+            # logger.info(f"Early stopping after {epoch + 1} epochs without improvement. Patience is {patience}.")
             break
 
         scheduler.step()
@@ -163,13 +163,13 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         names=["Training", "Validation"],
                         path=utils.get_path(dirs=dirs))
 
-    logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
+    # logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} & Validation Loss: {best_val_loss:.6f}\n')
 
     return avg_train_loss, best_val_loss
 
 
 def main_loop(time_repr, seed, y_col, dirs):
-    path = "../data/training_set_noa_classes.csv"
+    path = "../../../data/training_set_noa_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]

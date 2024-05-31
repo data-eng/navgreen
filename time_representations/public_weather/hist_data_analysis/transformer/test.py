@@ -100,7 +100,7 @@ def test(data, df, classes, criterion, model, seed, y, visualize=True):
     return avg_test_loss
 
 def main_loop(seed, y_col):
-    path = "../../data/test_set_classif_new_classes.csv"
+    path = "../../../data/test_set_classif_new_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]

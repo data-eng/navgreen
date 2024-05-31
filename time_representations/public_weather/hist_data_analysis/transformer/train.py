@@ -169,7 +169,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
 
 def main_loop(seed, y_col):
-    path = "../../data/training_set_classif_new_classes.csv"
+    path = "../../../data/training_set_classif_new_classes.csv"
     seq_len = 1440 // 180
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
@@ -194,7 +194,7 @@ def main_loop(seed, y_col):
 
     _, _ = train(data=(dl_train, dl_val),
            classes=classes,
-           epochs=1, #300,
+           epochs=300,
            patience=30,
            lr=5e-4,
            criterion=utils.WeightedCrossEntropyLoss(weights),
