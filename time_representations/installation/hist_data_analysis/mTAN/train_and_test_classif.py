@@ -115,14 +115,14 @@ def evaluate(model, dataloader, criterion, seed, time_representation, plot=False
             warnings.simplefilter("ignore", category=UserWarning)
 
             prfs = get_prfs(true_values, predicted_values)
-
+            '''
             logger.info(
                 f"Micro    | f1 score: {prfs['fscore_micro']:.6f} & precision {prfs['precision_micro']:.6f} & recall {prfs['recall_micro']:.6f}")
             logger.info(
                 f"Macro    | f1 score: {prfs['fscore_macro']:.6f} & precision {prfs['precision_macro']:.6f} & recall {prfs['recall_macro']:.6f}")
             logger.info(
                 f"Weighted | f1 score: {prfs['fscore_weighted']:.6f} & precision {prfs['precision_weighted']:.6f} & recall {prfs['recall_weighted']:.6f}")
-
+            '''
     return total_loss / len(dataloader), prfs, (true_values_all, predicted_values_all, predicted_values_probs)
 
 
@@ -160,11 +160,11 @@ def train(model, train_loader, val_loader, criterion, learning_rate, epochs, pat
         average_loss = total_loss / len(train_loader)
         # logger.info(f'Epoch {epoch} | Training Loss: {average_loss:.6f}, Validation Loss: {val_loss:.6f}, '
         #      f'Time : {(time.time() - start_time) / 60:.2f} minutes')
-
+        '''
         if epoch % 50 == 0 or epoch == 2:
             logger.info(
                 f'Epoch {epoch} | Best training Loss: {final_train_loss:.6f}, Best validation Loss: {best_val_loss:.6f}')
-
+        '''
         if epoch % 500 == 0 or epoch == 1:
             mfn = get_path(dirs=["models", time_representation, pred_value, "mTAN", str(seed)], name=f"mTAN_{epoch}.pth")
             torch.save(model.state_dict(), mfn)
@@ -225,14 +225,14 @@ def train_model(X_cols, y_cols, params, sequence_length, seed, weights, time_rep
     pred_value = y_cols[0]
     dim = len(X_cols)
 
-    train_df, mean_stds = load_df(df_path="../../data/training_set_noa_classes.csv",
+    train_df, mean_stds = load_df(df_path="../../../data/training_set_noa_classes.csv",
                                   pvt_cols=pvt_cols,
                                   parse_dates=["DATETIME"],
                                   normalize=True, y_cols=y_cols)
     save_json(mean_stds, 'mTAN/mean_stds.json')
 
-    train_df.to_csv("../../data/pvt_df_train.csv")
-    train_df = pd.read_csv("../../data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    train_df.to_csv("../../../data/pvt_df_train.csv")
+    train_df = pd.read_csv("../../../data/pvt_df_train.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Create a dataset and dataloader
     training_dataset = TimeSeriesDataset(dataframe=train_df, sequence_length=sequence_length,
@@ -299,12 +299,12 @@ def test_model(X_cols, y_cols, params, sequence_length, seed, weights, time_repr
     embed_time = params["embed_time"]
 
     mean_stds = load_json('mTAN/mean_stds.json')
-    test_df, _ = load_df(df_path="../../data/test_set_noa_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
+    test_df, _ = load_df(df_path="../../../data/test_set_noa_classes.csv", pvt_cols=pvt_cols, parse_dates=["DATETIME"],
                          normalize=True,
                          stats=mean_stds, y_cols=y_cols)
 
-    test_df.to_csv("../../data/pvt_df_test.csv")
-    test_df = pd.read_csv("../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
+    test_df.to_csv("../../../data/pvt_df_test.csv")
+    test_df = pd.read_csv("../../../data/pvt_df_test.csv", parse_dates=['DATETIME'], index_col='DATETIME')
 
     # Loss
     criterion = MaskedCrossEntropyLoss_mTAN(sequence_length=sequence_length, weights=torch.tensor(weights).to(device))
