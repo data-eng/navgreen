@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -22,14 +25,14 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 5,
   "links": [],
   "liveNow": false,
   "panels": [
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -37,6 +40,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -48,6 +54,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -87,8 +94,8 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "Q_TANK_BUILD_COOL",
-                  "Q_TANK_BUILD_HEAT"
+                  "Q_HP_TANK_COOL",
+                  "Q_HP_TANK_HEAT_OFF"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -120,9 +127,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "right"
+          "placement": "right",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -131,7 +140,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_COND\" or r._field == \"WATER_OUT_COND\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_CON_HEAT:\n           if r.FOUR_WAY_VALVE == \"True\" then 4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.WATER_OUT_COND-r.WATER_IN_COND)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_CON_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_CON_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_CON_HEAT\"])",
@@ -140,7 +149,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_COND\" or r._field == \"WATER_OUT_COND\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_EVAP_COOL:\n           if r.FOUR_WAY_VALVE == \"False\" then 4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.WATER_IN_COND-r.WATER_OUT_COND)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_EVAP_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_EVAP_COOL\")\n   |> keep(columns: [\"_time\", \"Q_EVAP_COOL\"])   ",
@@ -149,7 +158,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_EVAP\" or r._field == \"WATER_OUT_EVAP\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_CON_COOL:\n           if r.AIR_COOLED_COMMAND == \"False\" and r.FOUR_WAY_VALVE == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.WATER_OUT_EVAP-r.WATER_IN_EVAP)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_CON_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_CON_COOL\")\n   |> keep(columns: [\"_time\", \"Q_CON_COOL\"])",
@@ -158,7 +167,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_EVAP\" or r._field == \"WATER_OUT_EVAP\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_EVAP_HEAT:\n           if r.AIR_COOLED_COMMAND == \"False\" and r.FOUR_WAY_VALVE == \"True\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.WATER_IN_EVAP-r.WATER_OUT_EVAP)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_EVAP_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_EVAP_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_EVAP_HEAT\"])  ",
@@ -167,7 +176,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"DHW_INLET\" or r._field == \"DHW_OUTLET\" or r._field == \"FLOW_DHW\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_DHW: 4.18*(998.0/3600.0*r.FLOW_DHW)*(r.DHW_OUTLET-r.DHW_INLET)\n   }))\n   |> keep(columns: [\"_time\", \"Q_DHW\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_DHW\")\n   |> keep(columns: [\"_time\", \"Q_DHW\"])\n",
@@ -176,7 +185,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH1_IN\" or r._field == \"SH1_RETURN\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_HP_TANK_COOL:\n           if r.FOUR_WAY_VALVE == \"False\" then 4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.SH1_RETURN-r.SH1_IN)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_HP_TANK_COOL\")\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_COOL\"])",
@@ -185,7 +194,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_COND\" or r._field == \"WATER_OUT_COND\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\", \"Residential_office_mode\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\", \"Residential_office_mode\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_HP_TANK_HEAT_OFF:\n           if r.THREE_WAY_COND_OPERATION == \"False\" and r.FOUR_WAY_VALVE == \"True\" and r.Residential_office_mode == \"True\" then 4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.WATER_OUT_COND-r.WATER_IN_COND)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_HEAT_OFF\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_HP_TANK_HEAT_OFF\")\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_HEAT_OFF\"]) ",
@@ -194,7 +203,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH1_IN\" or r._field == \"SH1_RETURN\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\", \"Residential_office_mode\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\", \"Residential_office_mode\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n      fn: (r) => ({r with Q_HP_TANK_HEAT_RES:\n         if r.THREE_WAY_COND_OPERATION == \"True\" and r.FOUR_WAY_VALVE == \"True\" and r.Residential_office_mode == \"False\" then 4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.SH1_IN-r.SH1_RETURN)\n         else 0.0 }),\n   )\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_HEAT_RES\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_HP_TANK_HEAT_RES\")\n   |> keep(columns: [\"_time\", \"Q_HP_TANK_HEAT_RES\"])  ",
@@ -203,7 +212,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "  from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_OUT\" or r._field == \"PVT_IN\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_PVT: (3.6014+0.004*(r.PVT_IN + r.PVT_OUT)/2.0 - 0.000002*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN + \n      r.PVT_OUT)/2.0-0.0018*((r.PVT_IN + r.PVT_OUT)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_OUT - r.PVT_IN)\n   }))\n   |> keep(columns: [\"_time\", \"Q_PVT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT\")\n   |> keep(columns: [\"_time\", \"Q_PVT\"])",
           "refId": "Q_PVT"
@@ -211,7 +220,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_SOLAR_BUFFER\" or r._field == \"PVT_OUT_FROM_SOLAR_BUFFER\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_SOLAR_BUFFER:\n           if r.THREE_WAY_SOLAR_OPERATION == \"False\" then (3.6014+0.004*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0 - 0.000002*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0-0.0018*((r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_SOLAR_BUFFER+r.PVT_OUT_FROM_SOLAR_BUFFER)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_SOLAR_BUFFER\" )\n   |> keep(columns: [\"_time\", \"Q_PVT_SOLAR_BUFFER\"])",
@@ -220,7 +229,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"PVT_IN_TO_DHW\" or r._field == \"PVT_OUT_FROM_DHW\" or r._field == \"FLOW_PVT\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"THREE_WAY_SOLAR_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"THREE_WAY_SOLAR_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_PVT_DHW:\n           if r.THREE_WAY_SOLAR_OPERATION == \"True\" then (3.6014+0.004*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 - 0.000002*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)*((1049.0- 0.475*(r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0 -0.0018*((r.PVT_IN_TO_DHW + r.PVT_OUT_FROM_DHW)/2.0)^2.0)/3600.0*r.FLOW_PVT)*(r.PVT_IN_TO_DHW - r.PVT_OUT_FROM_DHW)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_PVT_DHW\")\n   |> keep(columns: [\"_time\", \"Q_PVT_DHW\"])\n",
@@ -229,7 +238,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "   from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"WATER_IN_COND\" or r._field == \"WATER_OUT_COND\" or r._field == \"FLOW_CONDENSER\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_COND_OPERATION\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_HP_DHWtank:\n           if r.THREE_WAY_COND_OPERATION == \"False\" and r.FOUR_WAY_VALVE == \"True\" then (4.18*(998.0/3600.0*r.FLOW_CONDENSER)*(r.WATER_OUT_COND-r.WATER_IN_COND))\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_HP_DHWtank\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_HP_DHWtank\" )\n   |> keep(columns: [\"_time\", \"Q_HP_DHWtank\"])",
@@ -238,7 +247,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_COOL:\n           if r.THREE_WAY_EVAP_OPERATION == \"True\" and r.FOUR_WAY_VALVE == \"False\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_IN-r.BTES_TANK_OUT)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_COOL\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_COOL\"]) ",
@@ -247,7 +256,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"BTES_TANK_IN\" or r._field == \"BTES_TANK_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_BTES_HP_HEAT:\n           if r.THREE_WAY_EVAP_OPERATION == \"True\" and r.FOUR_WAY_VALVE == \"True\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.BTES_TANK_OUT-r.BTES_TANK_IN)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_BTES_HP_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_BTES_HP_HEAT\"])",
@@ -256,7 +265,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SOLAR_BUFFER_IN\" or r._field == \"SOLAR_BUFFER_OUT\" or r._field == \"FLOW_EVAPORATOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\", \"FOUR_WAY_VALVE\", \"THREE_WAY_EVAP_OPERATION\", \"AIR_COOLED_COMMAND\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(\n       fn: (r) => ({r with Q_SOLAR_BUFFER_HP:\n           if r.THREE_WAY_EVAP_OPERATION == \"False\" and r.FOUR_WAY_VALVE == \"True\" and r.AIR_COOLED_COMMAND == \"False\" then 4.18*(998.0/3600.0*r.FLOW_EVAPORATOR)*(r.SOLAR_BUFFER_OUT-r.SOLAR_BUFFER_IN)\n           else 0.0 }),\n    )\n   |> keep(columns: [\"_time\", \"Q_SOLAR_BUFFER_HP\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_SOLAR_BUFFER_HP\")\n   |> keep(columns: [\"_time\", \"Q_SOLAR_BUFFER_HP\"]) ",
@@ -265,7 +274,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_HEAT: \n      if r.SH_INLET > r.SH_RETURN then 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_INLET-r.SH_RETURN)\n      else 0.0 }),\n   )\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_HEAT\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_HEAT\"])",
@@ -274,7 +283,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
           "query": "from(bucket: \"mult_source_heatpump\")\n   |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n   |> filter(fn: (r) => r._measurement == \"temperature\" or r._measurement == \"flow\")\n   |> filter(fn: (r) => r._field == \"SH_INLET\" or r._field == \"SH_RETURN\" or r._field == \"FLOW_FAN_COILS_INDOOR\")\n   |> keep(columns: [\"_time\", \"_field\", \"_value\"])\n   |> group(columns: [\"_time\"], mode: \"by\")\n   |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n   |> map(fn: (r) => ({\n      r with Q_TANK_BUILD_COOL: \n      if r.SH_INLET <= r.SH_RETURN then 4.18*(998.0/3600.0*r.FLOW_FAN_COILS_INDOOR)*(r.SH_RETURN-r.SH_INLET)\n      else 0.0 }),\n   )\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])\n   |> group()\n   |> aggregateWindow(every: v.windowPeriod, fn: max, column: \"Q_TANK_BUILD_COOL\")\n   |> keep(columns: [\"_time\", \"Q_TANK_BUILD_COOL\"])",
@@ -287,7 +296,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "description": "",
       "fieldConfig": {
@@ -297,17 +306,86 @@
           },
           "custom": {
             "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
             "lineWidth": 0,
             "spanNulls": 300000
           },
           "mappings": [
             {
               "options": {
-                "GROUND_TANK": {
-                  "index": 0
+                "Air source_1": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "Air source"
                 },
-                "SOLAR_BUFFER": {
-                  "index": 1
+                "Cooling mode_0": {
+                  "color": "red",
+                  "index": 3,
+                  "text": "Cooling mode"
+                },
+                "DHW tank_0": {
+                  "color": "red",
+                  "index": 9,
+                  "text": "DHW tank"
+                },
+                "DHW tank_1": {
+                  "color": "green",
+                  "index": 12,
+                  "text": "DHW tank"
+                },
+                "Ground/BTES tank_1": {
+                  "color": "green",
+                  "index": 10,
+                  "text": "Ground/BTES tank"
+                },
+                "Heating mode_1": {
+                  "color": "green",
+                  "index": 2,
+                  "text": "Heating mode"
+                },
+                "Local control_0": {
+                  "color": "red",
+                  "index": 5,
+                  "text": "Local control"
+                },
+                "Modbus control_1": {
+                  "color": "green",
+                  "index": 4,
+                  "text": "Modbus control"
+                },
+                "Office mode_1": {
+                  "color": "green",
+                  "index": 6,
+                  "text": "Office mode"
+                },
+                "Residential mode_0": {
+                  "color": "red",
+                  "index": 7,
+                  "text": "Residential mode"
+                },
+                "Solar buffer tank_0": {
+                  "color": "red",
+                  "index": 11,
+                  "text": "Solar buffer tank"
+                },
+                "Space buffer tank Off_1": {
+                  "color": "green",
+                  "index": 8,
+                  "text": "Space buffer tank Off"
+                },
+                "Water source_0": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "Water source"
+                },
+                "none": {
+                  "color": "transparent",
+                  "index": 13
                 }
               },
               "type": "value"
@@ -340,13 +418,15 @@
       "options": {
         "alignValue": "center",
         "legend": {
-          "displayMode": "hidden",
-          "placement": "bottom"
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
         },
         "mergeValues": true,
         "rowHeight": 0.9,
         "showValue": "auto",
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -355,9 +435,9 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
-          "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"control\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: last)\n",
+          "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"control\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: last)\n    |> map(fn: (r) => ({\n      r with\n      _field: if r._field == \"Residential_office_mode\" then \"RESIDENTIAL_OFFICE_MODE\"\n              else r._field\n  }))\n  |> map(fn: (r) => ({\n      r with\n      _value: if r._field == \"AIR_COOLED_COMMAND\" and r._value == true then \"Air source_1\"\n              else if r._field == \"AIR_COOLED_COMMAND\" and r._value == false then \"Water source_0\"\n              else if r._field == \"FOUR_WAY_VALVE\" and r._value == true then \"Heating mode_1\"\n              else if r._field == \"FOUR_WAY_VALVE\" and r._value == false then \"Cooling mode_0\"\n\t      else if r._field == \"MODBUS_LOCAL\" and r._value == true then \"Modbus control_1\"\n              else if r._field == \"MODBUS_LOCAL\" and r._value == false then \"Local control_0\"\n              else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == true then \"Office mode_1\"\n              else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == false then \"Residential mode_0\"\n\t      else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == true then \"Space buffer tank Off_1\"\n              else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == false then \"DHW tank_0\"\n\t      else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == true then \"Ground/BTES tank_1\"\n              else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n\t      else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == true then \"DHW tank_1\"\n              else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n              else \"none\"\n  }))\n\n",
           "refId": "A"
         }
       ],
@@ -367,7 +447,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -375,6 +455,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -386,6 +469,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -431,9 +515,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -442,7 +528,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"power\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "A"
@@ -453,6 +539,10 @@
     },
     {
       "collapsed": false,
+      "datasource": {
+        "type": "datasource",
+        "uid": "grafana"
+      },
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -461,13 +551,21 @@
       },
       "id": 8,
       "panels": [],
-      "title": "Row title",
+      "targets": [
+        {
+          "datasource": {
+            "type": "datasource",
+            "uid": "grafana"
+          },
+          "refId": "A"
+        }
+      ],
       "type": "row"
     },
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -475,6 +573,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -486,6 +587,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -530,9 +632,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -541,7 +645,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"other\")\n    |> filter(fn: (r) => r._field == \"EEV_LOAD1\" or r._field ==  \"EEV_LOAD2\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "A"
@@ -553,7 +657,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -561,6 +665,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -572,6 +679,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -616,9 +724,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -627,7 +737,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"other\" and r._field == \"Compressor_HZ\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "A"
@@ -639,7 +749,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -647,6 +757,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -658,6 +771,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -703,9 +817,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -714,7 +830,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"solar\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "A"
@@ -726,7 +842,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "fieldConfig": {
         "defaults": {
@@ -734,6 +850,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -745,6 +864,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineStyle": {
               "fill": "solid"
@@ -793,9 +913,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -804,7 +926,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"flow\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "A"
@@ -816,7 +938,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "description": "",
       "fieldConfig": {
@@ -825,6 +947,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -836,6 +961,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -906,9 +1032,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "multi",
           "sort": "asc"
         }
@@ -918,7 +1046,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"pressure\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)",
           "refId": "PressureValues"
@@ -930,7 +1058,7 @@
     {
       "datasource": {
         "type": "influxdb",
-        "uid": "U9EYdpMIz"
+        "uid": "fdor9b88uamtca"
       },
       "description": "",
       "fieldConfig": {
@@ -939,6 +1067,9 @@
             "mode": "palette-classic"
           },
           "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
@@ -950,6 +1081,7 @@
               "tooltip": false,
               "viz": false
             },
+            "insertNulls": false,
             "lineInterpolation": "linear",
             "lineWidth": 1,
             "pointSize": 5,
@@ -990,7 +1122,8 @@
                 "mode": "exclude",
                 "names": [
                   "T_CHECKPOINT_SPACE_HEATING_MODBUS",
-                  "T_CHECKPOINT_DHW_MODBUS"
+                  "T_SETPOINT_DHW_MODBUS",
+                  "T_SETPOINT_SPACE_HEATING_MODBUS"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -1022,9 +1155,11 @@
         "legend": {
           "calcs": [],
           "displayMode": "list",
-          "placement": "bottom"
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -1033,7 +1168,7 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"temperature\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: mean)\n \n",
           "refId": "Τemperatures"
@@ -1041,11 +1176,11 @@
         {
           "datasource": {
             "type": "influxdb",
-            "uid": "U9EYdpMIz"
+            "uid": "fdor9b88uamtca"
           },
           "hide": false,
-          "query": "from(bucket: \"mult_source_heatpump\")\r\n|> range(start: -30d)\r\n|> filter(fn: (r) => r._measurement == \"checkpoints\")\r\n|> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\r\n|> aggregateWindow(every: 30s, fn: last)\r\n|> fill(column: \"_value\", usePrevious: true)\r\n|> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n|> aggregateWindow(every: v.windowPeriod, fn: last)",
-          "refId": "Checkpoints"
+          "query": "from(bucket: \"mult_source_heatpump\")\r\n|> range(start: -30d)\r\n|> filter(fn: (r) => r._measurement == \"checkpoints\")\r\n|> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\r\n|> aggregateWindow(every: 30s, fn: last)\r\n|> fill(column: \"_value\", usePrevious: true)\r\n|> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n|> aggregateWindow(every: v.windowPeriod, fn: last)\r\n|> map(fn: (r) => ({\r\n      r with\r\n      _field: if r._field == \"T_CHECKPOINT_DHW_MODBUS\" then \"T_SETPOINT_DHW_MODBUS\"\r\n              else if r._field == \"T_CHECKPOINT_SPACE_HEATING_MODBUS\" then \"T_SETPOINT_SPACE_HEATING_MODBUS\"\r\n              else r._field\r\n  }))\r\n",
+          "refId": "Setpoints"
         }
       ],
       "title": "Temperatures",
@@ -1053,8 +1188,7 @@
     }
   ],
   "refresh": false,
-  "schemaVersion": 35,
-  "style": "dark",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": []
@@ -1063,10 +1197,11 @@
     "from": "now-30m",
     "to": "now"
   },
+  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {},
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 213,
+  "version": 6,
   "weekStart": ""
 }
