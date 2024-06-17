@@ -318,6 +318,10 @@
           "mappings": [
             {
               "options": {
+                " ": {
+                  "color": "transparent",
+                  "index": 13
+                },
                 "Air source_1": {
                   "color": "green",
                   "index": 0,
@@ -382,10 +386,6 @@
                   "color": "red",
                   "index": 1,
                   "text": "Water source"
-                },
-                "none": {
-                  "color": "transparent",
-                  "index": 13
                 }
               },
               "type": "value"
@@ -437,7 +437,7 @@
             "type": "influxdb",
             "uid": "fdor9b88uamtca"
           },
-          "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"control\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> aggregateWindow(every: v.windowPeriod, fn: last)\n    |> map(fn: (r) => ({\n      r with\n      _field: if r._field == \"Residential_office_mode\" then \"RESIDENTIAL_OFFICE_MODE\"\n              else r._field\n  }))\n  |> map(fn: (r) => ({\n      r with\n      _value: if r._field == \"AIR_COOLED_COMMAND\" and r._value == true then \"Air source_1\"\n              else if r._field == \"AIR_COOLED_COMMAND\" and r._value == false then \"Water source_0\"\n              else if r._field == \"FOUR_WAY_VALVE\" and r._value == true then \"Heating mode_1\"\n              else if r._field == \"FOUR_WAY_VALVE\" and r._value == false then \"Cooling mode_0\"\n\t      else if r._field == \"MODBUS_LOCAL\" and r._value == true then \"Modbus control_1\"\n              else if r._field == \"MODBUS_LOCAL\" and r._value == false then \"Local control_0\"\n              else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == true then \"Office mode_1\"\n              else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == false then \"Residential mode_0\"\n\t      else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == true then \"Space buffer tank Off_1\"\n              else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == false then \"DHW tank_0\"\n\t      else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == true then \"Ground/BTES tank_1\"\n              else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n\t      else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == true then \"DHW tank_1\"\n              else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n              else \"none\"\n  }))\n\n",
+          "query": "from(bucket: \"mult_source_heatpump\")\n    |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n    |> filter(fn: (r) => r._measurement == \"control\")\n    |> keep( columns: [ \"id\", \"_field\", \"_value\", \"_time\"] )\n    |> map(fn: (r) => ({\n      r with\n      _field: if r._field == \"Residential_office_mode\" then \"RESIDENTIAL_OFFICE_MODE\"\n              else r._field\n    }))\n    |> map(fn: (r) => ({\n        r with\n        _value: if r._field == \"AIR_COOLED_COMMAND\" and r._value == true then \"Air source_1\"\n                else if r._field == \"AIR_COOLED_COMMAND\" and r._value == false then \"Water source_0\"\n                else if r._field == \"FOUR_WAY_VALVE\" and r._value == true then \"Heating mode_1\"\n                else if r._field == \"FOUR_WAY_VALVE\" and r._value == false then \"Cooling mode_0\"\n          else if r._field == \"MODBUS_LOCAL\" and r._value == true then \"Modbus control_1\"\n                else if r._field == \"MODBUS_LOCAL\" and r._value == false then \"Local control_0\"\n                else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == true then \"Office mode_1\"\n                else if r._field == \"RESIDENTIAL_OFFICE_MODE\" and r._value == false then \"Residential mode_0\"\n          else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == true then \"Space buffer tank Off_1\"\n                else if r._field == \"THREE_WAY_COND_OPERATION\" and r._value == false then \"DHW tank_0\"\n          else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == true then \"Ground/BTES tank_1\"\n                else if r._field == \"THREE_WAY_EVAP_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n          else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == true then \"DHW tank_1\"\n                else if r._field == \"THREE_WAY_SOLAR_OPERATION\" and r._value == false then \"Solar buffer tank_0\"\n                else \" \"\n    }))\n    |> aggregateWindow(every: v.windowPeriod, fn: last)\n    \n\n",
           "refId": "A"
         }
       ],
@@ -560,6 +560,7 @@
           "refId": "A"
         }
       ],
+      "title": "Row title",
       "type": "row"
     },
     {
@@ -609,8 +610,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -701,8 +701,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -793,8 +792,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -889,8 +887,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -983,8 +980,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1103,8 +1099,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1202,6 +1197,6 @@
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 6,
+  "version": 7,
   "weekStart": ""
 }
