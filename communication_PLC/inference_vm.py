@@ -3,6 +3,8 @@ import numpy as np
 from datetime import datetime
 import os
 
+from public_weather_installation.test import main_loop
+
 
 def read_csv(weather_path):
     """
@@ -42,6 +44,11 @@ def filter_weather(df, rename_columns, create_columns, columns):
     return df_filtered
 
 
+def model_predictions(input_data, model_pth):
+
+    main_loop(df=input_data, model_pth=model_pth)
+
+
 if __name__ == '__main__':
 
     weather_csv = read_csv(weather_path='../')
@@ -54,4 +61,7 @@ if __name__ == '__main__':
     weather_csv = filter_weather(df=weather_csv, columns=keep_columns,
                                  create_columns=create_columns, rename_columns=rename_columns)
 
-    print(weather_csv)
+    weather_csv['DATETIME'] = pd.to_datetime(weather_csv['DATETIME'])
+
+    model_predictions(weather_csv, 'public_weather_installation/transformer.pth')
+
