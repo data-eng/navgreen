@@ -5,11 +5,11 @@ from .loader import *
 
 import public_weather_installation.utils as utils
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = "cpu" # Only cpu on the vm
 
 
 def test(data, df, classes, model, mfn):
-    model.load_state_dict(torch.load(mfn))
+    model.load_state_dict(torch.load(mfn, map_location=torch.device('cpu')))
 
     model.to(device)
     model.eval()
@@ -36,7 +36,7 @@ def test(data, df, classes, model, mfn):
             f"predicted": pred_classes,
             f"probabilities": predicted_values_prob.tolist()}
 
-    filename = "./public_weather_installation/data/model_pred_data.csv"
+    filename = "./public_weather_installation/model_pred_data.csv"
     if os.path.exists(filename):
         utils.save_csv(data=data, filename=filename, append=True)
     else:

@@ -1,6 +1,7 @@
 import os
 import time
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
@@ -76,11 +77,20 @@ def write_to_influxdb(qpvt_predictions):
 
     reconnect_interval = 30
 
+    qpvt_predictions = pd.DataFrame(qpvt_predictions)
+    # Convert DATETIME to a format suitable for InfluxDB
+    qpvt_predictions['DATETIME'] = pd.to_datetime(qpvt_predictions['DATETIME']) - timedelta(days=1)
+    qpvt_predictions['DATETIME'] = qpvt_predictions['DATETIME'].dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Same with probabilities
+    qpvt_predictions['probabilities'] = qpvt_predictions['probabilities'].apply(json.dumps)
+
     while True:
         try:
             # Try and write data to InfluxDB
             for idx in range(qpvt_predictions.shape[0]):
                 write_data(qpvt_predictions.iloc[idx], influx_client)
+
+            break
 
         except Exception as e:
             logger.error(f"Failed to write to InfluxDB: {str(e)}")
@@ -88,6 +98,8 @@ def write_to_influxdb(qpvt_predictions):
             logger.info(f"Sleeping for {reconnect_interval} seconds..")
             time.sleep(reconnect_interval)
             continue
+
+    logger.info("Written to InfluxDB!")
 
 
 if __name__ == '__main__':
