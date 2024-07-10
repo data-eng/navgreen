@@ -36,14 +36,13 @@ def test(data, df, classes, model, mfn):
             f"predicted": pred_classes,
             f"probabilities": predicted_values_prob.tolist()}
 
-    filename = "./public_weather_installation/data.csv"
+    filename = "./public_weather_installation/data/model_pred_data.csv"
     if os.path.exists(filename):
         utils.save_csv(data=data, filename=filename, append=True)
     else:
         utils.save_csv(data=data, filename=filename)
 
-
-    return
+    return data
 
 
 def main_loop(df, model_pth):
@@ -64,5 +63,5 @@ def main_loop(df, model_pth):
                         dim_feedforward=2048,
                         dropout=0)
 
-    test(data=dl_test, df=df_prep, classes=classes, model=model, mfn=model_pth)
+    return test(data=dl_test, df=df_prep, classes=classes, model=model, mfn=model_pth)
 
