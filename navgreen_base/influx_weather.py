@@ -66,7 +66,7 @@ def write_data(row, influx_client):
     api.write(bucket=bucket, org=organization, record=p)
 
 
-def read_data(influx_client):
+def read_data(influx_client, start=0):
     """
     Reads data from a specified bucket and stores it in a DataFrame.
     The bucket that will be used should be set using `set_bucket`
@@ -79,7 +79,7 @@ def read_data(influx_client):
     warnings.simplefilter("ignore", MissingPivotFunction)
 
     api = influx_client.query_api()
-    query = f'from(bucket: "{bucket}") |> range(start: 0)'
+    query = f'from(bucket: "{bucket}") |> range(start: {start})'
     data = api.query_data_frame(org=organization, query=query)
 
     if isinstance(data, pd.DataFrame):
