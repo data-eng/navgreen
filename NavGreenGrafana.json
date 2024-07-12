@@ -380,7 +380,7 @@
                 "Space buffer tank Off_1": {
                   "color": "green",
                   "index": 8,
-                  "text": "Space buffer tank Off"
+                  "text": "Space buffer tank"
                 },
                 "Water source_0": {
                   "color": "red",
@@ -1197,6 +1197,6 @@
   "timezone": "",
   "title": "NavGreen",
   "uid": "WLcvOpGIz",
-  "version": 7,
+  "version": 9,
   "weekStart": ""
 }
