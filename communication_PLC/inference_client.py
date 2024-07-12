@@ -2,10 +2,10 @@ import time
 import os
 import struct
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
 
-from navgreen_base import delete_data, read_data, set_bucket, establish_influxdb_connection
+from navgreen_base import delete_data_weather, read_data_weather, set_bucket_weather, establish_influxdb_connection_weather
 
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(lineno)d:%(message)s')
 # Set log file, its level and format
-file_handler = logging.FileHandler('./remote_control_logger.log')
+file_handler = logging.FileHandler('./remote_control_logger_weather.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 # Set stream its level and format
@@ -32,43 +32,45 @@ def get_predictions():
     """
 
     # InfluxDB requirements
-    influx_client = establish_influxdb_connection()
-    bucket = set_bucket("test_bucket")
+    influx_client = establish_influxdb_connection_weather()
+    bucket = set_bucket_weather("model_predictions")
 
     # Get the predicted Q_PVT by querying the test bucket
     df = None
     while True:
         try:
             logger.info(f"Reading from {bucket}... (last 2 days)")
-            df = read_data(influx_client, start="-2d")
+            df = read_data_weather(influx_client, start="-2d")
             logger.info("DONE.")
             break
         except Exception as e:
             logger.info("Reading from InfluxDB failed")
             logger.info(e)
+            logger.info(f"Sleeping for {reconnect_interval} seconds and retrying...")
+            time.sleep(reconnect_interval)
             continue
-
-    print(df)
 
     assert isinstance(df, pd.DataFrame), "Object is not a pandas DataFrame"
 
     # Get the last 8 rows (8 x 3 hrs)
     df_predictions_today = df.tail(8).reset_index()
-    df_predictions_today['ACCESS_DATETIME'] = pd.to_datetime(df_predictions_today['ACCESS_DATETIME'],
-                                                             format='%d/%m/%Y %H:%M:%S')
+    # In influxDB the dates are stored as a day prior
+    df_predictions_today['DATETIME'] = pd.to_datetime(df_predictions_today['DATETIME'], format='%d/%m/%Y %H:%M:%S') + timedelta(days=1)
 
     # Check if the values were actually accessed the same day as this script is run
-    if not all(df_predictions_today['ACCESS_DATETIME'].dt.date == datetime.now().date()):
+    if not (any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()) and any(df_predictions_today['DATETIME'].dt.date == (datetime.now()+ timedelta(days=1)).date())):
         raise ValueError("Today's weather predictions do not exist.")
 
     '''
     # Wipe clean the test bucket
     logger.info(f"Emptying {bucket}... ")
-    delete_data(influx_client)
+    delete_data_weather(influx_client)
     logger.info("DONE.")
     '''
 
-    return df
+    df_predictions_today.drop(columns=['index'], inplace=True)
+    
+    return df_predictions_today
 
 
 def read_reg_value(register, index, divisor):
@@ -103,13 +105,9 @@ def write_reg_value(client, register, value, multiplier):
 
 if __name__ == "__main__":
 
-    # IP and port of server for communication
-    server_host = os.environ.get('Server_ip_navgreen_control')
-    server_port = int(os.environ.get('Server_port_navgreen_control'))
-
-    # PLC IP address, port and connection intervals
-    plc_ip = os.environ.get('Plc_ip')
-    plc_port = 502
+    '''# PLC IP address, port and connection intervals
+                plc_ip = os.environ.get('Plc_ip')
+                plc_port = 502'''
     reconnect_interval = 30  # Seconds
     PLC_connect_interval = 5 * 60
 
@@ -123,7 +121,8 @@ if __name__ == "__main__":
                 # Read QPVT from server and do something with it
                 _ = get_predictions()
                 qpvt = 1
-
+                break
+                '''
                 # THIS IS WRONG, JUST ARCHITECTURAL STUFF
                 setpoint_DHW = 9 if qpvt == 15 else 16
 
@@ -286,13 +285,14 @@ if __name__ == "__main__":
 
                 # PLC must write no sooner than 5 minutes
                 time.sleep(5 * 60)
-
+            '''
             except Exception as e:
                 # Server refuses connection or no internet. The first case might occur often, so FOR noe, we do not
                 # include it to the file logger
                 logger.debug(f"{e}")
                 logger.debug(f"Sleeping for {PLC_connect_interval} seconds..")
                 time.sleep(PLC_connect_interval)
+                break
 
     except KeyboardInterrupt: # Ctrl ^C event
         logger.info("Client ends process.")

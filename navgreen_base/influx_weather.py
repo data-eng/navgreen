@@ -21,7 +21,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 # Import organisation
-organization = os.environ.get('Organization_influx_db')
+organization = os.environ.get('Organization_influx')
 # Bucket must be defined from the user using function 'set_bucket'
 bucket = None
 
@@ -31,11 +31,18 @@ def set_bucket(b):
     bucket = b
     return bucket
 
+# Establish connection with InfluxDb
+def establish_influxdb_connection():
+    # Import credentials
+    url = os.environ.get('Url_influx_db')
+    auth_token = os.environ.get('Auth_token')
+
+    return influxdb_client.InfluxDBClient(url=url, token=auth_token, org=organization)
+
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
     p.time(row["DATETIME"])
     
-    print(row["DATETIME"])
     # Tag with the state of the valves, as context
     for col in tag_columns:
         p.tag(col, row[col])
@@ -44,14 +51,6 @@ def make_point(measurement, row, value_columns, tag_columns):
         p.field(col, row[col])
 
     return p
-
-# Establish connection with InfluxDb
-def establish_influxdb_connection():
-    # Import credentials
-    url = os.environ.get('Url_influx_db')
-    auth_token = os.environ.get('Auth_token')
-
-    return influxdb_client.InfluxDBClient(url=url, token=auth_token, org=organization)
 
 def write_data(row, influx_client):
     """
@@ -77,7 +76,6 @@ def read_data(influx_client, start=0):
     # Supress warning about not having used pivot function
     # to optimize processing by pandas
     warnings.simplefilter("ignore", MissingPivotFunction)
-
     api = influx_client.query_api()
     query = f'from(bucket: "{bucket}") |> range(start: {start})'
     data = api.query_data_frame(org=organization, query=query)
@@ -100,10 +98,11 @@ def read_data(influx_client, start=0):
 
             dfs += [df]
 
-        df1, df2 = dfs[0], dfs[1]
-        df = pd.concat([df1, df2], axis=1, join='outer', sort=False)
-        df = df.rename(columns={'_time': 'DATETIME'})
-        df = df.loc[:, ~df.columns.duplicated(keep='first')]
+        df= dfs[0]
+        for dft in dfs[1:]:
+            df = pd.concat([dft, df], axis=1, join='outer', sort=False)
+            df = df.rename(columns={'_time': 'DATETIME'})
+            df = df.loc[:, ~df.columns.duplicated(keep='first')]
 
     return df
 
