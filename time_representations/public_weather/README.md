@@ -52,4 +52,4 @@ To train the different models for different seeds, run the script: `hist_data_an
 
 To evaluate the models, run the script: `hist_data_analysis/eval_ml_models.py`.
 
-Please note that the data should be stored in a parent folder called `/data`.
+Please note that you must maintain the directory structure of the tarball.
