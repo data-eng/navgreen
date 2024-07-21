@@ -42,8 +42,8 @@ def load_data(print_stats=False):
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
     """
-    df = pd.read_csv("data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], low_memory=False)
-    df = navgreen_base.process_data(df, hist_data=True)
+    df = pd.read_csv("data/DATA_FROM_PLC_CONV.csv", parse_dates=["DATETIME"], low_memory=False)
+    df = navgreen_base.process_data(df)
 
     logger.info("All data: {} rows".format(len(df)))
     df = df[(df['DATETIME'] > '2022-08-31') & (df['DATETIME'] < '2023-09-01')]
