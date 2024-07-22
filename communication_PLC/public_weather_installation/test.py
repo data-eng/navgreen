@@ -36,7 +36,7 @@ def test(data, df, classes, model, mfn):
             f"predicted": pred_classes,
             f"probabilities": predicted_values_prob.tolist()}
 
-    filename = "./public_weather_installation/model_pred_data.csv"
+    filename = "weather_predictions/communication_PLC/public_weather_installation/model_pred_data.csv"
     if os.path.exists(filename):
         utils.save_csv(data=data, filename=filename, append=True)
     else:

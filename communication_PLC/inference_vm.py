@@ -46,9 +46,11 @@ def read_csv(weather_path):
     df_predictions_today['ACCESS_DATETIME'] = pd.to_datetime(df_predictions_today['ACCESS_DATETIME'],
                                                              format='%d/%m/%Y %H:%M:%S')
 
+    df_predictions_today['FORECAST_DATETIME'] = pd.to_datetime(df_predictions_today['FORECAST_DATETIME'])
+
     # Check if the values were actually accessed the same day as this script is run
-    if not all(df_predictions_today['ACCESS_DATETIME'].dt.date == current_date.date()):
-        raise ValueError("Today's weather predictions do not exist.")
+    #if not all(df_predictions_today['ACCESS_DATETIME'].dt.date == current_date.date()):
+    #    raise ValueError("Today's weather predictions do not exist.")
 
     return df_predictions_today
 
@@ -69,7 +71,7 @@ def model_predictions(input_data, model_pth):
     return main_loop(df=input_data, model_pth=model_pth)
 
 
-def write_to_influxdb(qpvt_predictions):
+def write_to_influxdb(qpvt_predictions, forecast_datetime):
     # Establish connection with InfluxDb
     influx_client = establish_influxdb_connection()
     # Set the bucket
@@ -79,9 +81,11 @@ def write_to_influxdb(qpvt_predictions):
 
     qpvt_predictions = pd.DataFrame(qpvt_predictions)
     # Convert DATETIME to a format suitable for InfluxDB
-    qpvt_predictions['DATETIME'] = pd.to_datetime(qpvt_predictions['DATETIME']) - timedelta(days=1)
+    # qpvt_predictions['DATETIME'] = pd.to_datetime(qpvt_predictions['DATETIME']) - timedelta(days=1)
     qpvt_predictions['DATETIME'] = qpvt_predictions['DATETIME'].dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+    qpvt_predictions['FORECAST_DATETIME'] = forecast_datetime.dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     # Same with probabilities
+    print(qpvt_predictions)
     qpvt_predictions['probabilities'] = qpvt_predictions['probabilities'].apply(json.dumps)
 
     while True:
@@ -104,9 +108,9 @@ def write_to_influxdb(qpvt_predictions):
 
 if __name__ == '__main__':
 
-    weather_csv = read_csv(weather_path='../data/')
+    weather_csv = read_csv(weather_path='./weather_predictions/data/')
     # THE COLUMNS ARE DEFINITELY WRONG, WE ARE JUST CONSTRUCTING THE ARCHITECTURE OF THE PIPELINE
-    rename_columns = {'FORECAST_DATETIME': 'DATETIME', 'TEMPERATURE': 'temp', 'HUMIDITY': 'humidity',
+    rename_columns = {'FORECAST_DATETIME': 'FORECAST_DATETIME', 'ACCESS_DATETIME' : 'DATETIME', 'TEMPERATURE': 'temp', 'HUMIDITY': 'humidity',
                       'WIND_SPEED': 'wind_speed'}
     create_columns = ['pressure', 'feels_like', 'rain_1h']
     keep_columns = [rename_columns[key] for key in rename_columns] + create_columns
@@ -116,9 +120,11 @@ if __name__ == '__main__':
                                  create_columns=create_columns, rename_columns=rename_columns)
 
     weather_csv['DATETIME'] = pd.to_datetime(weather_csv['DATETIME'])
+    weather_csv['FORECAST_DATETIME'] = pd.to_datetime(weather_csv['FORECAST_DATETIME'])
+    # print(weather_csv['FORECAST_DATETIME'])
 
     # Feed forward the weather to obtain the 3hr-Q_PVT predictions
-    predictions = model_predictions(weather_csv, 'public_weather_installation/transformer.pth')
+    predictions = model_predictions(weather_csv, 'weather_predictions/communication_PLC/public_weather_installation/transformer.pth')
 
     # Write the predictions to InfluxDB
-    write_to_influxdb(qpvt_predictions=predictions)
+    write_to_influxdb(qpvt_predictions=predictions, forecast_datetime=weather_csv['FORECAST_DATETIME'])

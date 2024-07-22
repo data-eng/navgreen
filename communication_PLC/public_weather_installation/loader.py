@@ -35,10 +35,10 @@ def load(df, normalize=True):
         df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
         df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
 
-    stats = utils.load_json(filename='public_weather_installation/stats.json')
+    stats = utils.load_json(filename='weather_predictions/communication_PLC/public_weather_installation/stats.json')
 
     if normalize:
-        df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
+        df = utils.normalize(df, stats, exclude=['DATETIME', 'FORECAST_DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR'])
 
     # nan_counts = df.isna().sum() / len(df) * 100
@@ -55,7 +55,7 @@ def prepare(df, phase):
     :param phase: str model phase (train or test)
     :return: dataframe
     """
-    name = "public_weather_installation/" + "df_" + phase + ".csv"
+    name = "./weather_predictions/communication_PLC/public_weather_installation/" + "df_" + phase + ".csv"
 
     for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 

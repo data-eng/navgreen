@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import os
 import logging
+import sys
 
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -8,6 +10,7 @@ import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
 weather_columns = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "predicted", "probabilities"]
+forecast_datetime = ["FORECAST_DATETIME"]
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -21,7 +24,7 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 # Import organisation
-organization = os.environ.get('Organization_influx')
+organization = os.environ.get('Organization_influx_db')
 # Bucket must be defined from the user using function 'set_bucket'
 bucket = None
 
@@ -31,18 +34,11 @@ def set_bucket(b):
     bucket = b
     return bucket
 
-# Establish connection with InfluxDb
-def establish_influxdb_connection():
-    # Import credentials
-    url = os.environ.get('Url_influx_db')
-    auth_token = os.environ.get('Auth_token')
-
-    return influxdb_client.InfluxDBClient(url=url, token=auth_token, org=organization)
-
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
     p.time(row["DATETIME"])
     
+    #print(row["DATETIME"])
     # Tag with the state of the valves, as context
     for col in tag_columns:
         p.tag(col, row[col])
@@ -51,6 +47,14 @@ def make_point(measurement, row, value_columns, tag_columns):
         p.field(col, row[col])
 
     return p
+
+# Establish connection with InfluxDb
+def establish_influxdb_connection():
+    # Import credentials
+    url = os.environ.get('Url_influx_db')
+    auth_token = os.environ.get('Auth_token')
+
+    return influxdb_client.InfluxDBClient(url=url, token=auth_token, org=organization)
 
 def write_data(row, influx_client):
     """
@@ -61,11 +65,11 @@ def write_data(row, influx_client):
     """
     api = influx_client.write_api(write_options=SYNCHRONOUS)
 
-    p = make_point("weather", row, weather_columns, [])
+    p = make_point("weather", row, weather_columns, forecast_datetime)
     api.write(bucket=bucket, org=organization, record=p)
 
 
-def read_data(influx_client, start=0):
+def read_data(influx_client):
     """
     Reads data from a specified bucket and stores it in a DataFrame.
     The bucket that will be used should be set using `set_bucket`
@@ -76,8 +80,9 @@ def read_data(influx_client, start=0):
     # Supress warning about not having used pivot function
     # to optimize processing by pandas
     warnings.simplefilter("ignore", MissingPivotFunction)
+
     api = influx_client.query_api()
-    query = f'from(bucket: "{bucket}") |> range(start: {start})'
+    query = f'from(bucket: "{bucket}") |> range(start: 0)'
     data = api.query_data_frame(org=organization, query=query)
 
     if isinstance(data, pd.DataFrame):
@@ -98,11 +103,10 @@ def read_data(influx_client, start=0):
 
             dfs += [df]
 
-        df= dfs[0]
-        for dft in dfs[1:]:
-            df = pd.concat([dft, df], axis=1, join='outer', sort=False)
-            df = df.rename(columns={'_time': 'DATETIME'})
-            df = df.loc[:, ~df.columns.duplicated(keep='first')]
+        df1, df2 = dfs[0], dfs[1]
+        df = pd.concat([df1, df2], axis=1, join='outer', sort=False)
+        df = df.rename(columns={'_time': 'DATETIME'})
+        df = df.loc[:, ~df.columns.duplicated(keep='first')]
 
     return df
 
