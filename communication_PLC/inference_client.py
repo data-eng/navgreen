@@ -54,8 +54,6 @@ def get_predictions():
 
     # Get the last 8 rows (8 x 3 hrs)
     df_predictions_today = df.tail(8).reset_index()
-    # In influxDB the dates are stored as a day prior
-    df_predictions_today['DATETIME'] = pd.to_datetime(df_predictions_today['DATETIME'], format='%d/%m/%Y %H:%M:%S') + timedelta(days=1)
 
     # Check if the values were actually accessed the same day as this script is run
     if not (any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()) and any(df_predictions_today['DATETIME'].dt.date == (datetime.now()+ timedelta(days=1)).date())):
