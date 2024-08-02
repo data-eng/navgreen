@@ -5,7 +5,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
 
-from navgreen_base import delete_data_weather, read_data_weather, set_bucket_weather, establish_influxdb_connection_weather
+from navgreen_base import delete_data_weather, read_data_weather, set_bucket_weather, \
+    establish_influxdb_connection_weather
 
 import logging
 
@@ -56,7 +57,8 @@ def get_predictions():
     df_predictions_today = df.tail(8).reset_index()
 
     # Check if the values were actually accessed the same day as this script is run
-    if not (any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()) and any(df_predictions_today['DATETIME'].dt.date == (datetime.now()+ timedelta(days=1)).date())):
+    if not (any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()) and any(
+            df_predictions_today['DATETIME'].dt.date == (datetime.now() + timedelta(days=1)).date())):
         raise ValueError("Today's weather predictions do not exist.")
 
     '''
@@ -67,7 +69,7 @@ def get_predictions():
     '''
 
     df_predictions_today.drop(columns=['index'], inplace=True)
-    
+
     return df_predictions_today
 
 
@@ -118,6 +120,7 @@ if __name__ == "__main__":
             try:
                 # Read QPVT from server and do something with it
                 _ = get_predictions()
+
                 qpvt = 1
                 break
                 '''
@@ -292,5 +295,5 @@ if __name__ == "__main__":
                 time.sleep(PLC_connect_interval)
                 break
 
-    except KeyboardInterrupt: # Ctrl ^C event
+    except KeyboardInterrupt:  # Ctrl ^C event
         logger.info("Client ends process.")
