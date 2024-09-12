@@ -292,7 +292,7 @@ if __name__ == "__main__":
                     # Process columns and outliers of measurements
                     temp_df = pd.DataFrame(columns=new_row_with_time.keys())
                     temp_df.loc[0] = new_row_with_time
-                    write_row = process_data(temp_df, hist_data=False)
+                    write_row = process_data(temp_df)
                     write_row = write_row.iloc[0].to_dict()
 
                     csv_file = f'C:/Users/res4b/Desktop/modbus_tcp_ip/data/data_from_plc_{dataframe_date}.csv'
