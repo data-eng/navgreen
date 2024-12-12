@@ -3,3 +3,4 @@ from navgreen_base.processing import columns, numerical_columns, flow, power, so
 from navgreen_base.value_alarms import main as value_alarms
 from navgreen_base.weather import main as weather
 from navgreen_base.weather import weather_parser_lp, create_weather_dataframe
+from navgreen_base.meteo_processing import create_weather_dataframe, process_weather_df
