@@ -83,4 +83,10 @@ def create_weather_dataframe():
 def process_weather_df(df, drop_columns):
     df = df.drop(drop_columns, axis=1)
 
+    df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+
+    df.set_index('DATETIME', inplace=True)
+    df = df.resample('3h').mean()
+    df = df.reset_index()
+
     return df
