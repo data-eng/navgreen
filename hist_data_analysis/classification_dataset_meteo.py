@@ -1,7 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-import datetime
 import logging
 
 from navgreen_base import process_weather_df, create_weather_dataframe
@@ -172,11 +171,11 @@ def combine_dataframes(weather_df, data_df, out_filename):
         logger.info(f"Combined DataFrame: {len(df)} rows")
         df = df.reset_index()
 
-        # Show the remaining values after removing NaN rows
-        df.dropna(inplace=True)
-        logger.info(f"Combined DataFrame after removing NaNs: {len(df)} rows")
-
         df.to_csv(out_filename, index=False)
+
+        # Show the remaining values after removing NaN rows
+        # df.dropna(inplace=True)
+        logger.info(f"Combined DataFrame after removing NaNs: {len(df.dropna())} rows")
 
     return df
 
