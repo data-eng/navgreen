@@ -17,7 +17,6 @@ logger.addHandler(stream_handler)
 params = {
     "X": ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
-    # "y": ["binned_Q_PVT"],
     "ignore": [] 
 }
 
@@ -85,7 +84,7 @@ def prepare(df, phase):
     :param phase: str model phase (train or test)
     :return: dataframe
     """
-    name =  "transformer/" + "df_" + phase + ".csv"
+    name = "transformer/" + "df_" + phase + ".csv"
 
     for column, threshold in params["ignore"]:
         df = utils.filter(df, column=column, threshold=threshold) 
@@ -98,7 +97,7 @@ def prepare(df, phase):
 
 
 class TSDataset(Dataset):
-    def __init__(self, df, seq_len, X, t, y, per_day=False):
+    def __init__(self, df, seq_len, X, t, y, per_day=False, tune=False):
         """
         Initializes a time series dataset.
 
@@ -114,6 +113,9 @@ class TSDataset(Dataset):
 
         y_nan = df[y].isna().any(axis=1)
         df.loc[y_nan, :] = float('nan')
+
+        if tune:
+            X = ['HUMIDITY', 'WIND_DIRECTION', 'TEMPERATURE', 'TEMPERATURE', 'WIND_SPEED', 'SKY']
 
         self.X = pd.concat([df[X], df[t]], axis=1)
         self.y = df[y]
