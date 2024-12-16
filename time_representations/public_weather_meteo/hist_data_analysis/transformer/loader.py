@@ -50,28 +50,23 @@ def load(path, parse_dates, bin, normalize=True):
         df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
         df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
 
-    if os.path.exists('transformer/stats.json'):
-        stats = utils.load_json(filename='transformer/stats.json')
+    if os.path.exists('transformer/stats_new.json'):
+        stats_new = utils.load_json(filename='transformer/stats_new.json')
     else:
-        stats = utils.get_stats(df, path='transformer/')
+        stats_new = utils.get_stats(df, path='transformer/', name='stats_new.json')
 
-    occs = df[bin].value_counts().to_dict()
-    freqs = {int(key): value / sum(occs.values()) for key, value in occs.items()}
-    utils.save_json(data=freqs, filename=f'transformer/freqs_{bin}.json')
+    # For the values that are identical within the two datasets, use the old statistics
+    stats_init = utils.load_json(filename='transformer/stats.json')
+    stats = stats_new.copy()
+    stats['TEMPERATURE'] = stats_init['temp']
+    stats['HUMIDITY'] = stats_init['humidity']
+    stats['WIND_SPEED'] = stats_init['wind_speed']
 
-    inverse_occs = {int(key): 1 / value for key, value in occs.items()}
-    weights = {key: value / sum(inverse_occs.values()) for key, value in inverse_occs.items()}
-    
-    if not os.path.exists(f'transformer/weights_{bin}.json'):
-        utils.save_json(data=weights, filename=f'transformer/weights_{bin}.json')
-    # else: print("Weights file already exists. Skipping saving!")
+    # In this loader we will not save any weights, we use the ones from the initial dataset
 
     if normalize:
-        df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
+        df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY',
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR', bin])
-
-    '''nan_counts = df.isna().sum() / len(df) * 100
-    logger.info("NaN counts for columns in X: %s", nan_counts)'''
 
     return df
 

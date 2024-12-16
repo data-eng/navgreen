@@ -24,7 +24,6 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
     num_classes = len(classes)
     optimizer = utils.get_optim(optimizer, model, lr)
     scheduler = utils.get_sched(*scheduler, optimizer)
-    torch.manual_seed(seed)
 
     best_val_loss = float('inf')
     ylabel = y[0]
@@ -167,9 +166,11 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
 
 def main_loop(seed, y_col):
+    utils.set_seed(seed)
+
     path = "../../../data/train_classif_meteo.csv"
     seq_len = 24 // 3
-    batch_size = 1
+    batch_size = 8
     classes = ["0", "1", "2", "3", "4"]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])

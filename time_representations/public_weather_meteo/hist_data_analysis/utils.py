@@ -13,7 +13,28 @@ import os
 import json
 import math
 from collections import namedtuple
+import random
 
+
+def set_seed(seed):
+    """
+    Function that initializes all seeds in the program
+    :param seed: seed integer
+    """
+    # Set the seed for generating random numbers in Python
+    random.seed(seed)
+    # Set the seed for generating random numbers in NumPy
+    np.random.seed(seed)
+    # Set the seed for generating random numbers in PyTorch (CPU)
+    torch.manual_seed(seed)
+    # If you are using GPUs, set the seed for generating random numbers on all GPUs
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+    # Ensure that all operations on GPU are deterministic (if possible)
+    torch.backends.cudnn.deterministic = True
+    # Disable the inbuilt cudnn auto-tuner that finds the best algorithm to use for your hardware
+    torch.backends.cudnn.benchmark = False
 
 class CrossEntropyLoss(nn.Module):
     """
@@ -261,7 +282,7 @@ def get_prfs(true, pred, avg=['micro', 'macro', 'weighted'], include_support=Fal
     prfs = {}
 
     for method in avg:
-        precision, recall, fscore, support = precision_recall_fscore_support(true, pred, average=method)
+        precision, recall, fscore, support = precision_recall_fscore_support(true, pred, average=method, zero_division=0)
 
         prfs[f'precision_{method}'] = precision
         prfs[f'recall_{method}'] = recall
@@ -387,7 +408,7 @@ def normalize(df, stats, exclude=[]):
     return newdf
 
 
-def get_stats(df, path='data/'):
+def get_stats(df, path='data/', name=None):
     """
     Compute mean and standard deviation for each column in the dataframe.
 
@@ -404,7 +425,10 @@ def get_stats(df, path='data/'):
             std = series.std()
             stats[col] = (mean, std)
 
-    filename = os.path.join(path, 'stats.json')
+    if name == None:
+        filename = os.path.join(path, 'stats.json')
+    else:
+        filename = os.path.join(path, name)
     save_json(data=stats, filename=filename)
 
     return stats

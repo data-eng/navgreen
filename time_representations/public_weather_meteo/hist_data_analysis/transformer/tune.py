@@ -1,9 +1,12 @@
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 import matplotlib.pyplot as plt
 import utils
 
 from .model import Transformer
 from .loader import *
+
+from .loader_init import load as load_init
+from .loader_init import prepare as prepare_init
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -23,14 +26,14 @@ logger.info(f'Device is {device}')
 params_init = {"X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]}
 
 
-def train(data, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y, visualize=False):
+def train(data, data_combined, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y,
+          whole_dataset_epoch, visualize=False):
     model.to(device)
-    train_data, val_data = data
-    batches = len(train_data)
+    train_data_new, val_data_new = data
+    train_data_combined, val_data_combined = data_combined
     num_classes = len(classes)
     optimizer = utils.get_optim(optimizer, model, lr)
     scheduler = utils.get_sched(*scheduler, optimizer)
-    torch.manual_seed(seed)
 
     best_val_loss = float('inf')
     ylabel = y[0]
@@ -54,7 +57,16 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
     logger.info(f"\nTraining with seed {seed} just started...")
 
+    train_data = train_data_new
+    val_data = val_data_new
+
     for epoch in range(epochs):
+
+        # At some point continue training with the whole dataset to avoid catastrophic forgetting
+        if epoch == whole_dataset_epoch:
+            train_data = train_data_combined
+            val_data = val_data_combined
+
         model.train()
         total_train_loss = 0.0
         true_values, pred_values = [], []
@@ -82,7 +94,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
             true_values.append(y.cpu().numpy())
             pred_values.append(y_pred.detach().cpu().numpy())
 
-        avg_train_loss = total_train_loss / batches
+        avg_train_loss = total_train_loss / len(train_data)
         train_losses.append(avg_train_loss)
 
         model.eval()
@@ -104,7 +116,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                 val_loss = criterion(pred=y_pred, true=y)
                 total_val_loss += val_loss.item()
 
-        avg_val_loss = total_val_loss / batches
+        avg_val_loss = total_val_loss / len(val_data)
         val_losses.append(avg_val_loss)
 
         true_values = np.concatenate(true_values)
@@ -173,21 +185,36 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
 
 def main_loop(seed, y_col):
+    utils.set_seed(seed)
+
     path = "../../../data/train_classif_meteo.csv"
+    path_init = "../../../data/training_set_classif_new_classes.csv"
+
     seq_len = 24 // 3
-    batch_size = 1
+    batch_size = 8
     classes = ["0", "1", "2", "3", "4"]
 
+    df_init = load_init(path=path_init, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
     df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
+    df_prep_init = prepare_init(df_init, phase="train")
     df_prep = prepare(df, phase="train")
 
+    # Weights of outcome classes come from the initial data!
     weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
     ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col, tune=True)
+    ds_init = TSDataset(df=df_prep_init, seq_len=seq_len, X=params_init["X"], t=params["t"], y=y_col, tune=False)
+
+    ds_combined = ConcatDataset([ds, ds_init])
+
     ds_train, ds_val = split(ds, vperc=0.2)
+    ds_train_combined, ds_val_combined = split(ds_combined, vperc=0.2)
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
+
+    dl_train_combined = DataLoader(ds_train_combined, batch_size, shuffle=True)
+    dl_val_combined = DataLoader(ds_val_combined, batch_size, shuffle=False)
 
     model = Transformer(in_size=len(params_init["X"])+len(params["t"]),
                         out_size=len(classes),
@@ -208,15 +235,19 @@ def main_loop(seed, y_col):
 
     model.load_state_dict(torch.load(trained_model_pth))
 
+    epoch_num = 600
+
     _, _ = train(data=(dl_train, dl_val),
+                 data_combined=(dl_train_combined, dl_val_combined),
                  classes=classes,
-                 epochs=10,
+                 epochs=epoch_num,
                  patience=30,
-                 lr=1e-6,
+                 lr=1e-5,
                  criterion=utils.WeightedCrossEntropyLoss(weights),
                  model=model,
                  optimizer="AdamW",
                  scheduler=("StepLR", 1.0, 0.98),
                  seed=seed,
                  y=y_col,
-                 visualize=True)
+                 visualize=True,
+                 whole_dataset_epoch=epoch_num//2)
