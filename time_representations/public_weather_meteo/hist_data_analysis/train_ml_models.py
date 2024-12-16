@@ -44,7 +44,7 @@ def train_models():
 
             for s in seeds:
                 seed = str(s)
-                with open(f'{folder_path}/{seed}/train_checkpoints.json', "r") as file:
+                with open(f'{folder_path}/trained_new/{seed}/train_checkpoints.json', "r") as file:
                     checkpoint_data = json.load(file)
                     # Training time per epoch
                     epoch_time += [train_times[bin][model][s] / checkpoint_data["epochs"]]
@@ -71,7 +71,7 @@ def train_models():
                                       if key.startswith("mean") or key.startswith("std")}
 
             # Write the dictionary to a JSON file
-            with open(f'{folder_path}/acc_train_stats.json', "w") as file:
+            with open(f'{folder_path}/trained_new/acc_train_stats.json', "w") as file:
                 json.dump(acc_train_stats[model], file)
 
 

@@ -141,7 +141,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
         scheduler.step()
 
-    cfn = utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", (seed)], name="train_checkpoints.json")
+    cfn = utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", str(seed)], name="train_checkpoints.json")
     checkpoints.update({'epochs': epoch+1})
     utils.save_json(data=checkpoints, filename=cfn)
     
@@ -170,7 +170,7 @@ def main_loop(seed, y_col):
 
     path = "../../../data/train_classif_meteo.csv"
     seq_len = 24 // 3
-    batch_size = 8
+    batch_size = 4
     classes = ["0", "1", "2", "3", "4"]
 
     df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
