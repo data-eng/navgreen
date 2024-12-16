@@ -47,8 +47,11 @@ def load(path, parse_dates, bin, normalize=True):
 
     for i, dtime in enumerate(datetimes):
         timestamps = df['DATETIME'].dt.__getattribute__(dtime)
-        df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
-        df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
+        '''df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
+        df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])'''
+
+        df[f'SIN_{dtime.upper()}'] = np.sin(np.pi * timestamps / periods[i])
+        df[f'COS_{dtime.upper()}'] = np.cos(np.pi * timestamps / periods[i])
 
     if os.path.exists('transformer/stats_new.json'):
         stats_new = utils.load_json(filename='transformer/stats_new.json')
