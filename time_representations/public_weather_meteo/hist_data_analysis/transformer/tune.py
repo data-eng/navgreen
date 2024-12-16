@@ -26,11 +26,11 @@ logger.info(f'Device is {device}')
 params_init = {"X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"]}
 
 
-def train(data, data_combined, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y,
+def train(data, data_train_combined, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y,
           whole_dataset_epoch, visualize=False, dir_name="tuned"):
     model.to(device)
-    train_data_new, val_data_new = data
-    train_data_combined, val_data_combined = data_combined
+    train_data_new, val_data = data
+    train_data_combined = data_train_combined
     num_classes = len(classes)
     optimizer = utils.get_optim(optimizer, model, lr)
     scheduler = utils.get_sched(*scheduler, optimizer)
@@ -58,14 +58,12 @@ def train(data, data_combined, classes, epochs, patience, lr, criterion, model, 
     logger.info(f"\nTraining with seed {seed} just started...")
 
     train_data = train_data_new
-    val_data = val_data_new
 
     for epoch in range(epochs):
 
         # At some point continue training with the whole dataset to avoid catastrophic forgetting
         if epoch == whole_dataset_epoch:
             train_data = train_data_combined
-            val_data = val_data_combined
 
         model.train()
         total_train_loss = 0.0
@@ -191,7 +189,7 @@ def main_loop(seed, y_col):
     path_init = "../../../data/training_set_classif_new_classes.csv"
 
     seq_len = 24 // 3
-    batch_size = 8
+    batch_size = 4
     classes = ["0", "1", "2", "3", "4"]
 
     df_init = load_init(path=path_init, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
@@ -205,16 +203,13 @@ def main_loop(seed, y_col):
     ds = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col, tune=True)
     ds_init = TSDataset(df=df_prep_init, seq_len=seq_len, X=params_init["X"], t=params["t"], y=y_col, tune=False)
 
-    ds_combined = ConcatDataset([ds, ds_init])
-
     ds_train, ds_val = split(ds, vperc=0.2)
-    ds_train_combined, ds_val_combined = split(ds_combined, vperc=0.2)
+    ds_train_combined = ConcatDataset([ds_train, ds_init])
 
     dl_train = DataLoader(ds_train, batch_size, shuffle=True)
     dl_val = DataLoader(ds_val, batch_size, shuffle=False)
 
     dl_train_combined = DataLoader(ds_train_combined, batch_size, shuffle=True)
-    dl_val_combined = DataLoader(ds_val_combined, batch_size, shuffle=False)
 
     model = Transformer(in_size=len(params_init["X"])+len(params["t"]),
                         out_size=len(classes),
@@ -236,11 +231,12 @@ def main_loop(seed, y_col):
     model.load_state_dict(torch.load(trained_model_pth))
 
     epoch_num = 600
+    # whole_dataset_epoch = epoch_num + 1
     whole_dataset_epoch = epoch_num//2
     dir_name = "tuned_whole" if whole_dataset_epoch < epoch_num else "tuned_new"
 
     _, _ = train(data=(dl_train, dl_val),
-                 data_combined=(dl_train_combined, dl_val_combined),
+                 data_train_combined=dl_train_combined,
                  classes=classes,
                  epochs=epoch_num,
                  patience=30,
