@@ -27,7 +27,7 @@ params_init = {"X": ["humidity", "pressure", "feels_like", "temp", "wind_speed",
 
 
 def train(data, data_combined, classes, epochs, patience, lr, criterion, model, optimizer, scheduler, seed, y,
-          whole_dataset_epoch, visualize=False):
+          whole_dataset_epoch, visualize=False, dir_name="tuned"):
     model.to(device)
     train_data_new, val_data_new = data
     train_data_combined, val_data_combined = data_combined
@@ -134,7 +134,7 @@ def train(data, data_combined, classes, epochs, patience, lr, criterion, model, 
 
             logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
-            mfn = utils.get_path(dirs=["models", ylabel, "transformer", "tuned", str(seed)], name="transformer.pth")
+            mfn = utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)], name="transformer.pth")
             torch.save(model.state_dict(), mfn)
 
             checkpoints.update({'best_epoch': epoch + 1,
@@ -149,7 +149,7 @@ def train(data, data_combined, classes, epochs, patience, lr, criterion, model, 
                                 title="Train Heatmap " + ylabel,
                                 classes=classes,
                                 coloring=['azure', 'darkblue'],
-                                path=utils.get_path(dirs=["models", ylabel, "transformer", "tuned", str(seed)]))
+                                path=utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)]))
 
         else:
             stationary += 1
@@ -160,12 +160,12 @@ def train(data, data_combined, classes, epochs, patience, lr, criterion, model, 
 
         scheduler.step()
 
-    cfn = utils.get_path(dirs=["models", ylabel, "transformer", "tuned", str(seed)], name="train_checkpoints.json")
+    cfn = utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)], name="train_checkpoints.json")
     checkpoints.update({'epochs': epoch + 1})
     utils.save_json(data=checkpoints, filename=cfn)
 
     if visualize:
-        cfn = utils.get_path(dirs=["models", ylabel, "transformer", "tuned", str(seed)], name="train_losses.json")
+        cfn = utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)], name="train_losses.json")
         utils.save_json(data=train_losses, filename=cfn)
 
         utils.visualize(type="multi-plot",
@@ -176,7 +176,7 @@ def train(data, data_combined, classes, epochs, patience, lr, criterion, model, 
                         plot_func=plt.plot,
                         coloring=['brown', 'royalblue'],
                         names=["Training", "Validation"],
-                        path=utils.get_path(dirs=["models", ylabel, "transformer", "tuned", str(seed)]))
+                        path=utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)]))
 
     logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} '
                 f'& Validation Loss: {best_val_loss:.6f}\n')
@@ -236,6 +236,8 @@ def main_loop(seed, y_col):
     model.load_state_dict(torch.load(trained_model_pth))
 
     epoch_num = 600
+    whole_dataset_epoch = epoch_num//2
+    dir_name = "tuned_whole" if whole_dataset_epoch < epoch_num else "tuned_new"
 
     _, _ = train(data=(dl_train, dl_val),
                  data_combined=(dl_train_combined, dl_val_combined),
@@ -250,4 +252,5 @@ def main_loop(seed, y_col):
                  seed=seed,
                  y=y_col,
                  visualize=True,
-                 whole_dataset_epoch=epoch_num//2)
+                 whole_dataset_epoch=whole_dataset_epoch,
+                 dir_name=dir_name)

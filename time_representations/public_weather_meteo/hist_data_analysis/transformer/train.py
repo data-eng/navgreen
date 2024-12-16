@@ -115,7 +115,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
             logger.info(f"New best val found! ~ Epoch [{epoch + 1}/{epochs}], Val Loss {avg_val_loss}")
 
-            mfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="transformer.pth")
+            mfn = utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", str(seed)], name="transformer.pth")
             torch.save(model.state_dict(), mfn)
 
             checkpoints.update({'best_epoch': epoch+1, 
@@ -130,7 +130,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                                 title="Train Heatmap "+ylabel,
                                 classes=classes,
                                 coloring=['azure', 'darkblue'],
-                                path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
+                                path=utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", str(seed)]))
                 
         else:
             stationary += 1
@@ -141,13 +141,13 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
 
         scheduler.step()
 
-    cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="train_checkpoints.json")
+    cfn = utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", (seed)], name="train_checkpoints.json")
     checkpoints.update({'epochs': epoch+1})
     utils.save_json(data=checkpoints, filename=cfn)
     
     if visualize:
 
-        cfn = utils.get_path(dirs=["models", ylabel, "transformer", str(seed)], name="train_losses.json")
+        cfn = utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", str(seed)], name="train_losses.json")
         utils.save_json(data=train_losses, filename=cfn)
 
         utils.visualize(type="multi-plot",
@@ -157,7 +157,7 @@ def train(data, classes, epochs, patience, lr, criterion, model, optimizer, sche
                         plot_func=plt.plot,
                         coloring=['brown', 'royalblue'],
                         names=["Training", "Validation"],
-                        path=utils.get_path(dirs=["models", ylabel, "transformer", str(seed)]))
+                        path=utils.get_path(dirs=["models", ylabel, "transformer", "trained_new", str(seed)]))
 
     logger.info(f'\nTraining with seed {seed} complete!\nFinal Training Loss: {avg_train_loss:.6f} '
                 f'& Validation Loss: {best_val_loss:.6f}\n')
