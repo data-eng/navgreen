@@ -16,45 +16,48 @@ def eval_models():
 
     model_test = {"transformer": test_transformer}
 
+    dir_names = ['trained_new', 'tuned_new', 'tuned_whole', 'trained_new_best_time_repr']
+
     # Start testing the models for each seed and binning.
     # The testing information is stored within the folder 'models/{bin}/{model_name}'
     for bin in bins:
         for seed in seeds:
             for model in models:
                 print(f'Start test bin={bin} with model "{model}" for seed={seed}')
-                model_test[model](seed, [bin])
+                model_test[model](seed, [bin], dir_names)
                 print(f'End test bin={bin} with model "{model}" for seed={seed}')
 
     # Calculate mean and std of testin statistics for each model
-    for bin in bins:
-        bin_folder_path = f'models/{bin}'
-        acc_test_stats = {"transformer": dict()}
-        for model in models:
-            epoch_time = []
-            folder_path = f'{bin_folder_path}/{model}'
+    for dir_name in dir_names:
+        for bin in bins:
+            bin_folder_path = f'models/{bin}'
+            acc_test_stats = {"transformer": dict()}
+            for model in models:
+                epoch_time = []
+                folder_path = f'{bin_folder_path}/{model}'
 
-            for s in seeds:
-                seed = str(s)
-                with open(f'{folder_path}/{seed}/test_checkpoints.json', "r") as file:
-                    checkpoint_data = json.load(file)
+                for s in seeds:
+                    seed = str(s)
+                    with open(f'{folder_path}/{dir_name}/{seed}/test_checkpoints.json', "r") as file:
+                        checkpoint_data = json.load(file)
 
-                    for key in checkpoint_data:
-                        if key not in ["seed"]:
-                            try: acc_test_stats[model][key] += [checkpoint_data[key]]
-                            except KeyError: acc_test_stats[model][key] = [checkpoint_data[key]]
+                        for key in checkpoint_data:
+                            if key not in ["seed"]:
+                                try: acc_test_stats[model][key] += [checkpoint_data[key]]
+                                except KeyError: acc_test_stats[model][key] = [checkpoint_data[key]]
 
-            # Accumulate mean and std of testing statistics
-            keys = [key for key in acc_test_stats[model]]
-            for key in keys:
-                acc_test_stats[model][f'mean_{key}'] = np.mean(acc_test_stats[model][key])
-                acc_test_stats[model][f'std_{key}'] = np.std(acc_test_stats[model][key])
+                # Accumulate mean and std of testing statistics
+                keys = [key for key in acc_test_stats[model]]
+                for key in keys:
+                    acc_test_stats[model][f'mean_{key}'] = np.mean(acc_test_stats[model][key])
+                    acc_test_stats[model][f'std_{key}'] = np.std(acc_test_stats[model][key])
 
-            # Keep only statistics
-            acc_test_stats[model] = {key: value for key, value in acc_test_stats[model].items()
-                                      if key.startswith("mean") or key.startswith("std")}
+                # Keep only statistics
+                acc_test_stats[model] = {key: value for key, value in acc_test_stats[model].items()
+                                          if key.startswith("mean") or key.startswith("std")}
 
-            # Write the dictionary to a JSON file
-            with open(f'{folder_path}/acc_test_stats.json', "w") as file:
-                json.dump(acc_test_stats[model], file)
+                # Write the dictionary to a JSON file
+                with open(f'{folder_path}/{dir_name}/acc_test_stats.json', "w") as file:
+                    json.dump(acc_test_stats[model], file)
 
 eval_models()

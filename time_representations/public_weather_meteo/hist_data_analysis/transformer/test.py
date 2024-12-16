@@ -104,7 +104,7 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
     return avg_test_loss
 
 
-def main_loop(seed, y_col):
+def main_loop(seed, y_col, dir_names):
     utils.set_seed(seed)
 
     path = "../../../data/test_classif_meteo.csv"
@@ -112,13 +112,13 @@ def main_loop(seed, y_col):
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]
 
-    for dir_name in ['tuned']:
+    for dir_name in dir_names:
         df = load(path=path, parse_dates=["DATETIME"], normalize=True, bin=y_col[0])
         df_prep = prepare(df, phase="test")
 
         weights = utils.load_json(filename=f'transformer/weights_{y_col[0]}.json')
 
-        if dir_name == 'trained_new':
+        if dir_name == 'trained_new' or dir_name == 'trained_new_best_time_repr':
             ds_test = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col, per_day=True)
         else:
             ds_test = TSDataset(df=df_prep, seq_len=seq_len, X=params["X"], t=params["t"], y=y_col,
@@ -126,7 +126,8 @@ def main_loop(seed, y_col):
 
         dl_test = DataLoader(ds_test, batch_size, shuffle=False)
 
-        X_size = len(params["X"]) if dir_name == 'trained_new' else len(params_init["X"])
+        X_size = len(params["X"]) if dir_name == 'trained_new' or dir_name == 'trained_new_best_time_repr' else \
+            len(params_init["X"])
 
         model = Transformer(in_size=X_size+len(params["t"]),
                             out_size=len(classes),
