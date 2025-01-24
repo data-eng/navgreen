@@ -1,0 +1,5 @@
+seeds: [6, 72, 157, 838, 1214, 1505]
+bins: ["ValueRangeBin"]
+
+
+
