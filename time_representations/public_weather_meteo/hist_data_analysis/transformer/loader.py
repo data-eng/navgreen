@@ -59,11 +59,13 @@ def load(path, parse_dates, bin, normalize=True):
         stats_new = utils.get_stats(df, path='transformer/', name='stats_new.json')
 
     # For the values that are identical within the two datasets, use the old statistics
-    stats_init = utils.load_json(filename='transformer/stats.json')
+    '''stats_init = utils.load_json(filename='transformer/stats.json')
     stats = stats_new.copy()
     stats['TEMPERATURE'] = stats_init['temp']
     stats['HUMIDITY'] = stats_init['humidity']
-    stats['WIND_SPEED'] = stats_init['wind_speed']
+    stats['WIND_SPEED'] = stats_init['wind_speed']'''
+
+    stats = stats_new
 
     # In this loader we will not save any weights, we use the ones from the initial dataset
 
