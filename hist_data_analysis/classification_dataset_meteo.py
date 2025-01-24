@@ -210,7 +210,7 @@ def main():
     weather_df = create_weather_dataframe()
     weather_df = process_weather_df(df=weather_df, drop_columns=['SUNRISE', 'SUNSET'])
 
-    data_df = combine_PLC_data(in_path='../data/data_plc', out_filename='../data/PLC_may_to_dec_2024.csv')
+    data_df = combine_PLC_data(in_path='../data/data_plc', out_filename='../data/PLC_may_to_jan_2025.csv')
 
     # Define data columns aggregator
     group = "3h"
@@ -224,13 +224,13 @@ def main():
                                     keep_columns=data_columns_to_keep,
                                     grp=group,
                                     aggregators=aggregators_data,
-                                    out_filename=f'../data/PLC_may_to_dec_2024_aggr_{group}.csv',
+                                    out_filename=f'../data/PLC_may_to_jan_2025_aggr_{group}.csv',
                                     y_name=pred_column)
 
     # Create the combined data-weather DataFrame
     combined_df = combine_dataframes(weather_df=weather_df,
                                      data_df=data_df,
-                                     out_filename='../data/combined_jun_to_dec_2024.csv')
+                                     out_filename='../data/PLC_may_to_jan_2025.csv')
 
     # Plot distribution of bins
     plot_hist(df=combined_df, y_name=pred_column, data='all')
