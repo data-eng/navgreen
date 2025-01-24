@@ -16,7 +16,8 @@ def eval_models():
 
     model_test = {"transformer": test_transformer}
 
-    dir_names = ['trained_new', 'tuned_new', 'tuned_whole', 'trained_new_best_time_repr']
+    # dir_names = ['trained_new', 'tuned_new', 'tuned_whole', 'trained_new_best_time_repr']
+    dir_names = ['trained_new_best_time_repr']
 
     # Start testing the models for each seed and binning.
     # The testing information is stored within the folder 'models/{bin}/{model_name}'
@@ -27,7 +28,7 @@ def eval_models():
                 model_test[model](seed, [bin], dir_names)
                 print(f'End test bin={bin} with model "{model}" for seed={seed}')
 
-    # Calculate mean and std of testin statistics for each model
+    # Calculate mean and std of testing statistics for each model
     for dir_name in dir_names:
         for bin in bins:
             bin_folder_path = f'models/{bin}'

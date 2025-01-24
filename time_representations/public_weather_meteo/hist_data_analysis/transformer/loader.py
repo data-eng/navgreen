@@ -69,7 +69,8 @@ def load(path, parse_dates, bin, normalize=True):
 
     if normalize:
         df = utils.normalize(df, stats, exclude=['DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY',
-                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', bin])
+                                                 'COS_DAY', 'SIN_HOUR', 'COS_HOUR', 'Q_PVT', 'OUTDOOR_TEMP',
+                                                 'PYRANOMETER', bin])
 
     return df
 

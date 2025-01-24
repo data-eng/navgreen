@@ -28,7 +28,7 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
     num_classes = len(classes)
 
     total_test_loss = 0.0
-    true_values, pred_values = [], []
+    true_values, pred_values, true_values_, pred_values_ = [], [], [], []
 
     checkpoints = {'seed': seed, 
                    'test_loss': float('inf'),
@@ -53,11 +53,17 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
             y = y.reshape(-1)
             mask_y = mask_y.reshape(-1)
         
+            y_pred_ = utils.mask_nan(tensor=y_pred, mask=mask_y, id=0)
+            y_ = utils.mask_nan(tensor=y, mask=mask_y, id=0)
+
             y_pred = utils.mask(tensor=y_pred, mask=mask_y, id=0)
             y = utils.mask(tensor=y, mask=mask_y, id=0)
             
             test_loss = criterion(pred=y_pred, true=y)
             total_test_loss += test_loss.item()
+
+            true_values_.append(y_.cpu().numpy())
+            pred_values_.append(y_pred_.cpu().numpy())
 
             true_values.append(y.cpu().numpy())
             pred_values.append(y_pred.cpu().numpy())
@@ -66,6 +72,12 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
     
     true_values = np.concatenate(true_values)
     pred_values = np.concatenate(pred_values)
+
+    true_values_ = np.concatenate(true_values_)
+    pred_values_ = np.concatenate(pred_values_)
+
+    true_values_whole = true_values_.tolist()
+    pred_values_whole = [utils.get_max(pred).index if float('nan') not in pred else float('nan') for pred in pred_values_]
 
     true_classes = true_values.tolist()
     pred_classes = [utils.get_max(pred).index for pred in pred_values]
@@ -84,17 +96,12 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
     utils.save_json(data=checkpoints, filename=cfn)
 
     predicted_values_prob = np.exp(pred_values) / np.sum(np.exp(pred_values), axis=-1, keepdims=True)
-    '''data_ = {"DATETIME": df.index,
-             **{col: df[col].values for col in params["X"]},
-             f"{ylabel}_real": true_classes,
-             f"{ylabel}_pred": pred_classes,
-             f"{ylabel}_probs": predicted_values_prob.tolist()}
-    '''
+    pred_probs_whole = np.exp(pred_values_) / np.sum(np.exp(pred_values_), axis=-1, keepdims=True)
 
     data_ = {
-         f"{ylabel}_real": true_classes,
-         f"{ylabel}_pred": pred_classes,
-         f"{ylabel}_probs": predicted_values_prob.tolist()}
+         f"{ylabel}_real": true_values_whole,
+         f"{ylabel}_pred": pred_values_whole,
+         f"{ylabel}_probs": pred_probs_whole.tolist()}
 
     dfn = utils.get_path(dirs=["models", ylabel, "transformer", dir_name, str(seed)], name="data.csv")
     utils.save_csv(data=data_, filename=dfn)
@@ -107,7 +114,8 @@ def test(data, df, classes, criterion, model, seed, y, dir_name, visualize=True)
 def main_loop(seed, y_col, dir_names):
     utils.set_seed(seed)
 
-    path = "../../../data/test_classif_meteo.csv"
+    # path = "../../../data/test_classif_meteo.csv"
+    path = "../../../data/combined_jun_to_dec_2024.csv"
     seq_len = 24 // 3
     batch_size = 1
     classes = ["0", "1", "2", "3", "4"]

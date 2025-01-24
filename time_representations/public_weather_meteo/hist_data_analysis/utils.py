@@ -71,6 +71,22 @@ def mask(tensor, mask, id=0):
     return tensor[mask == id]
 
 
+def mask_nan(tensor, mask, id=0):
+    """
+    Mask a tensor based on a specified condition.
+
+    :param tensor_: torch.Tensor
+    :param mask: torch.Tensor
+    :param id: int value specifying the elements to keep, others pad with NaNs
+    :return: torch.Tensor
+    """
+    if not tensor.dtype.is_floating_point:
+        tensor = tensor.float()
+
+    tensor[mask != id] = float('nan')
+    return tensor
+
+
 class WeightedCrossEntropyLoss(nn.Module):
     def __init__(self, weights):
         """

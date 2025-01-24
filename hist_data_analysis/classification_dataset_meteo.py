@@ -90,7 +90,7 @@ def train_test_split(df, train_path, test_path):
 
 def create_data_dataframe(data_df, keep_columns, grp, aggregators, y_name, out_filename):
 
-    if os.path.exists(out_filename):
+    if False: #os.path.exists(out_filename):
         logger.info("Aggregated PLC data DataFrame exists. Loading it.")
         df = pd.read_csv(out_filename)
     else:
@@ -130,7 +130,7 @@ def create_data_dataframe(data_df, keep_columns, grp, aggregators, y_name, out_f
 
         # Add the binned Q_PVT based on the bins and labels
         df[y_name] = pd.cut(df['Q_PVT'], bins=bins, labels=labels, right=False)
-        df = df.drop(['Q_PVT'], axis=1)
+        # df = df.drop(['Q_PVT'], axis=1)
 
         # Make DATETIME a regular column and not index
         df = df.reset_index()
@@ -142,7 +142,7 @@ def create_data_dataframe(data_df, keep_columns, grp, aggregators, y_name, out_f
 
 def combine_dataframes(weather_df, data_df, out_filename):
 
-    if os.path.exists(out_filename):
+    if False: #os.path.exists(out_filename):
         logger.info("Combined weather and data DataFrame exists. Loading it.")
         df = pd.read_csv(out_filename)
     else:
@@ -182,7 +182,7 @@ def combine_dataframes(weather_df, data_df, out_filename):
 
 def combine_PLC_data(in_path, out_filename):
 
-    if os.path.exists(out_filename):
+    if False: #os.path.exists(out_filename):
         logger.info("Concatenated PLC data DataFrame exists. Loading it.")
         df = pd.read_csv(out_filename)
     else:
@@ -214,12 +214,12 @@ def main():
 
     # Define data columns aggregator
     group = "3h"
-    aggregators_data = {'Q_PVT': 'mean'}
+    aggregators_data = {'Q_PVT': 'mean', 'PYRANOMETER': 'mean', 'OUTDOOR_TEMP': 'mean'}
 
     pred_column = 'ValueRangeBin'
 
     # Columns that should not be filtered out
-    data_columns_to_keep = ["Date_time_local"]
+    data_columns_to_keep = ["Date_time_local", "PYRANOMETER", "OUTDOOR_TEMP"]
     data_df = create_data_dataframe(data_df=data_df,
                                     keep_columns=data_columns_to_keep,
                                     grp=group,
