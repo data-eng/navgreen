@@ -2,12 +2,19 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+import logging
 import public_weather_installation.utils as utils
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s:%(lineno)d:%(levelname)s:%(name)s:%(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 
 params = {
-    "X": ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h"],
+    "X": ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY"],
     "t": ["SIN_HOUR", "COS_HOUR", "SIN_DAY", "COS_DAY", "SIN_MONTH", "COS_MONTH"],
     "ignore": [] 
 }
@@ -16,13 +23,12 @@ params = {
 def load(df, normalize=True):
     """
     Loads and preprocesses data from a CSV file.
-    :param df: path to the CSV file
+
+    :param df: the CSV file
     :param normalize: normalization flag
     :return: dataframe
     """
-    # df = pd.read_csv(path, parse_dates=parse_dates, low_memory=False)
     df.sort_values(by='DATETIME', inplace=True)
-
     assert len(df) == 8
 
     empty_days = df.groupby(df['DATETIME'].dt.date).apply(lambda x: x.dropna(subset=params["X"], how='all').empty)
@@ -32,17 +38,14 @@ def load(df, normalize=True):
 
     for i, dtime in enumerate(datetimes):
         timestamps = df['DATETIME'].dt.__getattribute__(dtime)
-        df[f'SIN_{dtime.upper()}'] = np.sin(2*np.pi*timestamps/periods[i])
-        df[f'COS_{dtime.upper()}'] = np.cos(2*np.pi*timestamps/periods[i])
+        df[f'SIN_{dtime.upper()}'] = np.sin(np.pi * timestamps / periods[i])
+        df[f'COS_{dtime.upper()}'] = np.cos(np.pi * timestamps / periods[i])
 
     stats = utils.load_json(filename='weather_predictions/communication_PLC/public_weather_installation/stats.json')
 
     if normalize:
-        df = utils.normalize(df, stats, exclude=['DATETIME', 'FORECAST_DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY', 
+        df = utils.normalize(df, stats, exclude=['DATETIME', 'FORECAST_DATETIME', 'SIN_MONTH', 'COS_MONTH', 'SIN_DAY',
                                                  'COS_DAY', 'SIN_HOUR', 'COS_HOUR'])
-
-    # nan_counts = df.isna().sum() / len(df) * 100
-    # print("NaN counts for columns in X: %s", nan_counts)
 
     return df
 
@@ -131,5 +134,3 @@ class TSDataset(Dataset):
     @property
     def num_seqs(self):
         return self.X.shape[0] // self.seq_len
-
-

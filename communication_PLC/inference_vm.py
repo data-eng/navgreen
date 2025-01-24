@@ -81,12 +81,12 @@ def write_to_influxdb(qpvt_predictions, forecast_datetime):
 
     qpvt_predictions = pd.DataFrame(qpvt_predictions)
     # Convert DATETIME to a format suitable for InfluxDB
-    # qpvt_predictions['DATETIME'] = pd.to_datetime(qpvt_predictions['DATETIME']) - timedelta(days=1)
     qpvt_predictions['DATETIME'] = qpvt_predictions['DATETIME'].dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     qpvt_predictions['FORECAST_DATETIME'] = forecast_datetime.dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     # Same with probabilities
-    print(qpvt_predictions)
     qpvt_predictions['probabilities'] = qpvt_predictions['probabilities'].apply(json.dumps)
+
+    print(qpvt_predictions.columns)
 
     while True:
         try:
@@ -109,22 +109,13 @@ def write_to_influxdb(qpvt_predictions, forecast_datetime):
 if __name__ == '__main__':
 
     weather_csv = read_csv(weather_path='./weather_predictions/data/')
-    # THE COLUMNS ARE DEFINITELY WRONG, WE ARE JUST CONSTRUCTING THE ARCHITECTURE OF THE PIPELINE
-    rename_columns = {'FORECAST_DATETIME': 'FORECAST_DATETIME', 'ACCESS_DATETIME' : 'DATETIME', 'TEMPERATURE': 'temp', 'HUMIDITY': 'humidity',
-                      'WIND_SPEED': 'wind_speed'}
-    create_columns = ['pressure', 'feels_like', 'rain_1h']
-    keep_columns = [rename_columns[key] for key in rename_columns] + create_columns
-
-    # Get the weather DataFrame
-    weather_csv = filter_weather(df=weather_csv, columns=keep_columns,
-                                 create_columns=create_columns, rename_columns=rename_columns)
-
-    weather_csv['DATETIME'] = pd.to_datetime(weather_csv['DATETIME'])
-    weather_csv['FORECAST_DATETIME'] = pd.to_datetime(weather_csv['FORECAST_DATETIME'])
-    # print(weather_csv['FORECAST_DATETIME'])
+    weather_csv = weather_csv.rename(columns={'ACCESS_DATETIME': 'DATETIME'})
+    weather_csv = weather_csv[[col for col in weather_csv.columns if col not in ['index', 'SUNRISE', 'SUNSET', 'BEAUFORT']]]
 
     # Feed forward the weather to obtain the 3hr-Q_PVT predictions
     predictions = model_predictions(weather_csv, 'weather_predictions/communication_PLC/public_weather_installation/transformer.pth')
+
+    print(predictions)
 
     # Write the predictions to InfluxDB
     write_to_influxdb(qpvt_predictions=predictions, forecast_datetime=weather_csv['FORECAST_DATETIME'])

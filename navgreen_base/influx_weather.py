@@ -7,7 +7,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
-weather_columns = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "predicted", "probabilities"]
+weather_columns = ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY", "predicted", "probabilities"]
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
