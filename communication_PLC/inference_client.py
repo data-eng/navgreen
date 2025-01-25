@@ -26,6 +26,43 @@ logger.addHandler(file_handler)
 logger.addHandler(stream_handler)
 
 
+def get_DHW(h, m):
+    """
+    This function returns the observed DHW for that specific time and month
+    :param h: hour
+    :param m: month
+    :return: DWH (kWh)
+    """
+
+    file_path = '../data/DHW_profile_KWH.csv'
+    df = pd.read_csv(file_path)
+
+    month_map = {
+        1: 'Jan',
+        2: 'Feb',
+        3: 'Mar',
+        4: 'Apr',
+        5: 'May',
+        6: 'Jun',
+        7: 'Jul',
+        8: 'Aug',
+        9: 'Sep',
+        10: 'Oct',
+        11: 'Nov',
+        12: 'Dec'
+    }
+
+    df['hour'] = [0, 3, 6, 9, 12, 15, 18, 21]
+
+    hour = df[df['hour'] == h]
+
+    DHW_val = hour[month_map[m]].values
+
+    assert len(DHW_val) == 1
+
+    return DHW_val[0]
+
+
 def get_predictions():
     """
     This function reads the daily QPVT predictions from the
@@ -103,6 +140,14 @@ def write_reg_value(client, register, value, multiplier):
     return
 
 
+qpvt_class_to_range = {'0': [0.0, 0.05],
+                       '1': [0.05, 0.21],
+                       '2': [0.21, 0.53],
+                       '3': [0.53, 1.05],
+                       '4': [1.05, float('inf')]
+                       }
+
+
 if __name__ == "__main__":
 
     '''# PLC IP address, port and connection intervals
@@ -112,18 +157,35 @@ if __name__ == "__main__":
     PLC_connect_interval = 5 * 60
 
     too_cold = False
-    min_setpoint, max_setpoint = 15.0, 49.0
+    min_setpoint, max_setpoint = 44.5, 48.0
 
     try:
         while True:
             # Try to connect with the InfluxDB
             try:
                 # Read QPVT from server and do something with it
-                _ = get_predictions()
+                predictions = get_predictions()
+                # Current hour in installation
+                current_hour, current_month = datetime.now().hour, datetime.now().month
+
+                predictions['HOUR'] = predictions['DATETIME'].dt.hour
+
+                qpvt_of_interest = predictions[predictions['hour'] == current_hour]
+
+                dhw = get_DHW(h=current_hour, m=current_month)
+
+                assert len(qpvt_of_interest) == 1, f"Expected 1 row, but found {len(filtered_rows)} rows"
+
+                raise ValueError("WHAT TO DO WITH LAST CLASS MEAN?")
+                raise ValueError("Check how mean looks in pandas and get the range")
+
+                # should check when to make it run
+                # also make the correct checks so that it does not loop for ever
+                # check hour indexes
 
                 qpvt = 1
                 break
-                '''
+
                 # THIS IS WRONG, JUST ARCHITECTURAL STUFF
                 setpoint_DHW = 9 if qpvt == 15 else 16
 
@@ -284,9 +346,6 @@ if __name__ == "__main__":
                         modbus_client.close()
                         logger.info("Closed PLC socket.")
 
-                # PLC must write no sooner than 5 minutes
-                time.sleep(5 * 60)
-            '''
             except Exception as e:
                 # Server refuses connection or no internet. The first case might occur often, so FOR noe, we do not
                 # include it to the file logger
