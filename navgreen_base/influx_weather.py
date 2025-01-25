@@ -7,7 +7,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
-weather_columns = ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY", "predicted", "probabilities"]
+weather_columns = ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY", "predicted", "probabilities", "DATETIME"]
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -44,7 +44,8 @@ def establish_influxdb_connection():
 
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
-    p.time(row["DATETIME"])
+    #p.time(row["DATETIME"])
+    p.time(row["FORECAST_DATETIME"])
 
     # Tag with the state of the valves, as context
     for col in tag_columns:
@@ -58,7 +59,7 @@ def make_point(measurement, row, value_columns, tag_columns):
 
 def write_data(row, influx_client):
     """
-    Wrires one row to a specified bucket. The bucket that will
+    Writes one row to a specified bucket. The bucket that will
     be used should be set using `set_bucket` before the first
     invocation of this method. It does not need to be set again
     for subsequent invocations.

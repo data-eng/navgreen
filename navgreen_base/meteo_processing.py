@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from datetime import timedelta
 
 import logging
 
@@ -84,6 +85,21 @@ def process_weather_df(df, drop_columns):
     df = df.drop(drop_columns, axis=1)
 
     df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+
+    # Define the valid hours set
+    valid_hours = [0, 3, 6, 9, 12, 15, 18, 21]
+
+    # Adjust hours to the next valid hour if not in valid_hours
+    def adjust_to_next_valid_hour(date):
+        current_hour = date.hour
+        if current_hour not in valid_hours:
+            # Find the next valid hour
+            next_hour = min(hour for hour in valid_hours if hour > current_hour) if current_hour < max(valid_hours) else \
+                valid_hours[0] + 24
+            return date + timedelta(hours=(next_hour - current_hour))
+        return date
+
+    df['DATETIME'] = df['DATETIME'].apply(adjust_to_next_valid_hour)
 
     df.set_index('DATETIME', inplace=True)
     df = df.resample('3h').mean()

@@ -82,6 +82,7 @@ def write_to_influxdb(qpvt_predictions, forecast_datetime):
     qpvt_predictions = pd.DataFrame(qpvt_predictions)
     # Convert DATETIME to a format suitable for InfluxDB
     qpvt_predictions['DATETIME'] = qpvt_predictions['DATETIME'].dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+    forecast_datetime = forecast_datetime + pd.to_timedelta(qpvt_predictions.index, unit='s')
     qpvt_predictions['FORECAST_DATETIME'] = forecast_datetime.dt.strftime('%Y-%m-%dT%H:%M:%SZ')
     # Same with probabilities
     qpvt_predictions['probabilities'] = qpvt_predictions['probabilities'].apply(json.dumps)
@@ -106,11 +107,24 @@ def write_to_influxdb(qpvt_predictions, forecast_datetime):
     logger.info("Written to InfluxDB!")
 
 
+def adjust_to_next_valid_hour(date):
+    valid_hours = [0, 3, 6, 9, 12, 15, 18, 21]
+    current_hour = date.hour
+    if current_hour not in valid_hours:
+        # Find the next valid hour
+        next_hour = min(hour for hour in valid_hours if hour > current_hour) if current_hour < max(valid_hours) else \
+            valid_hours[0] + 24
+        return date + timedelta(hours=(next_hour - current_hour))
+    return date
+
+
 if __name__ == '__main__':
 
-    weather_csv = read_csv(weather_path='./weather_predictions/data/')
-    weather_csv = weather_csv.rename(columns={'ACCESS_DATETIME': 'DATETIME'})
-    weather_csv = weather_csv[[col for col in weather_csv.columns if col not in ['index', 'SUNRISE', 'SUNSET', 'BEAUFORT']]]
+    weather_csv_init = read_csv(weather_path='./weather_predictions/data/')
+    weather_csv_init['FORECAST_DATETIME'] = weather_csv_init['FORECAST_DATETIME'].apply(adjust_to_next_valid_hour)
+
+    weather_csv = weather_csv_init.rename(columns={'FORECAST_DATETIME': 'DATETIME'})
+    weather_csv = weather_csv[[col for col in weather_csv.columns if col not in ['index', 'SUNRISE', 'SUNSET', 'BEAUFORT', 'ACCESS_DATETIME']]]
 
     # Feed forward the weather to obtain the 3hr-Q_PVT predictions
     predictions = model_predictions(weather_csv, 'weather_predictions/communication_PLC/public_weather_installation/transformer.pth')
@@ -118,4 +132,4 @@ if __name__ == '__main__':
     print(predictions)
 
     # Write the predictions to InfluxDB
-    write_to_influxdb(qpvt_predictions=predictions, forecast_datetime=weather_csv['FORECAST_DATETIME'])
+    write_to_influxdb(qpvt_predictions=predictions, forecast_datetime=weather_csv_init['ACCESS_DATETIME'])
