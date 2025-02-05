@@ -7,7 +7,7 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import warnings
 from influxdb_client.client.warnings import MissingPivotFunction
 
-weather_columns = ["TEMPERATURE", "HUMIDITY", "WIND_SPEED", "WIND_DIRECTION", "SKY", "predicted", "probabilities", "DATETIME"]
+weather_columns = ["humidity", "pressure", "feels_like", "temp", "wind_speed", "rain_1h", "predicted", "probabilities"]
 
 # Configure logger and set its level
 logger = logging.getLogger(__name__)
@@ -44,8 +44,7 @@ def establish_influxdb_connection():
 
 def make_point(measurement, row, value_columns, tag_columns):
     p = influxdb_client.Point(measurement)
-    #p.time(row["DATETIME"])
-    p.time(row["FORECAST_DATETIME"])
+    p.time(row["DATETIME"])
 
     # Tag with the state of the valves, as context
     for col in tag_columns:
@@ -94,37 +93,14 @@ def read_data(influx_client, start=0):
         df = df.rename(columns={'_time': 'DATETIME'})
 
     elif isinstance(data, list):
-        dfs = dict()  # []
+        df = {'DATETIME': [], 'predicted': []}
+        df = pd.DataFrame(df)
         for datum in data:
             # Pivot the DataFrame to separate fields into different columns
-            df = datum.pivot(index='FORECAST_DATETIME', columns='_field', values='_value')
-            # Reset the index to make the 'FORECAST_DATETIME' column a regular column
-            df.reset_index(inplace=True)
-            df.columns.name = None
+            if datum._field[0] == 'DATETIME' or datum._field[0] == 'predicted':
+                df[datum._field[0]] = datum['_value']
 
-            # Each dataframe may have rows of different dates, so split them and organize them by date
-            for index, row in df.iterrows():
-                row_df = pd.DataFrame([row])
-                row_df.reset_index(inplace=True)
-                try:
-                    dfs[row_df.FORECAST_DATETIME.iloc[0]].append(row_df)
-                except KeyError:
-                    dfs[row_df.FORECAST_DATETIME.iloc[0]] = [row_df]
-
-        # Combine all the dataframes of the same datetime to one dataframe
-        all_dfs = []
-        for _, df_list in dfs.items():
-            df = pd.concat(df_list, axis=1, join='outer', sort=False)
-            df = df.rename(columns={'FORECAST_DATETIME': 'DATETIME'})
-            # If conflicting values for a column, keep the non-NaN values
-            df = df.groupby(df.columns, axis=1).apply(lambda x: x.ffill(axis=1).bfill(axis=1).iloc[:, 0])
-            df = df.drop(columns=['index'])
-
-            all_dfs.append(df)
-
-        # Now concat all the dataframes as rows (different datetimes)
-        df = pd.concat(all_dfs, axis=0, ignore_index=True)
-        df = df.rename(columns={'FORECAST_DATETIME': 'DATETIME'})
+        # df = pd.concat(dfs, axis=1, ignore_index=True)
         df['DATETIME'] = pd.to_datetime(df['DATETIME'])
 
     return df

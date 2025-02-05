@@ -2,6 +2,8 @@ import time
 import os
 import struct
 import pandas as pd
+import csv
+import numpy as np
 from datetime import datetime, timedelta
 from pymodbus.client import ModbusTcpClient
 
@@ -34,7 +36,7 @@ def get_DHW(h, m):
     :return: DWH (kWh)
     """
 
-    file_path = '../data/DHW_profile_KWH.csv'
+    file_path = './DHW_profile_KWH.csv'
     df = pd.read_csv(file_path)
 
     month_map = {
@@ -147,12 +149,23 @@ qpvt_class_to_range = {'0': [0.0, 0.05],
                        '4': [1.05, float('inf')]
                        }
 
-
 if __name__ == "__main__":
 
-    '''# PLC IP address, port and connection intervals
-                plc_ip = os.environ.get('Plc_ip')
-                plc_port = 502'''
+    dataframe_date = datetime.now().strftime("%Y-%m-%d")
+
+    # Current hour in installation
+    current_hour, current_day, current_month = datetime.now().hour, datetime.now().day, datetime.now().month
+
+    # current_hour = 15
+
+    if current_hour in [0, 3, 6, 9, 12, 15, 18, 21]:
+        row = {'DATETIME': pd.to_datetime(datetime.now()).floor('H'), 'SETPOINT_ML': 0}
+    else:
+        raise ValueError('Woke up at the wrong time.')
+
+    # PLC IP address, port and connection intervals
+    plc_ip = os.environ.get('Plc_ip')
+    plc_port = 502
     reconnect_interval = 30  # Seconds
     PLC_connect_interval = 5 * 60
 
@@ -165,35 +178,41 @@ if __name__ == "__main__":
             try:
                 # Read QPVT from server and do something with it
                 predictions = get_predictions()
-                # Current hour in installation
-                current_hour, current_month = datetime.now().hour, datetime.now().month
 
-                predictions['HOUR'] = predictions['DATETIME'].dt.hour
+                qpvt_predicted = predictions[(predictions['DATETIME'].dt.hour == current_hour) &
+                                             (predictions['DATETIME'].dt.day == current_day) &
+                                             (predictions['DATETIME'].dt.month == current_month)]
 
-                qpvt_of_interest = predictions[predictions['hour'] == current_hour]
+                qpvt_predicted = qpvt_predicted['predicted']
+                assert len(qpvt_predicted) == 1, f"Expected 1 row, but found {len(qpvt_predicted)} rows"
+
+                qpvt_predicted = qpvt_predicted.iloc[0]
 
                 dhw = get_DHW(h=current_hour, m=current_month)
-
-                assert len(qpvt_of_interest) == 1, f"Expected 1 row, but found {len(filtered_rows)} rows"
-
-                raise ValueError("WHAT TO DO WITH LAST CLASS MEAN?")
-                raise ValueError("Check how mean looks in pandas and get the range")
 
                 # should check when to make it run
                 # also make the correct checks so that it does not loop for ever
                 # check hour indexes
+                # store if setpoint was from algo
 
-                qpvt = 1
-                break
+                q_pvt_predicted = np.mean(qpvt_class_to_range[str(qpvt_predicted)]) if qpvt_predicted < 4 else \
+                qpvt_class_to_range[str(qpvt_predicted)][0]
 
-                # THIS IS WRONG, JUST ARCHITECTURAL STUFF
-                setpoint_DHW = 9 if qpvt == 15 else 16
+                if dhw < 0.0:
+                    setpoint_DHW = min_setpoint
+                else:
+                    if qpvt_predicted >= dhw:
+                        setpoint_DHW = min_setpoint
+                    else:
+                        setpoint_DHW = max_setpoint
 
                 # Now, write the new setpoint to the PLC
                 # Connect with the PLC
                 modbus_client = None
 
-                try:
+                break
+
+                '''try:
                     while True:
                         try:
                             # Create a Modbus TCP/IP modbus_client
@@ -219,6 +238,10 @@ if __name__ == "__main__":
                             # Setpoint value given by the server
                             new_DHW_setpoint = setpoint_DHW
 
+                            write_reg_value(modbus_client, 536, new_DHW_setpoint, 10)
+
+                            break
+
                             # Get ready to write:
 
                             # If no alarm is raised
@@ -237,16 +260,16 @@ if __name__ == "__main__":
                                     # If heat pump is on
                                     if compressor_HZ >= 30.0 and POWER_HP > 2.0:
                                         # Top of tank is too hot
-                                        if DHW_buffer > 50.0:
+                                        if DHW_buffer > 52.0:
                                             logger.debug('DHW_buffer too hot.. closing')
-                                            # Turn of HP
+                                            # Turn off HP
                                             new_DHW_setpoint = min_setpoint
 
                                         write_value = True
                                     else:
                                         # If the hp is going to be turned on check that it respects the constraints
                                         if new_DHW_setpoint > DHW_buffer + 1:  # Start hp (+1 dt)
-                                            if DHW_buffer <= 50.0 and BTES_TANK > 8.0:
+                                            if DHW_buffer <= 52.0 and BTES_TANK > 8.0:
                                                 write_value = True
                                         else: # otherwise, if the hp will remain closed, set the minimal setpoint
                                             new_DHW_setpoint = min_setpoint
@@ -269,6 +292,7 @@ if __name__ == "__main__":
                                             # has our value,  the operation was successful
                                             if setpoint_read_DHW == new_DHW_setpoint:
                                                 logger.info("The setpoint change was successful.")
+                                                row['SETPOINT_ML'] = 1
                                             else:
                                                 setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,1)
                                                 setpoint_write_DHW = read_reg_value(setpoint_registers_write_DHW, 0, 10)
@@ -307,6 +331,7 @@ if __name__ == "__main__":
                                             # has our value,  the operation was successful
                                             if setpoint_read_DHW == new_DHW_setpoint:
                                                 logger.info("The setpoint change was successful.")
+                                                row['SETPOINT_ML'] = 1
                                             else:
                                                 setpoint_registers_write_DHW = modbus_client.read_holding_registers(536, 1)
                                                 setpoint_write_DHW = read_reg_value(setpoint_registers_write_DHW, 0, 10)
@@ -344,11 +369,11 @@ if __name__ == "__main__":
                 except KeyboardInterrupt:
                     if modbus_client is not None and modbus_client.is_socket_open():
                         modbus_client.close()
-                        logger.info("Closed PLC socket.")
+                        logger.info("Closed PLC socket.")'''
 
             except Exception as e:
-                # Server refuses connection or no internet. The first case might occur often, so FOR noe, we do not
-                # include it to the file logger
+                # Server refuses connection or no internet. The first case might occur often, so FOR now, we do not
+                # include it to the file logger.
                 logger.debug(f"{e}")
                 logger.debug(f"Sleeping for {PLC_connect_interval} seconds..")
                 time.sleep(PLC_connect_interval)
@@ -356,3 +381,20 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:  # Ctrl ^C event
         logger.info("Client ends process.")
+
+    # We should keep whether the setpoint was given by the predictions or if the predictions did not reach the PLC.
+    print('Writing to file.')
+
+    csv_file = f'C:/Users/res4b/Desktop/modbus_tcp_ip/ml_control/setpoints_{dataframe_date}.csv'
+
+    # If file does not exist aka the day has changed, and we need a new .csv, create it
+    # Write row to DataFrame.csv
+    if not os.path.isfile(csv_file):
+        with open(csv_file, 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=row.keys())
+            writer.writeheader()
+
+    # Append the new row of information
+    with open(csv_file, 'a', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=row.keys())
+        writer.writerow(row)
