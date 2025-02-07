@@ -151,6 +151,9 @@ qpvt_class_to_range = {'0': [0.0, 0.05],
 
 if __name__ == "__main__":
 
+    tries = 0
+    max_tries = 2  # 20
+
     dataframe_date = datetime.now().strftime("%Y-%m-%d")
 
     # Current hour in installation
@@ -159,7 +162,7 @@ if __name__ == "__main__":
     # current_hour = 15
 
     if current_hour in [0, 3, 6, 9, 12, 15, 18, 21]:
-        row = {'DATETIME': pd.to_datetime(datetime.now()).floor('H'), 'SETPOINT_ML': 0}
+        row = {'DATETIME': pd.to_datetime(datetime.now()).floor('H'), 'SETPOINT_FROM_ML': 0, 'SETPOINT_VALUE': 0.0}
     else:
         raise ValueError('Woke up at the wrong time.')
 
@@ -170,10 +173,11 @@ if __name__ == "__main__":
     PLC_connect_interval = 5 * 60
 
     too_cold = False
+    write_value = False
     min_setpoint, max_setpoint = 44.5, 48.0
 
     try:
-        while True:
+        while tries < max_tries:
             # Try to connect with the InfluxDB
             try:
                 # Read QPVT from server and do something with it
@@ -210,10 +214,8 @@ if __name__ == "__main__":
                 # Connect with the PLC
                 modbus_client = None
 
-                break
-
-                '''try:
-                    while True:
+                try:
+                    while tries < max_tries:
                         try:
                             # Create a Modbus TCP/IP modbus_client
                             modbus_client = ModbusTcpClient(plc_ip, port=plc_port)
@@ -223,7 +225,8 @@ if __name__ == "__main__":
 
                             # Read holding registers
                             result = modbus_client.read_holding_registers(500, 20)
-                            other_registers = modbus_client.read_holding_registers(542, 25)  # Read pressure and temp registers
+                            other_registers = modbus_client.read_holding_registers(542,
+                                                                                   25)  # Read pressure and temp registers
                             result_alarm = modbus_client.read_coils(8192 + 506, 1, int=0)
                             # setpoint_registers_write_heating = modbus_client.read_holding_registers(537, 1)
 
@@ -240,16 +243,13 @@ if __name__ == "__main__":
 
                             write_reg_value(modbus_client, 536, new_DHW_setpoint, 10)
 
-                            break
-
                             # Get ready to write:
+                            write_value = False
 
                             # If no alarm is raised
                             if not general_alarm:
                                 # If the heatpump was not turned off previously due to cold temperature
                                 if not too_cold:
-                                    write_value = False
-
                                     # Tank is too cold
                                     if BTES_TANK <= 8.0:
                                         logger.debug('BTES_TANK too cold.. closing')
@@ -271,7 +271,7 @@ if __name__ == "__main__":
                                         if new_DHW_setpoint > DHW_buffer + 1:  # Start hp (+1 dt)
                                             if DHW_buffer <= 52.0 and BTES_TANK > 8.0:
                                                 write_value = True
-                                        else: # otherwise, if the hp will remain closed, set the minimal setpoint
+                                        else:  # otherwise, if the hp will remain closed, set the minimal setpoint
                                             new_DHW_setpoint = min_setpoint
                                             write_value = True
 
@@ -292,17 +292,24 @@ if __name__ == "__main__":
                                             # has our value,  the operation was successful
                                             if setpoint_read_DHW == new_DHW_setpoint:
                                                 logger.info("The setpoint change was successful.")
-                                                row['SETPOINT_ML'] = 1
+                                                row['SETPOINT_FROM_ML'] = 1
+                                                row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                break
                                             else:
-                                                setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,1)
+                                                setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,
+                                                                                                                    1)
                                                 setpoint_write_DHW = read_reg_value(setpoint_registers_write_DHW, 0, 10)
 
                                                 # Otherwise, if the local setpoint has the value and not the PLC one,
                                                 # we forgot to turn on the 'modbus' command in the PLC, which should be
                                                 # done at the installation
                                                 if setpoint_write_DHW == new_DHW_setpoint:
-                                                    logger.info("Modbus control deactivated. Activate physically from screen.")
-                                                else: # if none of it holds true, the setpoint value did not change
+                                                    logger.info(
+                                                        "Modbus control deactivated. Activate physically from screen.")
+                                                    row['SETPOINT_FROM_ML'] = 1
+                                                    row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                    break
+                                                else:  # if none of it holds true, the setpoint value did not change
                                                     logger.info("Setpoint writing unsuccessful. Try again.")
                                         except:
                                             # In this case for some reason we could not read from the PLC, so we do not
@@ -310,6 +317,7 @@ if __name__ == "__main__":
                                             logger.debug("Reading the PLC: unsuccessful.")
                                     else:
                                         logger.info("No writing.")
+                                        break
 
                                 else:
                                     # If hp was closed due to cold temperature, should wait until it is at least 12
@@ -331,16 +339,23 @@ if __name__ == "__main__":
                                             # has our value,  the operation was successful
                                             if setpoint_read_DHW == new_DHW_setpoint:
                                                 logger.info("The setpoint change was successful.")
-                                                row['SETPOINT_ML'] = 1
+                                                row['SETPOINT_FROM_ML'] = 1
+                                                row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                break
                                             else:
-                                                setpoint_registers_write_DHW = modbus_client.read_holding_registers(536, 1)
+                                                setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,
+                                                                                                                    1)
                                                 setpoint_write_DHW = read_reg_value(setpoint_registers_write_DHW, 0, 10)
 
                                                 # Otherwise, if the local setpoint has the value and not the PLC one,
                                                 # we forgot to turn on the 'modbus' command in the PLC, which should be
                                                 # done at the installation
                                                 if setpoint_write_DHW == new_DHW_setpoint:
-                                                    logger.info("Modbus control deactivated. Activate physically from screen.")
+                                                    logger.info(
+                                                        "Modbus control deactivated. Activate physically from screen.")
+                                                    row['SETPOINT_FROM_ML'] = 1
+                                                    row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                    break
                                                 else:  # if none of it holds true, the setpoint value did not change
                                                     logger.info("Setpoint writing unsuccessful. Try again.")
                                         except:
@@ -349,27 +364,39 @@ if __name__ == "__main__":
                                             logger.debug("Reading the PLC: unsuccessful.")
                                     else:
                                         logger.debug('BTES_TANK still too cold.')
+                                        break
                             else:
                                 logger.debug('Alarm is on!')
+                                break
 
                             break
 
                         # PLC exception raised
                         except Exception as e:
-                            logger.error(f"{e}")
-                            logger.debug(f"Sleeping for {reconnect_interval} seconds..")
 
-                            if modbus_client is not None and modbus_client.is_socket_open():
-                                modbus_client.close()
+                            if row['SETPOINT_FROM_ML'] == 0:
+                                logger.error(f"{e}")
+                                logger.debug(f"Sleeping for {reconnect_interval} seconds..")
 
-                            time.sleep(reconnect_interval)
-                            continue
+                                if modbus_client is not None and modbus_client.is_socket_open():
+                                    modbus_client.close()
+
+                                time.sleep(reconnect_interval)
+                                continue
+
+                            elif row['SETPOINT_FROM_ML'] == 1:
+                                break
+                            else:
+                                raise ValueError('Uknown value for SETPOINT_FROM_ML. This should never happen!')
+
+                    tries += 1
 
                 # Close connection when interrupted by the user
                 except KeyboardInterrupt:
                     if modbus_client is not None and modbus_client.is_socket_open():
                         modbus_client.close()
-                        logger.info("Closed PLC socket.")'''
+                        logger.info("Closed PLC socket.")
+                    break
 
             except Exception as e:
                 # Server refuses connection or no internet. The first case might occur often, so FOR now, we do not
@@ -379,13 +406,18 @@ if __name__ == "__main__":
                 time.sleep(PLC_connect_interval)
                 break
 
+            if row['SETPOINT_FROM_ML'] == 1:
+                break
+
+            tries += 1
+
     except KeyboardInterrupt:  # Ctrl ^C event
         logger.info("Client ends process.")
 
     # We should keep whether the setpoint was given by the predictions or if the predictions did not reach the PLC.
     print('Writing to file.')
 
-    csv_file = f'C:/Users/res4b/Desktop/modbus_tcp_ip/ml_control/setpoints_{dataframe_date}.csv'
+    csv_file = f'./ml_control/setpoints_{dataframe_date}.csv'
 
     # If file does not exist aka the day has changed, and we need a new .csv, create it
     # Write row to DataFrame.csv
