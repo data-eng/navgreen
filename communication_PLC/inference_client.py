@@ -92,12 +92,11 @@ def get_predictions():
 
     assert isinstance(df, pd.DataFrame), "Object is not a pandas DataFrame"
 
-    # Get the last 8 rows (8 x 3 hrs)
-    df_predictions_today = df.tail(8).reset_index()
+    # Get the last 10 rows (10 x 3 hrs)
+    df_predictions_today = df.tail(10).reset_index()
 
     # Check if the values were actually accessed the same day as this script is run
-    if not (any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()) and any(
-            df_predictions_today['DATETIME'].dt.date == (datetime.now() + timedelta(days=1)).date())):
+    if not any(df_predictions_today['DATETIME'].dt.date == datetime.now().date()):
         raise ValueError("Today's weather predictions do not exist.")
 
     '''
