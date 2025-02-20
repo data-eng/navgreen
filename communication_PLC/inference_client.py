@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s:%(lineno)d:%(message)s')
 # Set log file, its level and format
-file_handler = logging.FileHandler('./remote_control_logger_weather.log')
+file_handler = logging.FileHandler('C:/Users/res4b/Desktop/modbus_tcp_ip/remote_control_logger_weather.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(formatter)
 # Set stream its level and format
@@ -36,7 +36,7 @@ def get_DHW(h, m):
     :return: DWH (kWh)
     """
 
-    file_path = './DHW_profile_KWH.csv'
+    file_path = 'C:/Users/res4b/Desktop/modbus_tcp_ip/DHW_profile_KWH.csv'
     df = pd.read_csv(file_path)
 
     month_map = {
@@ -92,7 +92,7 @@ def get_predictions():
 
     assert isinstance(df, pd.DataFrame), "Object is not a pandas DataFrame"
 
-    # Get the last 10 rows (10 x 3 hrs)
+    # Get the last 8 rows (8 x 3 hrs)
     df_predictions_today = df.tail(10).reset_index()
 
     # Check if the values were actually accessed the same day as this script is run
@@ -151,7 +151,7 @@ qpvt_class_to_range = {'0': [0.0, 0.05],
 if __name__ == "__main__":
 
     tries = 0
-    max_tries = 2  # 20
+    max_tries = 20  # 20
 
     dataframe_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -161,7 +161,8 @@ if __name__ == "__main__":
     # current_hour = 15
 
     if current_hour in [0, 3, 6, 9, 12, 15, 18, 21]:
-        row = {'DATETIME': pd.to_datetime(datetime.now()).floor('H'), 'SETPOINT_FROM_ML': 0, 'SETPOINT_VALUE': 0.0}
+        row = {'DATETIME': pd.to_datetime(datetime.now()).floor('H').strftime('%Y-%m-%d %H:%M:%S'),
+               'SETPOINT_FROM_ML': 0, 'SETPOINT_VALUE': 0.0, 'DHW': -500.0, 'QPVT_PRED': -500.0, 'QPVT_TRUE': -500.0}
     else:
         raise ValueError('Woke up at the wrong time.')
 
@@ -198,7 +199,7 @@ if __name__ == "__main__":
                 # check hour indexes
                 # store if setpoint was from algo
 
-                q_pvt_predicted = np.mean(qpvt_class_to_range[str(qpvt_predicted)]) if qpvt_predicted < 4 else \
+                q_pvt_predicted = 3 * np.mean(qpvt_class_to_range[str(qpvt_predicted)]) if qpvt_predicted < 4 else \
                 qpvt_class_to_range[str(qpvt_predicted)][0]
 
                 if dhw < 0.0:
@@ -293,6 +294,8 @@ if __name__ == "__main__":
                                                 logger.info("The setpoint change was successful.")
                                                 row['SETPOINT_FROM_ML'] = 1
                                                 row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                row['QPVT_PRED'] = q_pvt_predicted
+                                                row['DHW'] = dhw
                                                 break
                                             else:
                                                 setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,
@@ -307,6 +310,8 @@ if __name__ == "__main__":
                                                         "Modbus control deactivated. Activate physically from screen.")
                                                     row['SETPOINT_FROM_ML'] = 1
                                                     row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                    row['QPVT_PRED'] = q_pvt_predicted
+                                                    row['DHW'] = dhw
                                                     break
                                                 else:  # if none of it holds true, the setpoint value did not change
                                                     logger.info("Setpoint writing unsuccessful. Try again.")
@@ -340,6 +345,8 @@ if __name__ == "__main__":
                                                 logger.info("The setpoint change was successful.")
                                                 row['SETPOINT_FROM_ML'] = 1
                                                 row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                row['QPVT_PRED'] = q_pvt_predicted
+                                                row['DHW'] = dhw
                                                 break
                                             else:
                                                 setpoint_registers_write_DHW = modbus_client.read_holding_registers(536,
@@ -354,6 +361,8 @@ if __name__ == "__main__":
                                                         "Modbus control deactivated. Activate physically from screen.")
                                                     row['SETPOINT_FROM_ML'] = 1
                                                     row['SETPOINT_VALUE'] = new_DHW_setpoint
+                                                    row['QPVT_PRED'] = q_pvt_predicted
+                                                    row['DHW'] = dhw
                                                     break
                                                 else:  # if none of it holds true, the setpoint value did not change
                                                     logger.info("Setpoint writing unsuccessful. Try again.")
@@ -416,7 +425,7 @@ if __name__ == "__main__":
     # We should keep whether the setpoint was given by the predictions or if the predictions did not reach the PLC.
     print('Writing to file.')
 
-    csv_file = f'./ml_control/setpoints_{dataframe_date}.csv'
+    csv_file = f'./ml_control/setpoints_{dataframe_date}_v2.csv'
 
     # If file does not exist aka the day has changed, and we need a new .csv, create it
     # Write row to DataFrame.csv
