@@ -21,7 +21,7 @@ df = df.dropna()
 df = df.reset_index()
 
 df.rename(columns={"Date_time_local": "DATETIME"}, inplace=True)
-df['DATETIME'] = pd.to_datetime(df['DATETIME'])
+df['DATETIME'] = pd.to_datetime(df['DATETIME']).strftime('%Y-%m-%d %H:%M:%S')
 
 df = df.groupby(pd.Grouper(key='DATETIME', freq="3h")).agg({'QPVT_TRUE': 'mean'})
 df = df.reset_index()
@@ -29,12 +29,14 @@ df = df.reset_index()
 ml_control_csv = f'./ml_control/setpoints_{dataframe_date}_v2.csv'
 df_ctrl = pd.read_csv(ml_control_csv)
 
-df['DATETIME'] = pd.to_datetime(df['DATETIME'])
-df_ctrl['DATETIME'] = pd.to_datetime(df_ctrl['DATETIME'])
+df_ctrl['DATETIME'] = pd.to_datetime(df_ctrl['DATETIME']).strftime('%Y-%m-%d %H:%M:%S')
 df_ctrl = df_ctrl.drop(columns=["QPVT_TRUE"])
 
 # Concatenate DataFrames along the 'DATETIME' column
-df = pd.concat([df.set_index('DATETIME'), df_ctrl.set_index('DATETIME')], axis=1, join='outer')
-df = df.reset_index()
+df_ctrl = pd.concat([df.set_index('DATETIME'), df_ctrl.set_index('DATETIME')], axis=1, join='outer')
+df_ctrl = df_ctrl.reset_index()
+df_ctrl['DATETIME'] = pd.to_datetime(df_ctrl['DATETIME']).strftime('%Y-%m-%d %H:%M:%S')
 
-df.to_csv(ml_control_csv, index=False)
+df_ctrl = df_ctrl['DATETIME', 'SETPOINT_FROM_ML', 'SETPOINT_VALUE', 'DHW', 'QPVT_PRED', 'QPVT_TRUE']
+
+df_ctrl.to_csv(ml_control_csv, index=False)
