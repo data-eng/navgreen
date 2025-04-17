@@ -17,13 +17,13 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def load_data(df_path, parse_dates, hist_data):
+def load_data(df_path):
     """
     Loads the data from the historical data DataFrame
     :return: whole dataframe, dataframe for hp, dataframe for solar
     """
-    df = pandas.read_csv(df_path, parse_dates=parse_dates, low_memory=False)
-    df = navgreen_base.process_data(df, hist_data=hist_data)
+    df = pandas.read_csv(df_path, parse_dates=["DATETIME"], low_memory=False)
+    df = navgreen_base.process_data(df)
 
     return df
 # end def load_data
@@ -122,8 +122,7 @@ def check_stats_within_magnitude(old_df, new_df, magnitude=10):
 
 def main():
     print("\nCheck units within the historical data.\n")
-
-    df = load_data(df_path="data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], hist_data=True)
+    df = load_data(df_path="data/DATA_FROM_PLC_CONV.csv")
     dfavg = None
     for m in range(9, 21):
         df_monthly = df[df.DATETIME.dt.month == ((m - 1) % 12) + 1]
@@ -134,8 +133,8 @@ def main():
         else: dfavg = (dfavg + newavg)/2
 
     print("\nCheck units and types between the new and old historical data.\n")
-    old_df = load_data(df_path="data/DATA_FROM_PLC.csv", parse_dates=["Date&time"], hist_data=True)
-    new_df = load_data(df_path="data/concatenated_data.csv", parse_dates=['DATETIME'], hist_data=False)
+    old_df = load_data(df_path="data/DATA_FROM_PLC_CONV.csv")
+    new_df = load_data(df_path="data/concatenated_data.csv")
 
     # Drop newly added columns
     new_df.drop(columns=['T_CHECKPOINT_DHW_MODBUS', 'T_CHECKPOINT_SPACE_HEATING_MODBUS', 'DIFFUSE_SOLAR_RADIATION'], inplace=True)
